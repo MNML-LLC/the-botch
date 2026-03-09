@@ -19,10 +19,8 @@ export async function GET(request: NextRequest) {
       prisma.otokogiEvent.findMany({
         where: dateWhere,
         include: {
-          payer: true,
-          participants: {
-            include: { member: true },
-          },
+          payer: { select: { id: true, name: true } },
+          participants: { select: { memberId: true } },
         },
         orderBy: { eventDate: 'asc' },
       }),
@@ -37,12 +35,37 @@ export async function GET(request: NextRequest) {
     const totalAmount = events.reduce((sum, e) => sum + e.amount, 0)
     const averageAmount = totalCount > 0 ? Math.round(totalAmount / totalCount) : 0
 
+    // --- ルックアップMap構築 (O(N*M)の繰り返しfilterをO(1)検索に) ---
+    const eventsByPayer = new Map<string, typeof events>()
+    const participationByMember = new Map<string, typeof events>()
+    const eventsByMonth = new Map<string, typeof events>()
+    const participantSets = new Map<string, Set<string>>()
+
+    for (const event of events) {
+      const payerList = eventsByPayer.get(event.payerId)
+      if (payerList) payerList.push(event)
+      else eventsByPayer.set(event.payerId, [event])
+
+      const d = new Date(event.eventDate)
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      const monthList = eventsByMonth.get(monthKey)
+      if (monthList) monthList.push(event)
+      else eventsByMonth.set(monthKey, [event])
+
+      const memberIds = new Set<string>()
+      for (const p of event.participants) {
+        memberIds.add(p.memberId)
+        const memberList = participationByMember.get(p.memberId)
+        if (memberList) memberList.push(event)
+        else participationByMember.set(p.memberId, [event])
+      }
+      participantSets.set(event.id, memberIds)
+    }
+
     // --- メンバー別統計 ---
     const perMember = members.map((member) => {
-      const paidEvents = events.filter((e) => e.payerId === member.id)
-      const participatedEvents = events.filter((e) =>
-        e.participants.some((p) => p.memberId === member.id)
-      )
+      const paidEvents = eventsByPayer.get(member.id) ?? []
+      const participatedEvents = participationByMember.get(member.id) ?? []
 
       const count = paidEvents.length
       const participated = participatedEvents.length
@@ -117,7 +140,7 @@ export async function GET(request: NextRequest) {
       let lastWasPayer = false
 
       for (const event of sortedEvents) {
-        const isParticipant = event.participants.some((p) => p.memberId === member.id)
+        const isParticipant = participantSets.get(event.id)?.has(member.id) ?? false
         if (!isParticipant) continue
 
         if (event.payerId === member.id) {
@@ -146,11 +169,7 @@ export async function GET(request: NextRequest) {
     }
 
     for (const { month } of monthlyTrend) {
-      const monthEvents = events.filter((e) => {
-        const d = new Date(e.eventDate)
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-        return key === month
-      })
+      const monthEvents = eventsByMonth.get(month) ?? []
 
       for (const event of monthEvents) {
         if (cumulative[event.payerId] !== undefined) {

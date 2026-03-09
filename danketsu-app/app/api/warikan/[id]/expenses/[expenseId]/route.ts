@@ -8,11 +8,12 @@ export async function PUT(request: NextRequest, { params }: Params) {
   try {
     const { id, expenseId } = await params
     const body = await request.json()
-    const { payerId, description, amount } = body
+    const { payerId, description, amount, debtorIds } = body
 
     // 割り勘イベントの存在・ステータス確認
     const warikanEvent = await prisma.warikanEvent.findUnique({
       where: { id },
+      include: { participants: true },
     })
 
     if (!warikanEvent) {
@@ -36,6 +37,24 @@ export async function PUT(request: NextRequest, { params }: Params) {
       )
     }
 
+    // debtorIdsのバリデーション
+    if (debtorIds !== undefined) {
+      if (!Array.isArray(debtorIds) || debtorIds.length === 0) {
+        return NextResponse.json(
+          { error: '対象者を1人以上指定してください' },
+          { status: 400 }
+        )
+      }
+      const participantIds = new Set(warikanEvent.participants.map((p) => p.memberId))
+      const invalidIds = debtorIds.filter((did: string) => !participantIds.has(did))
+      if (invalidIds.length > 0) {
+        return NextResponse.json(
+          { error: 'イベント参加者でないメンバーが含まれています' },
+          { status: 400 }
+        )
+      }
+    }
+
     // expenseがこのwarikanEventに属するか検証
     const existingExpense = await prisma.warikanExpense.findFirst({
       where: { id: expenseId, warikanEventId: id },
@@ -47,6 +66,38 @@ export async function PUT(request: NextRequest, { params }: Params) {
       )
     }
 
+    // debtorIdsが指定された場合はトランザクションで更新
+    if (debtorIds !== undefined) {
+      const expense = await prisma.$transaction(async (tx) => {
+        const updated = await tx.warikanExpense.update({
+          where: { id: expenseId },
+          data: {
+            ...(payerId !== undefined && { payerId }),
+            ...(description !== undefined && { description }),
+            ...(amount !== undefined && { amount }),
+          },
+        })
+
+        // 既存debtorを全削除して再作成
+        await tx.warikanExpenseDebtor.deleteMany({
+          where: { expenseId },
+        })
+        await tx.warikanExpenseDebtor.createMany({
+          data: (debtorIds as string[]).map((memberId: string) => ({
+            expenseId,
+            memberId,
+          })),
+        })
+
+        return tx.warikanExpense.findUnique({
+          where: { id: expenseId },
+          include: { payer: true, debtors: { include: { member: true } } },
+        })
+      })
+
+      return NextResponse.json(expense)
+    }
+
     const expense = await prisma.warikanExpense.update({
       where: { id: expenseId },
       data: {
@@ -54,7 +105,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
         ...(description !== undefined && { description }),
         ...(amount !== undefined && { amount }),
       },
-      include: { payer: true },
+      include: { payer: true, debtors: { include: { member: true } } },
     })
 
     return NextResponse.json(expense)

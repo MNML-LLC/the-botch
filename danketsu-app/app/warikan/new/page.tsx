@@ -24,13 +24,21 @@ type Member = {
   initial: string;
 };
 
+type CalendarEvent = {
+  id: string;
+  title: string;
+  date: string;
+};
+
 export default function WarikanNewPage() {
   const router = useRouter();
   const [members, setMembers] = useState<Member[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(false);
 
   const [eventName, setEventName] = useState('');
   const [managerId, setManagerId] = useState('');
+  const [eventId, setEventId] = useState('');
   const [detailDeadline, setDetailDeadline] = useState('');
   const [paymentDeadline, setPaymentDeadline] = useState('');
   const [memo, setMemo] = useState('');
@@ -38,8 +46,13 @@ export default function WarikanNewPage() {
 
   useEffect(() => {
     fetch('/api/members')
-      .then((res) => res.json())
-      .then((data) => setMembers(data));
+      .then((res) => { if (!res.ok) throw new Error(); return res.json(); })
+      .then((data) => setMembers(data))
+      .catch(() => {});
+    fetch('/api/events')
+      .then((res) => { if (!res.ok) throw new Error(); return res.json(); })
+      .then((data) => setEvents(data))
+      .catch(() => {});
   }, []);
 
   const toggleParticipant = (id: string) => {
@@ -58,6 +71,7 @@ export default function WarikanNewPage() {
       body: JSON.stringify({
         eventName,
         managerId: managerId || null,
+        eventId: (eventId && eventId !== 'none') ? eventId : null,
         detailDeadline: detailDeadline || null,
         paymentDeadline: paymentDeadline || null,
         memo: memo || null,
@@ -91,6 +105,25 @@ export default function WarikanNewPage() {
               placeholder="例: 20260306_テニス"
             />
           </div>
+
+          {events.length > 0 && (
+            <div>
+              <Label>カレンダーイベント（任意）</Label>
+              <Select value={eventId} onValueChange={setEventId}>
+                <SelectTrigger className="mt-1 w-full">
+                  <SelectValue placeholder="紐づけるイベントを選択" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">なし</SelectItem>
+                  {events.map((ev) => (
+                    <SelectItem key={ev.id} value={ev.id}>
+                      {ev.title}（{new Date(ev.date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' })}）
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>

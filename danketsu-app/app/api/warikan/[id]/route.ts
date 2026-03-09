@@ -12,6 +12,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
       where: { id },
       include: {
         manager: true,
+        event: true,
         participants: {
           include: { member: true },
         },

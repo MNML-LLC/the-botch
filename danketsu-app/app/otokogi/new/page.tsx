@@ -9,6 +9,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 type Member = {
   id: string;
@@ -19,13 +26,21 @@ type Member = {
   colorText: string;
 };
 
+type CalendarEvent = {
+  id: string;
+  title: string;
+  date: string;
+};
+
 export default function OtokogiNewPage() {
   const router = useRouter();
   const [members, setMembers] = useState<Member[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(false);
 
   const [eventDate, setEventDate] = useState(new Date().toISOString().slice(0, 10));
   const [eventName, setEventName] = useState('');
+  const [eventId, setEventId] = useState('');
   const [payerId, setPayerId] = useState('');
   const [amount, setAmount] = useState('');
   const [place, setPlace] = useState('');
@@ -40,6 +55,10 @@ export default function OtokogiNewPage() {
         return res.json();
       })
       .then((data) => setMembers(data))
+      .catch(() => {});
+    fetch('/api/events')
+      .then((res) => { if (!res.ok) throw new Error(); return res.json(); })
+      .then((data) => setEvents(data))
       .catch(() => {});
   }, []);
 
@@ -67,6 +86,7 @@ export default function OtokogiNewPage() {
         place: place || null,
         hasAlbum,
         memo: memo || null,
+        eventId: (eventId && eventId !== 'none') ? eventId : null,
         participantIds,
       }),
     });
@@ -118,6 +138,25 @@ export default function OtokogiNewPage() {
               placeholder="例: chapter"
             />
           </div>
+
+          {events.length > 0 && (
+            <div>
+              <Label>カレンダーイベント（任意）</Label>
+              <Select value={eventId} onValueChange={setEventId}>
+                <SelectTrigger className="mt-1 w-full">
+                  <SelectValue placeholder="紐づけるイベントを選択" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">なし</SelectItem>
+                  {events.map((ev) => (
+                    <SelectItem key={ev.id} value={ev.id}>
+                      {ev.title}（{new Date(ev.date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' })}）
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <hr className="border-gray-200" />
 

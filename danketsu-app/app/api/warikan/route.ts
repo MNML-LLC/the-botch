@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { eventName, managerId, detailDeadline, paymentDeadline, memo, walicaUrl, participantIds } = body
+    const { eventName, managerId, detailDeadline, paymentDeadline, memo, walicaUrl, eventId, participantIds } = body
 
     if (!eventName) {
       return NextResponse.json(
@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
         paymentDeadline: paymentDeadline ? new Date(paymentDeadline) : null,
         memo: memo ?? null,
         walicaUrl: walicaUrl ?? null,
+        eventId: eventId ?? null,
         participants: {
           create: (participantIds as string[]).map((memberId) => ({
             memberId,

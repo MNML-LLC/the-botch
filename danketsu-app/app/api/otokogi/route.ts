@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { eventDate, eventName, payerId, amount, place, hasAlbum, memo, participantIds } = body
+    const { eventDate, eventName, payerId, amount, place, hasAlbum, memo, eventId, participantIds } = body
 
     if (!eventDate || !eventName || !payerId || amount === undefined || amount === null) {
       return NextResponse.json(
@@ -77,6 +77,7 @@ export async function POST(request: NextRequest) {
         place: place ?? null,
         hasAlbum: hasAlbum ?? false,
         memo: memo ?? null,
+        eventId: eventId ?? null,
         participants: {
           create: (participantIds as string[]).map((memberId) => ({
             memberId,

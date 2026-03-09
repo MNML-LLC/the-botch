@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -50,6 +50,14 @@ type Settlement = {
   toMember: Member;
 };
 
+type LinkedEvent = {
+  id: string;
+  title: string;
+  date: string;
+  endDate: string | null;
+  eventType: string;
+};
+
 type WarikanDetail = {
   id: string;
   eventName: string;
@@ -59,6 +67,7 @@ type WarikanDetail = {
   memo: string | null;
   walicaUrl: string | null;
   manager: Member | null;
+  event: LinkedEvent | null;
   participants: { member: Member }[];
   expenses: Expense[];
   settlements: Settlement[];
@@ -85,6 +94,7 @@ function formatShortDate(date: string | null) {
 
 export default function WarikanDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params.id as string;
 
   const [event, setEvent] = useState<WarikanDetail | null>(null);
@@ -97,6 +107,13 @@ export default function WarikanDetailPage() {
   const [expenseAmount, setExpenseAmount] = useState('');
   const [expenseDebtorIds, setExpenseDebtorIds] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
+
+  // 明細編集
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+  const [editPayerId, setEditPayerId] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editAmount, setEditAmount] = useState('');
+  const [editDebtorIds, setEditDebtorIds] = useState<Set<string>>(new Set());
 
   const fetchEvent = useCallback(async () => {
     const res = await fetch(`/api/warikan/${id}`);
@@ -143,6 +160,79 @@ export default function WarikanDetailPage() {
     setSubmitting(false);
   };
 
+  const startEditExpense = (expense: Expense) => {
+    setEditingExpenseId(expense.id);
+    setEditPayerId(expense.payerId);
+    setEditDescription(expense.description);
+    setEditAmount(String(expense.amount));
+    const debtorMemberIds = expense.debtors.map((d) => d.memberId);
+    // debtorsが空 or 全員 → 全員選択
+    if (debtorMemberIds.length === 0 || (event && debtorMemberIds.length === event.participants.length)) {
+      setEditDebtorIds(new Set(event?.participants.map((p) => p.member.id) ?? []));
+    } else {
+      setEditDebtorIds(new Set(debtorMemberIds));
+    }
+  };
+
+  const cancelEditExpense = () => {
+    setEditingExpenseId(null);
+  };
+
+  const handleUpdateExpense = async () => {
+    if (!editPayerId || !editDescription || !editAmount || editDebtorIds.size === 0) return;
+    if (submitting) return;
+    const amountNum = Number(editAmount);
+    if (!Number.isInteger(amountNum) || amountNum <= 0) {
+      alert('金額は1以上の整数を入力してください');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const allSelected = event && editDebtorIds.size === event.participants.length;
+      const debtorIds = allSelected ? undefined : [...editDebtorIds];
+      const res = await fetch(`/api/warikan/${id}/expenses/${editingExpenseId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          payerId: editPayerId,
+          description: editDescription,
+          amount: amountNum,
+          ...(debtorIds && { debtorIds }),
+        }),
+      });
+      if (res.ok) {
+        setEditingExpenseId(null);
+        fetchEvent();
+      } else {
+        const data = await res.json().catch(() => null);
+        alert(data?.error ?? '更新に失敗しました');
+      }
+    } catch {
+      alert('更新に失敗しました');
+    }
+    setSubmitting(false);
+  };
+
+  const handleDeleteExpense = async (expenseId: string) => {
+    if (submitting) return;
+    if (!confirm('この明細を削除しますか？')) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/warikan/${id}/expenses/${expenseId}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        fetchEvent();
+      } else {
+        const data = await res.json().catch(() => null);
+        alert(data?.error ?? '削除に失敗しました');
+      }
+    } catch {
+      alert('削除に失敗しました');
+    }
+    setSubmitting(false);
+  };
+
   const handleCalculateSettlements = async () => {
     setSubmitting(true);
     const res = await fetch(`/api/warikan/${id}/settlements`, {
@@ -185,6 +275,24 @@ export default function WarikanDetailPage() {
     setSubmitting(false);
   };
 
+  const handleDeleteEvent = async () => {
+    if (submitting) return;
+    if (!confirm('この割り勘イベントを削除しますか？\n関連する立替明細・精算結果も全て削除されます。')) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/warikan/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        router.push('/warikan');
+      } else {
+        const data = await res.json().catch(() => null);
+        alert(data?.error ?? '削除に失敗しました');
+      }
+    } catch {
+      alert('削除に失敗しました');
+    }
+    setSubmitting(false);
+  };
+
   if (loading) return <p className="text-sm text-gray-500">読み込み中...</p>;
   if (!event) return <p className="text-sm text-gray-500">イベントが見つかりません</p>;
 
@@ -194,9 +302,19 @@ export default function WarikanDetailPage() {
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-4">
-        <Link href="/warikan" className="text-gray-500 hover:text-gray-700">← 戻る</Link>
-        <h2 className="text-xl font-bold text-slate-800">精算詳細</h2>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <Link href="/warikan" className="text-gray-500 hover:text-gray-700">← 戻る</Link>
+          <h2 className="text-xl font-bold text-slate-800">精算詳細</h2>
+        </div>
+        <button
+          type="button"
+          className="text-xs text-red-500 hover:text-red-700 hover:underline"
+          onClick={handleDeleteEvent}
+          disabled={submitting}
+        >
+          削除
+        </button>
       </div>
 
       <div className="space-y-4">
@@ -223,6 +341,14 @@ export default function WarikanDetailPage() {
               <div><span className="text-gray-400">明細追加期日:</span> {formatShortDate(event.detailDeadline)}</div>
               <div><span className="text-gray-400">支払期日:</span> {formatShortDate(event.paymentDeadline)}</div>
             </div>
+            {event.event && (
+              <div className="mt-2 text-sm text-gray-600">
+                <span className="text-gray-400">イベント:</span>{' '}
+                <Link href={`/calendar`} className="text-blue-500 hover:underline">
+                  {event.event.title}（{formatShortDate(event.event.date)}{event.event.endDate ? `〜${formatShortDate(event.event.endDate)}` : ''}）
+                </Link>
+              </div>
+            )}
             <div className="mt-3">
               <span className="text-xs text-gray-400">参加者:</span>
               <div className="flex flex-wrap gap-1 mt-1">
@@ -249,6 +375,105 @@ export default function WarikanDetailPage() {
                 {event.expenses.map((expense) => {
                   const isAllMembers = expense.debtors.length === 0 || expense.debtors.length === event.participants.length;
                   const debtorNames = isAllMembers ? '全員' : expense.debtors.map((d) => d.member.name).join('・');
+
+                  // 編集モード
+                  if (editingExpenseId === expense.id) {
+                    return (
+                      <div key={expense.id} className="bg-gray-50 rounded-lg p-3 border space-y-2">
+                        <div className="flex gap-2">
+                          <Select value={editPayerId} onValueChange={setEditPayerId}>
+                            <SelectTrigger className="flex-1">
+                              <SelectValue placeholder="立替者" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {event.participants.map((p) => (
+                                <SelectItem key={p.member.id} value={p.member.id}>
+                                  {p.member.name}（{p.member.fullName}）
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            type="number"
+                            min={1}
+                            step={1}
+                            className="w-28 text-right font-mono"
+                            placeholder="金額"
+                            value={editAmount}
+                            onChange={(e) => setEditAmount(e.target.value)}
+                          />
+                        </div>
+                        <Input
+                          placeholder="内容（例: コート代）"
+                          value={editDescription}
+                          onChange={(e) => setEditDescription(e.target.value)}
+                        />
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <Label className="text-xs text-gray-500">対象者</Label>
+                            <button
+                              type="button"
+                              className="text-xs text-blue-500 hover:underline"
+                              onClick={() => {
+                                if (editDebtorIds.size === event.participants.length) {
+                                  setEditDebtorIds(new Set());
+                                } else {
+                                  setEditDebtorIds(new Set(event.participants.map((p) => p.member.id)));
+                                }
+                              }}
+                            >
+                              {editDebtorIds.size === event.participants.length ? '全解除' : '全選択'}
+                            </button>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {event.participants.map((p) => {
+                              const checked = editDebtorIds.has(p.member.id);
+                              return (
+                                <button
+                                  key={p.member.id}
+                                  type="button"
+                                  className={`text-xs px-2 py-1 rounded-full border transition ${
+                                    checked
+                                      ? 'bg-blue-100 text-blue-700 border-blue-300'
+                                      : 'bg-gray-50 text-gray-400 border-gray-200'
+                                  }`}
+                                  onClick={() => {
+                                    const next = new Set(editDebtorIds);
+                                    if (checked) {
+                                      next.delete(p.member.id);
+                                    } else {
+                                      next.add(p.member.id);
+                                    }
+                                    setEditDebtorIds(next);
+                                  }}
+                                >
+                                  {p.member.name}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={cancelEditExpense}
+                          >
+                            キャンセル
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="bg-slate-800 hover:bg-slate-700"
+                            onClick={handleUpdateExpense}
+                            disabled={submitting || !editPayerId || !editDescription || !editAmount || editDebtorIds.size === 0}
+                          >
+                            保存
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  }
+
                   return (
                     <div key={expense.id} className="flex items-center justify-between gap-2 py-2 border-b last:border-b-0">
                       <div className="min-w-0">
@@ -256,7 +481,28 @@ export default function WarikanDetailPage() {
                         <p className="text-xs text-gray-500 truncate">{expense.description}</p>
                         <p className="text-xs text-gray-400 truncate">対象: {debtorNames}</p>
                       </div>
-                      <p className="font-bold text-sm text-slate-800 shrink-0">¥{expense.amount.toLocaleString()}</p>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <p className="font-bold text-sm text-slate-800">¥{expense.amount.toLocaleString()}</p>
+                        {event.status === 'ENTERING' && (
+                          <>
+                            <button
+                              type="button"
+                              className="text-xs text-blue-500 hover:underline"
+                              onClick={() => startEditExpense(expense)}
+                            >
+                              編集
+                            </button>
+                            <button
+                              type="button"
+                              className="text-xs text-red-500 hover:underline"
+                              onClick={() => handleDeleteExpense(expense.id)}
+                              disabled={submitting}
+                            >
+                              削除
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
                   );
                 })}

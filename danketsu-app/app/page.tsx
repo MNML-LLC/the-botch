@@ -26,42 +26,48 @@ function formatShortDate(date: Date | string | null) {
 }
 
 async function fetchDashboardData() {
-  const openWarikan = await prisma.warikanEvent.findMany({
-    where: { status: { not: 'CLOSED' } },
-    include: {
-      manager: true,
-      participants: { include: { member: true } },
-      _count: { select: { expenses: true, settlements: true } },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
+  // 3クエリを並行実行（全件フェッチを排除）
+  const [openWarikan, recentOtokogi, otokogiStats, topPayerGroup] = await Promise.all([
+    prisma.warikanEvent.findMany({
+      where: { status: { not: 'CLOSED' } },
+      include: {
+        manager: { select: { name: true } },
+        participants: { include: { member: { select: { id: true, name: true } } } },
+        _count: { select: { expenses: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.otokogiEvent.findMany({
+      include: { payer: true },
+      orderBy: { eventDate: 'desc' },
+      take: 5,
+    }),
+    // count + sum をDB集計で取得（全件フェッチ不要）
+    prisma.otokogiEvent.aggregate({
+      _count: true,
+      _sum: { amount: true },
+    }),
+    // 最多支払者をDB側でグループ集計
+    prisma.otokogiEvent.groupBy({
+      by: ['payerId'],
+      _sum: { amount: true },
+      orderBy: { _sum: { amount: 'desc' } },
+      take: 1,
+    }),
+  ]);
 
-  const recentOtokogi = await prisma.otokogiEvent.findMany({
-    include: {
-      payer: true,
-      participants: { include: { member: true } },
-    },
-    orderBy: { eventDate: 'desc' },
-    take: 5,
-  });
+  const totalEvents = otokogiStats._count;
+  const totalAmount = otokogiStats._sum.amount ?? 0;
 
-  const allOtokogi = await prisma.otokogiEvent.findMany({
-    include: { payer: true },
-  });
-
-  const totalEvents = allOtokogi.length;
-  const totalAmount = allOtokogi.reduce((sum, e) => sum + e.amount, 0);
-
-  const payerMap = new Map<string, { name: string; total: number }>();
-  for (const event of allOtokogi) {
-    const existing = payerMap.get(event.payerId);
-    if (existing) {
-      existing.total += event.amount;
-    } else {
-      payerMap.set(event.payerId, { name: event.payer.name, total: event.amount });
-    }
+  // topPayerの名前を取得（1件だけ）
+  let topPayer: { name: string; total: number } | undefined;
+  if (topPayerGroup.length > 0) {
+    const member = await prisma.member.findUnique({
+      where: { id: topPayerGroup[0].payerId },
+      select: { name: true },
+    });
+    topPayer = { name: member?.name ?? '-', total: topPayerGroup[0]._sum.amount ?? 0 };
   }
-  const topPayer = Array.from(payerMap.values()).sort((a, b) => b.total - a.total)[0];
 
   return { openWarikan, recentOtokogi, totalEvents, totalAmount, topPayer };
 }
