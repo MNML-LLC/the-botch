@@ -7,6 +7,21 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+
+type BankAccountData = {
+  bankName: string;
+  branchName: string;
+  accountType: 'SAVINGS' | 'CHECKING';
+  accountNumber: string;
+  accountHolder: string;
+};
 
 const COLOR_OPTIONS = [
   { label: 'アンバー', bg: 'bg-amber-100', text: 'text-amber-700', accent: 'border-amber-400 bg-amber-50', dot: 'bg-amber-400' },
@@ -33,20 +48,43 @@ export default function MemberEditPage() {
   const [paypayId, setPaypayId] = useState('');
   const [isActive, setIsActive] = useState(true);
 
+  // 口座情報
+  const [bankName, setBankName] = useState('');
+  const [branchName, setBranchName] = useState('');
+  const [accountType, setAccountType] = useState<'SAVINGS' | 'CHECKING'>('SAVINGS');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [accountHolder, setAccountHolder] = useState('');
+  const [hasBankAccount, setHasBankAccount] = useState(false);
+  const [bankSaving, setBankSaving] = useState(false);
+
   useEffect(() => {
-    fetch(`/api/members/${id}`)
-      .then((res) => {
+    // メンバー情報と口座情報を並行取得
+    Promise.all([
+      fetch(`/api/members/${id}`).then((res) => {
         if (!res.ok) throw new Error('API error');
         return res.json();
-      })
-      .then((data) => {
-        setName(data.name);
-        setFullName(data.fullName);
-        setInitial(data.initial);
-        setColorBg(data.colorBg);
-        setColorText(data.colorText);
-        setPaypayId(data.paypayId || '');
-        setIsActive(data.isActive);
+      }),
+      fetch(`/api/members/${id}/bank-account`).then((res) => {
+        if (!res.ok) throw new Error('API error');
+        return res.json();
+      }),
+    ])
+      .then(([memberData, bankData]) => {
+        setName(memberData.name);
+        setFullName(memberData.fullName);
+        setInitial(memberData.initial);
+        setColorBg(memberData.colorBg);
+        setColorText(memberData.colorText);
+        setPaypayId(memberData.paypayId || '');
+        setIsActive(memberData.isActive);
+        if (bankData) {
+          setBankName(bankData.bankName);
+          setBranchName(bankData.branchName);
+          setAccountType(bankData.accountType);
+          setAccountNumber(bankData.accountNumber);
+          setAccountHolder(bankData.accountHolder);
+          setHasBankAccount(true);
+        }
         setLoading(false);
       })
       .catch(() => {
@@ -84,6 +122,68 @@ export default function MemberEditPage() {
       setSaving(false);
       alert(data.error || '更新に失敗しました');
     }
+  };
+
+  const handleSaveBankAccount = async () => {
+    if (bankSaving) return;
+    if (!bankName || !branchName || !accountNumber || !accountHolder) {
+      alert('口座情報を全て入力してください');
+      return;
+    }
+    if (!/^\d{1,7}$/.test(accountNumber)) {
+      alert('口座番号は7桁以下の数字で入力してください');
+      return;
+    }
+    setBankSaving(true);
+    try {
+      const res = await fetch(`/api/members/${id}/bank-account`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bankName,
+          branchName,
+          accountType,
+          accountNumber,
+          accountHolder,
+        } satisfies BankAccountData),
+      });
+      if (res.ok) {
+        setHasBankAccount(true);
+        alert('口座情報を保存しました');
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || '口座情報の保存に失敗しました');
+      }
+    } catch {
+      alert('口座情報の保存に失敗しました');
+    }
+    setBankSaving(false);
+  };
+
+  const handleDeleteBankAccount = async () => {
+    if (bankSaving) return;
+    if (!confirm('口座情報を削除しますか？')) return;
+    setBankSaving(true);
+    try {
+      const res = await fetch(`/api/members/${id}/bank-account`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setBankName('');
+        setBranchName('');
+        setAccountType('SAVINGS');
+        setAccountNumber('');
+        setAccountHolder('');
+        setHasBankAccount(false);
+        alert('口座情報を削除しました');
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || '口座情報の削除に失敗しました');
+      }
+    } catch {
+      alert('口座情報の削除に失敗しました');
+    }
+    setBankSaving(false);
   };
 
   if (loading) return <p className="text-sm text-gray-500">読み込み中...</p>;
@@ -184,6 +284,100 @@ export default function MemberEditPage() {
               </div>
               <p className="text-xs text-gray-400 mt-1">
                 PayPayアプリ &gt; マイページ &gt; PayPay ID で確認できます
+              </p>
+            </div>
+          </div>
+
+          <hr className="border-gray-200" />
+
+          {/* 口座情報 */}
+          <div>
+            <h4 className="text-sm font-bold text-slate-800 mb-3">口座情報</h4>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>銀行名</Label>
+                  <Input
+                    className="mt-1"
+                    value={bankName}
+                    onChange={(e) => setBankName(e.target.value)}
+                    placeholder="例: 三菱UFJ銀行"
+                    maxLength={50}
+                  />
+                </div>
+                <div>
+                  <Label>支店名</Label>
+                  <Input
+                    className="mt-1"
+                    value={branchName}
+                    onChange={(e) => setBranchName(e.target.value)}
+                    placeholder="例: 渋谷支店"
+                    maxLength={50}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>口座種別</Label>
+                  <Select value={accountType} onValueChange={(v) => setAccountType(v as 'SAVINGS' | 'CHECKING')}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="SAVINGS">普通</SelectItem>
+                      <SelectItem value="CHECKING">当座</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>口座番号</Label>
+                  <Input
+                    className="mt-1 font-mono"
+                    value={accountNumber}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, '').slice(0, 7);
+                      setAccountNumber(v);
+                    }}
+                    placeholder="例: 1234567"
+                    inputMode="numeric"
+                    maxLength={7}
+                  />
+                </div>
+              </div>
+              <div>
+                <Label>口座名義（カナ）</Label>
+                <Input
+                  className="mt-1"
+                  value={accountHolder}
+                  onChange={(e) => setAccountHolder(e.target.value)}
+                  placeholder="例: ウチヤマ ユウキ"
+                  maxLength={100}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={handleSaveBankAccount}
+                  disabled={bankSaving || !bankName || !branchName || !accountNumber || !accountHolder}
+                >
+                  {bankSaving ? '保存中...' : '口座情報を保存'}
+                </Button>
+                {hasBankAccount && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-red-500 border-red-200 hover:bg-red-50"
+                    onClick={handleDeleteBankAccount}
+                    disabled={bankSaving}
+                  >
+                    削除
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-gray-400">
+                精算画面で振込先として表示されます
               </p>
             </div>
           </div>

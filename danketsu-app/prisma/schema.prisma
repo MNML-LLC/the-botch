@@ -25,6 +25,7 @@ model Member {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // リレーション
+  bankAccount            BankAccount?
   otokogiEventsPaid      OtokogiEvent[]
   otokogiParticipations  OtokogiParticipant[]
   warikanManaged         WarikanEvent[]        @relation("WarikanManager")
@@ -37,6 +38,32 @@ model Member {
   eventParticipations    EventParticipant[]
 
   @@map("members")
+}
+
+// ============================================================
+// 1-1. 銀行口座（Member と 1:1）
+// ============================================================
+enum AccountType {
+  SAVINGS   @map("普通")
+  CHECKING  @map("当座")
+
+  @@map("account_type")
+}
+
+model BankAccount {
+  id            String      @id @default(uuid())
+  memberId      String      @unique @map("member_id")
+  bankName      String      @map("bank_name") @db.VarChar(50)
+  branchName    String      @map("branch_name") @db.VarChar(50)
+  accountType   AccountType @default(SAVINGS) @map("account_type")
+  accountNumber String      @map("account_number") @db.VarChar(7)
+  accountHolder String      @map("account_holder") @db.VarChar(100)
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@map("bank_accounts")
 }
 
 // ============================================================

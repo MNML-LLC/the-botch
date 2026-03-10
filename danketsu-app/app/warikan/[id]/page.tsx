@@ -15,6 +15,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
+type BankAccount = {
+  bankName: string;
+  branchName: string;
+  accountType: 'SAVINGS' | 'CHECKING';
+  accountNumber: string;
+  accountHolder: string;
+};
+
 type Member = {
   id: string;
   name: string;
@@ -23,6 +31,7 @@ type Member = {
   colorBg: string;
   colorText: string;
   paypayId: string | null;
+  bankAccount?: BankAccount | null;
 };
 
 type ExpenseDebtor = {
@@ -84,6 +93,15 @@ function statusBadge(status: string) {
     default:
       return null;
   }
+}
+
+function maskAccountNumber(num: string): string {
+  if (num.length <= 3) return num;
+  return '****' + num.slice(-3);
+}
+
+function accountTypeLabel(type: string): string {
+  return type === 'CHECKING' ? '当座' : '普通';
 }
 
 function formatShortDate(date: string | null) {
@@ -665,6 +683,14 @@ export default function WarikanDetailPage() {
                     {settlement.toMember.paypayId && (
                       <p className="text-xs text-gray-500 mb-2">
                         送金先: <span className="text-red-500 font-mono font-medium">@{settlement.toMember.paypayId}</span>
+                      </p>
+                    )}
+                    {settlement.toMember.bankAccount && (
+                      <p className="text-xs text-gray-500 mb-2">
+                        振込先: {settlement.toMember.bankAccount.bankName} {settlement.toMember.bankAccount.branchName}{' '}
+                        {accountTypeLabel(settlement.toMember.bankAccount.accountType)}{' '}
+                        <span className="font-mono">{maskAccountNumber(settlement.toMember.bankAccount.accountNumber)}</span>{' '}
+                        {settlement.toMember.bankAccount.accountHolder}
                       </p>
                     )}
                     <div className="flex flex-wrap items-center gap-1.5">

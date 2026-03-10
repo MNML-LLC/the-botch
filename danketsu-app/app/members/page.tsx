@@ -13,6 +13,7 @@ type Member = {
   colorBg: string;
   colorText: string;
   paypayId: string | null;
+  bankAccount: { id: string } | null;
   isActive: boolean;
 };
 
@@ -63,6 +64,9 @@ export default function MembersPage() {
                       <p className="text-xs text-gray-500">{member.fullName}</p>
                       {member.paypayId && (
                         <p className="text-xs text-red-500 font-mono mt-0.5">@{member.paypayId}</p>
+                      )}
+                      {member.bankAccount && (
+                        <span className="inline-block text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium mt-0.5">口座登録済</span>
                       )}
                     </div>
                   </div>

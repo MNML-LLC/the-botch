@@ -26,7 +26,9 @@ export async function GET(_request: NextRequest, { params }: Params) {
         settlements: {
           include: {
             fromMember: true,
-            toMember: true,
+            toMember: {
+              include: { bankAccount: true },
+            },
           },
           orderBy: { amount: 'desc' },
         },
@@ -100,7 +102,12 @@ export async function PUT(request: NextRequest, { params }: Params) {
             },
           },
           settlements: {
-            include: { fromMember: true, toMember: true },
+            include: {
+              fromMember: true,
+              toMember: {
+                include: { bankAccount: true },
+              },
+            },
           },
         },
       })
