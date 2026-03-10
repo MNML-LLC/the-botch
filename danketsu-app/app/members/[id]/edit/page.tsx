@@ -56,10 +56,11 @@ export default function MemberEditPage() {
   const [accountHolder, setAccountHolder] = useState('');
   const [hasBankAccount, setHasBankAccount] = useState(false);
   const [bankSaving, setBankSaving] = useState(false);
+  const [bankError, setBankError] = useState(false);
 
   useEffect(() => {
-    // メンバー情報と口座情報を並行取得
-    Promise.all([
+    // メンバー情報と口座情報を並行取得（口座APIが失敗してもメンバー情報は表示する）
+    Promise.allSettled([
       fetch(`/api/members/${id}`).then((res) => {
         if (!res.ok) throw new Error('API error');
         return res.json();
@@ -69,25 +70,31 @@ export default function MemberEditPage() {
         return res.json();
       }),
     ])
-      .then(([memberData, bankData]) => {
-        setName(memberData.name);
-        setFullName(memberData.fullName);
-        setInitial(memberData.initial);
-        setColorBg(memberData.colorBg);
-        setColorText(memberData.colorText);
-        setPaypayId(memberData.paypayId || '');
-        setIsActive(memberData.isActive);
-        if (bankData) {
-          setBankName(bankData.bankName);
-          setBranchName(bankData.branchName);
-          setAccountType(bankData.accountType);
-          setAccountNumber(bankData.accountNumber);
-          setAccountHolder(bankData.accountHolder);
-          setHasBankAccount(true);
+      .then(([memberResult, bankResult]) => {
+        if (memberResult.status === 'fulfilled') {
+          const memberData = memberResult.value;
+          setName(memberData.name);
+          setFullName(memberData.fullName);
+          setInitial(memberData.initial);
+          setColorBg(memberData.colorBg);
+          setColorText(memberData.colorText);
+          setPaypayId(memberData.paypayId || '');
+          setIsActive(memberData.isActive);
         }
-        setLoading(false);
-      })
-      .catch(() => {
+        if (bankResult.status === 'fulfilled') {
+          const bankData = bankResult.value;
+          if (bankData) {
+            setBankName(bankData.bankName);
+            setBranchName(bankData.branchName);
+            setAccountType(bankData.accountType);
+            setAccountNumber(bankData.accountNumber);
+            setAccountHolder(bankData.accountHolder);
+            setHasBankAccount(true);
+          }
+        } else {
+          // 口座情報の取得に失敗（テーブル未作成時など）
+          setBankError(true);
+        }
         setLoading(false);
       });
   }, [id]);
@@ -293,6 +300,9 @@ export default function MemberEditPage() {
           {/* 口座情報 */}
           <div>
             <h4 className="text-sm font-bold text-slate-800 mb-3">口座情報</h4>
+            {bankError && (
+              <p className="text-sm text-red-500 mb-2">口座情報の取得に失敗しました</p>
+            )}
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>

@@ -1,4 +1,4 @@
-# Otokogi
+# The botch
 
 イベント参加者のじゃんけん勝負と精算を管理する Next.js アプリ。
 
