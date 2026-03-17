@@ -129,10 +129,11 @@ export default function WarikanDetailPage() {
   const { data: event, isLoading: loading } = useQuery({
     queryKey: ['warikan-detail', id],
     queryFn: async () => {
-      const res = await fetch(`/api/warikan/${id}`);
+      const res = await fetch(`/api/warikan/${id}`, { cache: 'no-store' });
       if (!res.ok) throw new Error('割り勘イベントの取得に失敗しました');
       return res.json() as Promise<WarikanDetail>;
     },
+    staleTime: 0,
   });
 
   const invalidateDetail = () => queryClient.invalidateQueries({ queryKey: ['warikan-detail', id] });

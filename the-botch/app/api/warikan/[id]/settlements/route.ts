@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma'
 
 type Params = { params: Promise<{ id: string }> }
 
+// キャッシュ無効化（Vercel CDNでのエッジキャッシュ防止）
+export const dynamic = 'force-dynamic'
+
 // GET /api/warikan/[id]/settlements — 精算結果一覧
 export async function GET(_request: NextRequest, { params }: Params) {
   try {
@@ -20,7 +23,9 @@ export async function GET(_request: NextRequest, { params }: Params) {
       orderBy: { amount: 'desc' },
     })
 
-    return NextResponse.json(settlements)
+    return NextResponse.json(settlements, {
+      headers: { 'Cache-Control': 'no-store, must-revalidate' },
+    })
   } catch (error) {
     console.error('精算結果一覧取得エラー:', error)
     return NextResponse.json(
