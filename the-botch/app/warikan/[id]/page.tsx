@@ -96,11 +96,6 @@ function statusBadge(status: string) {
   }
 }
 
-function maskAccountNumber(num: string): string {
-  if (num.length <= 3) return num;
-  return '****' + num.slice(-3);
-}
-
 function accountTypeLabel(type: string): string {
   return type === 'CHECKING' ? '当座' : '普通';
 }
@@ -739,7 +734,7 @@ export default function WarikanDetailPage() {
                       <p className="text-xs text-gray-500 mb-2">
                         振込先: {settlement.toMember.bankAccount.bankName} {settlement.toMember.bankAccount.branchName}{' '}
                         {accountTypeLabel(settlement.toMember.bankAccount.accountType)}{' '}
-                        <span className="font-mono">{maskAccountNumber(settlement.toMember.bankAccount.accountNumber)}</span>{' '}
+                        <span className="font-mono">{settlement.toMember.bankAccount.accountNumber}</span>{' '}
                         {settlement.toMember.bankAccount.accountHolder}
                       </p>
                     )}
