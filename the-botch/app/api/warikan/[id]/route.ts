@@ -43,6 +43,9 @@ const warikanDetailInclude = {
   },
 } as const
 
+// キャッシュ無効化（Vercel CDNでのエッジキャッシュ防止）
+export const dynamic = 'force-dynamic'
+
 // GET /api/warikan/[id] — 割り勘イベント詳細
 export async function GET(_request: NextRequest, { params }: Params) {
   try {
@@ -59,7 +62,9 @@ export async function GET(_request: NextRequest, { params }: Params) {
       )
     }
 
-    return NextResponse.json(event)
+    return NextResponse.json(event, {
+      headers: { 'Cache-Control': 'no-store, must-revalidate' },
+    })
   } catch (error) {
     console.error('割り勘イベント詳細取得エラー:', error)
     return NextResponse.json(
