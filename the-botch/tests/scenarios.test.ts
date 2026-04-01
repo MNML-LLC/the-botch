@@ -897,3 +897,202 @@ describe('シナリオ7: API異常系テスト', () => {
     expect(status).toBe(404)
   })
 })
+
+// ============================================================
+// シナリオ5: ENTERING状態での明細変更→自動再計算
+// Issue #174: 明細追加・更新・削除のたびに精算が再計算されること
+// ============================================================
+describe('シナリオ5: ENTERING状態での明細変更→自動再計算 (Issue #174)', () => {
+  let warikanId: string
+  let expenseId: string
+
+  test('割り勘イベントを作成（ENTERING状態）', async () => {
+    const participantIds = testMembers.slice(0, 3).map((m) => m.id)
+    const res = await createWarikan(
+      createRequest('/api/warikan', {
+        method: 'POST',
+        body: {
+          eventName: 'テスト: 再計算確認',
+          participantIds,
+        },
+      })
+    )
+    const { status, data } = await parseResponse<{ id: string; status: string }>(res)
+    expect(status).toBe(201)
+    expect(data.status).toBe('ENTERING')
+    warikanId = data.id
+    createdIds.warikanEvents.push(warikanId)
+  })
+
+  test('ENTERING状態で明細追加後に精算が自動計算される', async () => {
+    // 明細を追加
+    const res = await createExpense(
+      createRequest(`/api/warikan/${warikanId}/expenses`, {
+        method: 'POST',
+        body: {
+          payerId: testMembers[0].id,
+          description: '食事代',
+          amount: 9000,
+        },
+      }),
+      makeParams({ id: warikanId })
+    )
+    const { status, data } = await parseResponse<{ id: string }>(res)
+    expect(status).toBe(201)
+    expenseId = data.id
+
+    // 精算が自動計算されていることを確認
+    const settlementsRes = await getSettlements(
+      createRequest(`/api/warikan/${warikanId}/settlements`),
+      makeParams({ id: warikanId })
+    )
+    const { data: settlements } = await parseResponse<{ fromMemberId: string; toMemberId: string; amount: number }[]>(settlementsRes)
+    expect(settlements.length).toBeGreaterThan(0)
+
+    // 9000円÷3人=3000円/人。member[0]が9000円払い、負担3000円→6000円受取
+    // member[1]: 3000円支払、member[2]: 3000円支払
+    const totalSettlement = settlements.reduce((sum, s) => sum + s.amount, 0)
+    expect(totalSettlement).toBe(6000)
+  })
+
+  test('ENTERING状態で明細更新後に精算が再計算される', async () => {
+    // 金額を9000→6000に更新
+    const res = await updateExpense(
+      createRequest(`/api/warikan/${warikanId}/expenses/${expenseId}`, {
+        method: 'PUT',
+        body: { amount: 6000 },
+      }),
+      makeParams({ id: warikanId, expenseId })
+    )
+    const { status } = await parseResponse(res)
+    expect(status).toBe(200)
+
+    // 精算が再計算されていることを確認
+    const settlementsRes = await getSettlements(
+      createRequest(`/api/warikan/${warikanId}/settlements`),
+      makeParams({ id: warikanId })
+    )
+    const { data: settlements } = await parseResponse<{ amount: number }[]>(settlementsRes)
+    // 6000円÷3人=2000円/人。member[0]が6000円払い、負担2000円→4000円受取
+    const totalSettlement = settlements.reduce((sum, s) => sum + s.amount, 0)
+    expect(totalSettlement).toBe(4000)
+  })
+
+  test('ENTERING状態で明細削除後に精算が再計算される', async () => {
+    // 明細を削除
+    const res = await deleteExpense(
+      createRequest(`/api/warikan/${warikanId}/expenses/${expenseId}`, {
+        method: 'DELETE',
+      }),
+      makeParams({ id: warikanId, expenseId })
+    )
+    const { status } = await parseResponse(res)
+    expect(status).toBe(200)
+
+    // 明細がないので精算結果は空になる
+    const settlementsRes = await getSettlements(
+      createRequest(`/api/warikan/${warikanId}/settlements`),
+      makeParams({ id: warikanId })
+    )
+    const { data: settlements } = await parseResponse<unknown[]>(settlementsRes)
+    expect(settlements.length).toBe(0)
+  })
+
+  test('端数を含む割り勘（7000円÷3人）で合計が一致する', async () => {
+    // 7000円÷3人 = 2333円×2 + 2334円（端数は1人に寄せる）
+    const res = await createExpense(
+      createRequest(`/api/warikan/${warikanId}/expenses`, {
+        method: 'POST',
+        body: {
+          payerId: testMembers[0].id,
+          description: '端数テスト',
+          amount: 7000,
+        },
+      }),
+      makeParams({ id: warikanId })
+    )
+    const { status } = await parseResponse(res)
+    expect(status).toBe(201)
+
+    // 精算結果を確認
+    const settlementsRes = await getSettlements(
+      createRequest(`/api/warikan/${warikanId}/settlements`),
+      makeParams({ id: warikanId })
+    )
+    const { data: settlements } = await parseResponse<{ fromMemberId: string; toMemberId: string; amount: number }[]>(settlementsRes)
+
+    // member[0]が7000円支払い。負担は7000÷3の按分。
+    // 精算合計 = 7000 - (member[0]の負担分) で、合計が整数で端数なく一致すること
+    const totalSettlement = settlements.reduce((sum, s) => sum + s.amount, 0)
+    // 7000円のうちmember[0]負担分を引いた残り（他2人の負担合計）
+    // 7000÷3 = 2333余1 → member[0]負担2334、他2人は各2333 → settlement合計4666
+    // または member[0]負担2333、他2人は2333+2334 → settlement合計4667
+    // いずれにせよ端数が消えず合計が7000と一致すること
+    expect(totalSettlement + Math.floor(7000 / 3)).toBeLessThanOrEqual(7000)
+    expect(totalSettlement + Math.ceil(7000 / 3)).toBeGreaterThanOrEqual(7000)
+    // 各精算金額が整数であること
+    for (const s of settlements) {
+      expect(Number.isInteger(s.amount)).toBe(true)
+    }
+  })
+})
+
+// ============================================================
+// シナリオ6: PAYING状態での参加者変更禁止
+// Issue #174: 精算中のイベントの参加者を変更できないこと
+// ============================================================
+describe('シナリオ6: PAYING状態での参加者変更禁止 (Issue #174)', () => {
+  let warikanId: string
+
+  test('割り勘イベントを作成→明細追加→精算でPAYINGにする', async () => {
+    const participantIds = testMembers.slice(0, 3).map((m) => m.id)
+    const res = await createWarikan(
+      createRequest('/api/warikan', {
+        method: 'POST',
+        body: {
+          eventName: 'テスト: 参加者変更禁止',
+          participantIds,
+        },
+      })
+    )
+    const { data } = await parseResponse<{ id: string }>(res)
+    warikanId = data.id
+    createdIds.warikanEvents.push(warikanId)
+
+    // 明細追加
+    await createExpense(
+      createRequest(`/api/warikan/${warikanId}/expenses`, {
+        method: 'POST',
+        body: {
+          payerId: testMembers[0].id,
+          description: '参加者変更テスト用',
+          amount: 3000,
+        },
+      }),
+      makeParams({ id: warikanId })
+    )
+
+    // 精算計算でPAYINGにする
+    const calcRes = await calculateSettlements(
+      createRequest(`/api/warikan/${warikanId}/settlements`, { method: 'POST' }),
+      makeParams({ id: warikanId })
+    )
+    const { data: calcData } = await parseResponse<{ status: string }>(calcRes)
+    expect(calcData.status).toBe('PAYING')
+  })
+
+  test('PAYING状態で参加者変更が400エラーで拒否される', async () => {
+    const res = await updateWarikan(
+      createRequest(`/api/warikan/${warikanId}`, {
+        method: 'PUT',
+        body: {
+          participantIds: testMembers.slice(0, 2).map((m) => m.id),
+        },
+      }),
+      makeParams({ id: warikanId })
+    )
+    const { status, data } = await parseResponse<{ error: string }>(res)
+    expect(status).toBe(400)
+    expect(data.error).toContain('精算中')
+  })
+})

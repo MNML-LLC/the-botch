@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { calculateSettlements } from '@/lib/warikan-calc'
 
 type Params = { params: Promise<{ id: string; expenseId: string }> }
 
@@ -23,9 +24,9 @@ export async function PUT(request: NextRequest, { params }: Params) {
       )
     }
 
-    if (warikanEvent.status !== 'ENTERING') {
+    if (warikanEvent.status === 'CLOSED') {
       return NextResponse.json(
-        { error: '明細入力中のイベントのみ編集できます' },
+        { error: 'クローズ済みのイベントは編集できません' },
         { status: 400 }
       )
     }
@@ -95,6 +96,9 @@ export async function PUT(request: NextRequest, { params }: Params) {
         })
       })
 
+      // 明細更新時は常に精算を自動再計算
+      await recalculateSettlementsForEvent(id, warikanEvent.participants.map((p) => p.memberId))
+
       return NextResponse.json(expense)
     }
 
@@ -107,6 +111,9 @@ export async function PUT(request: NextRequest, { params }: Params) {
       },
       include: { payer: true, debtors: { include: { member: true } } },
     })
+
+    // 明細更新時は常に精算を自動再計算
+    await recalculateSettlementsForEvent(id, warikanEvent.participants.map((p) => p.memberId))
 
     return NextResponse.json(expense)
   } catch (error) {
@@ -124,6 +131,29 @@ export async function PUT(request: NextRequest, { params }: Params) {
   }
 }
 
+// 明細が変更された場合、精算結果を再計算する
+async function recalculateSettlementsForEvent(warikanEventId: string, participantIds: string[]) {
+  const allExpenses = await prisma.warikanExpense.findMany({
+    where: { warikanEventId },
+    include: { debtors: true },
+  })
+  const { settlements } = calculateSettlements(allExpenses, participantIds)
+
+  await prisma.$transaction(async (tx) => {
+    await tx.warikanSettlement.deleteMany({ where: { warikanEventId } })
+    if (settlements.length > 0) {
+      await tx.warikanSettlement.createMany({
+        data: settlements.map((s) => ({
+          warikanEventId,
+          fromMemberId: s.fromMemberId,
+          toMemberId: s.toMemberId,
+          amount: s.amount,
+        })),
+      })
+    }
+  })
+}
+
 // DELETE /api/warikan/[id]/expenses/[expenseId] — 立替明細削除
 export async function DELETE(_request: NextRequest, { params }: Params) {
   try {
@@ -132,6 +162,7 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     // 割り勘イベントの存在・ステータス確認
     const warikanEvent = await prisma.warikanEvent.findUnique({
       where: { id },
+      include: { participants: true },
     })
 
     if (!warikanEvent) {
@@ -141,9 +172,9 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
       )
     }
 
-    if (warikanEvent.status !== 'ENTERING') {
+    if (warikanEvent.status === 'CLOSED') {
       return NextResponse.json(
-        { error: '明細入力中のイベントからのみ削除できます' },
+        { error: 'クローズ済みのイベントからは削除できません' },
         { status: 400 }
       )
     }
@@ -162,6 +193,9 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     await prisma.warikanExpense.delete({
       where: { id: expenseId },
     })
+
+    // 明細削除時は常に精算を自動再計算
+    await recalculateSettlementsForEvent(id, warikanEvent.participants.map((p) => p.memberId))
 
     return NextResponse.json({ success: true })
   } catch (error) {

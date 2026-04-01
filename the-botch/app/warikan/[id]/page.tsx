@@ -361,7 +361,7 @@ export default function WarikanDetailPage() {
   if (!event) return <p className="text-sm text-gray-500">イベントが見つかりません</p>;
 
   const totalExpenses = event.expenses.reduce((sum, e) => sum + e.amount, 0);
-  const perPerson = event.participants.length > 0 ? Math.round(totalExpenses / event.participants.length) : 0;
+  const perPerson = event.participants.length > 0 ? Math.floor(totalExpenses / event.participants.length) : 0;
   const receivedCount = event.settlements.filter((s) => s.isReceived).length;
 
   return (

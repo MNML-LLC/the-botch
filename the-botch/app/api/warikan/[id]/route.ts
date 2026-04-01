@@ -81,6 +81,20 @@ export async function PUT(request: NextRequest, { params }: Params) {
     const body = await request.json()
     const { eventName, status, managerId, detailDeadline, paymentDeadline, memo, walicaUrl, eventId, participantIds } = body
 
+    // PAYING状態での参加者変更を禁止
+    if (participantIds && Array.isArray(participantIds)) {
+      const currentEvent = await prisma.warikanEvent.findUnique({
+        where: { id },
+        select: { status: true },
+      })
+      if (currentEvent?.status === 'PAYING') {
+        return NextResponse.json(
+          { error: '精算中のイベントの参加者は変更できません' },
+          { status: 400 }
+        )
+      }
+    }
+
     const event = await prisma.$transaction(async (tx) => {
       // 参加者の更新がある場合は差し替え
       if (participantIds && Array.isArray(participantIds)) {

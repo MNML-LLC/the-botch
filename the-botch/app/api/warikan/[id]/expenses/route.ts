@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { calculateSettlements } from '@/lib/warikan-calc'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -71,9 +72,9 @@ export async function POST(request: NextRequest, { params }: Params) {
       )
     }
 
-    if (warikanEvent.status !== 'ENTERING') {
+    if (warikanEvent.status === 'CLOSED') {
       return NextResponse.json(
-        { error: '明細入力中のイベントにのみ追加できます' },
+        { error: 'クローズ済みのイベントには追加できません' },
         { status: 400 }
       )
     }
@@ -97,6 +98,28 @@ export async function POST(request: NextRequest, { params }: Params) {
         payer: true,
         debtors: { include: { member: true } },
       },
+    })
+
+    // 明細追加時は常に精算を自動再計算
+    const allExpenses = await prisma.warikanExpense.findMany({
+      where: { warikanEventId: id },
+      include: { debtors: true },
+    })
+    const participantIds = warikanEvent.participants.map((p) => p.memberId)
+    const { settlements } = calculateSettlements(allExpenses, participantIds)
+
+    await prisma.$transaction(async (tx) => {
+      await tx.warikanSettlement.deleteMany({ where: { warikanEventId: id } })
+      if (settlements.length > 0) {
+        await tx.warikanSettlement.createMany({
+          data: settlements.map((s) => ({
+            warikanEventId: id,
+            fromMemberId: s.fromMemberId,
+            toMemberId: s.toMemberId,
+            amount: s.amount,
+          })),
+        })
+      }
     })
 
     return NextResponse.json(expense, { status: 201 })
