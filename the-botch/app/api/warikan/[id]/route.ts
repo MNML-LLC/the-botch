@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { WarikanStatus } from '@prisma/client'
 import { computeDisplayDate } from '@/lib/date-utils'
 
 type Params = { params: Promise<{ id: string }> }
@@ -81,15 +80,40 @@ export async function PUT(request: NextRequest, { params }: Params) {
     const body = await request.json()
     const { eventName, status, managerId, detailDeadline, paymentDeadline, memo, walicaUrl, eventId, participantIds } = body
 
-    // PAYING状態での参加者変更を禁止
+    // ステータスの直接変更を禁止（専用エンドポイント経由のみ）
+    if (status !== undefined) {
+      return NextResponse.json(
+        { error: 'ステータスは直接変更できません' },
+        { status: 400 }
+      )
+    }
+
+    // 現在のステータスを取得
+    const currentEvent = await prisma.warikanEvent.findUnique({
+      where: { id },
+      select: { status: true },
+    })
+
+    if (!currentEvent) {
+      return NextResponse.json(
+        { error: '割り勘イベントが見つかりません' },
+        { status: 404 }
+      )
+    }
+
+    // CLOSED状態では編集不可
+    if (currentEvent.status === 'CLOSED') {
+      return NextResponse.json(
+        { error: 'クローズ済みのイベントは編集できません' },
+        { status: 400 }
+      )
+    }
+
+    // PAYING/CLOSED状態での参加者変更を禁止
     if (participantIds && Array.isArray(participantIds)) {
-      const currentEvent = await prisma.warikanEvent.findUnique({
-        where: { id },
-        select: { status: true },
-      })
-      if (currentEvent?.status === 'PAYING') {
+      if (currentEvent.status !== 'ENTERING') {
         return NextResponse.json(
-          { error: '精算中のイベントの参加者は変更できません' },
+          { error: '明細入力中のイベントのみ参加者を変更できます' },
           { status: 400 }
         )
       }
@@ -133,8 +157,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
         where: { id },
         data: {
           ...(eventName !== undefined && { eventName }),
-          ...(status !== undefined &&
-            Object.values(WarikanStatus).includes(status) && { status }),
+          // status は専用エンドポイント経由のみ変更可能
           ...(managerId !== undefined && { managerId }),
           ...(detailDeadline !== undefined && {
             detailDeadline: detailDeadline ? new Date(detailDeadline) : null,

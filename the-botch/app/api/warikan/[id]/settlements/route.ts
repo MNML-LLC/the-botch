@@ -61,23 +61,23 @@ export async function POST(_request: NextRequest, { params }: Params) {
       )
     }
 
-    if (warikanEvent.status === 'CLOSED') {
+    if (warikanEvent.status !== 'ENTERING') {
       return NextResponse.json(
-        { error: 'クローズ済みのイベントは再精算できません' },
+        { error: '明細入力中のイベントのみ精算を確定できます' },
         { status: 400 }
       )
     }
 
     if (warikanEvent.expenses.length === 0) {
       return NextResponse.json(
-        { error: '立替明細がありません' },
+        { error: '明細が登録されていません' },
         { status: 400 }
       )
     }
 
-    if (warikanEvent.participants.length === 0) {
+    if (warikanEvent.participants.length < 2) {
       return NextResponse.json(
-        { error: '参加者がいません' },
+        { error: '参加者が2人以上必要です' },
         { status: 400 }
       )
     }

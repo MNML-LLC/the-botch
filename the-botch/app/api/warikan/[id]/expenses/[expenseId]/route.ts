@@ -24,9 +24,9 @@ export async function PUT(request: NextRequest, { params }: Params) {
       )
     }
 
-    if (warikanEvent.status === 'CLOSED') {
+    if (warikanEvent.status !== 'ENTERING') {
       return NextResponse.json(
-        { error: 'クローズ済みのイベントは編集できません' },
+        { error: '明細入力中のイベントのみ編集できます' },
         { status: 400 }
       )
     }
@@ -172,9 +172,9 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
       )
     }
 
-    if (warikanEvent.status === 'CLOSED') {
+    if (warikanEvent.status !== 'ENTERING') {
       return NextResponse.json(
-        { error: 'クローズ済みのイベントからは削除できません' },
+        { error: '明細入力中のイベントのみ編集できます' },
         { status: 400 }
       )
     }

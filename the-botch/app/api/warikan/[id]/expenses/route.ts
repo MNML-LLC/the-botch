@@ -72,9 +72,9 @@ export async function POST(request: NextRequest, { params }: Params) {
       )
     }
 
-    if (warikanEvent.status === 'CLOSED') {
+    if (warikanEvent.status !== 'ENTERING') {
       return NextResponse.json(
-        { error: 'クローズ済みのイベントには追加できません' },
+        { error: '明細入力中のイベントのみ編集できます' },
         { status: 400 }
       )
     }

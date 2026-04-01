@@ -180,7 +180,6 @@ export default function WarikanDetailPage() {
     setEditDescription(expense.description);
     setEditAmount(String(expense.amount));
     const debtorMemberIds = expense.debtors.map((d) => d.memberId);
-    // debtorsが空 or 全員 → 全員選択
     if (debtorMemberIds.length === 0 || (event && debtorMemberIds.length === event.participants.length)) {
       setEditDebtorIds(new Set(event?.participants.map((p) => p.member.id) ?? []));
     } else {
@@ -260,7 +259,7 @@ export default function WarikanDetailPage() {
     deleteExpenseMutation.mutate(expenseId);
   };
 
-  // 精算計算
+  // 精算確定（ENTERING → PAYING）
   const calculateSettlementsMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch(`/api/warikan/${id}/settlements`, {
@@ -282,7 +281,39 @@ export default function WarikanDetailPage() {
   });
 
   const handleCalculateSettlements = () => {
+    if (isMutating) return;
     calculateSettlementsMutation.mutate();
+  };
+
+  // 明細修正に戻る（PAYING → ENTERING）
+  const revertToEnteringMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/warikan/${id}/revert-to-entering`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error ?? '明細修正に戻す処理に失敗しました');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['warikan'] });
+      invalidateDetail();
+    },
+    onError: (error: Error) => {
+      alert(error.message);
+    },
+  });
+
+  const handleRevertToEntering = () => {
+    if (isMutating || !event) return;
+    const paidCount = event.settlements.filter((s) => s.isPaid).length;
+    if (paidCount > 0) {
+      // 送金済みがある場合は確認ダイアログ
+      if (!confirm(`送金済みの精算が${paidCount}件あります。明細を修正すると精算結果がリセットされ、再度精算をやり直す必要があります。`)) return;
+    }
+    revertToEnteringMutation.mutate();
   };
 
   // 精算アクション（送金済み/受領確認）
@@ -293,40 +324,31 @@ export default function WarikanDetailPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action }),
       });
-      if (!res.ok) throw new Error('操作に失敗しました');
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error ?? '操作に失敗しました');
+      }
       return res.json();
     },
     onSuccess: () => {
       invalidateDetail();
     },
+    onError: (error: Error) => {
+      alert(error.message);
+    },
   });
 
-  const handleSettlementAction = (settlementId: string, action: 'pay' | 'receive') => {
+  // 送金済み確認ダイアログ付き
+  const handleMarkAsPaid = (settlement: Settlement) => {
     if (isMutating) return;
-    settlementActionMutation.mutate({ settlementId, action });
+    const msg = `${settlement.toMember.name}さんへの ¥${settlement.amount.toLocaleString()} の送金を完了しましたか？`;
+    if (!confirm(msg)) return;
+    settlementActionMutation.mutate({ settlementId: settlement.id, action: 'pay' });
   };
 
-  // ステータス変更
-  const statusChangeMutation = useMutation({
-    mutationFn: async (newStatus: string) => {
-      const res = await fetch(`/api/warikan/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-      });
-      if (!res.ok) throw new Error('ステータス変更に失敗しました');
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['warikan'] });
-      queryClient.invalidateQueries({ queryKey: ['calendar'] });
-      invalidateDetail();
-    },
-  });
-
-  const handleStatusChange = (newStatus: string) => {
+  const handleMarkAsReceived = (settlementId: string) => {
     if (isMutating) return;
-    statusChangeMutation.mutate(newStatus);
+    settlementActionMutation.mutate({ settlementId, action: 'receive' });
   };
 
   // イベント削除
@@ -355,14 +377,19 @@ export default function WarikanDetailPage() {
     deleteEventMutation.mutate();
   };
 
-  const isMutating = addExpenseMutation.isPending || updateExpenseMutation.isPending || deleteExpenseMutation.isPending || calculateSettlementsMutation.isPending || settlementActionMutation.isPending || statusChangeMutation.isPending || deleteEventMutation.isPending;
+  const isMutating = addExpenseMutation.isPending || updateExpenseMutation.isPending || deleteExpenseMutation.isPending || calculateSettlementsMutation.isPending || settlementActionMutation.isPending || revertToEnteringMutation.isPending || deleteEventMutation.isPending;
 
   if (loading) return <p className="text-sm text-gray-500">読み込み中...</p>;
   if (!event) return <p className="text-sm text-gray-500">イベントが見つかりません</p>;
 
+  const isEntering = event.status === 'ENTERING';
+  const isPaying = event.status === 'PAYING';
+  const isClosed = event.status === 'CLOSED';
   const totalExpenses = event.expenses.reduce((sum, e) => sum + e.amount, 0);
   const perPerson = event.participants.length > 0 ? Math.floor(totalExpenses / event.participants.length) : 0;
   const receivedCount = event.settlements.filter((s) => s.isReceived).length;
+  // 精算確定の有効化条件: 明細1件以上 & 参加者2人以上
+  const canConfirmSettlement = isEntering && event.expenses.length > 0 && event.participants.length >= 2;
 
   return (
     <div>
@@ -390,16 +417,8 @@ export default function WarikanDetailPage() {
                 <h3 className="text-base sm:text-lg font-bold text-slate-800 truncate">{event.eventName}</h3>
                 <p className="text-xs sm:text-sm text-gray-500 mt-1">管理: {event.manager?.name ?? '未設定'}</p>
               </div>
-              <Select value={event.status} onValueChange={handleStatusChange}>
-                <SelectTrigger className="w-auto shrink-0">
-                  {statusBadge(event.status)}
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ENTERING">明細入力中</SelectItem>
-                  <SelectItem value="PAYING">支払待ち</SelectItem>
-                  <SelectItem value="CLOSED">クローズ</SelectItem>
-                </SelectContent>
-              </Select>
+              {/* ステータスは読み取り専用バッジ */}
+              {statusBadge(event.status)}
             </div>
             <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
               <div><span className="text-gray-400">明細追加期日:</span> {formatShortDate(event.detailDeadline)}</div>
@@ -440,8 +459,8 @@ export default function WarikanDetailPage() {
                   const isAllMembers = expense.debtors.length === 0 || expense.debtors.length === event.participants.length;
                   const debtorNames = isAllMembers ? '全員' : expense.debtors.map((d) => d.member.name).join('・');
 
-                  // 編集モード
-                  if (editingExpenseId === expense.id) {
+                  // 編集モード（ENTERINGのみ）
+                  if (isEntering && editingExpenseId === expense.id) {
                     return (
                       <div key={expense.id} className="bg-gray-50 rounded-lg p-3 border space-y-2">
                         <div className="flex gap-2">
@@ -547,7 +566,8 @@ export default function WarikanDetailPage() {
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <p className="font-bold text-sm text-slate-800">¥{expense.amount.toLocaleString()}</p>
-                        {event.status === 'ENTERING' && (
+                        {/* 編集・削除ボタンはENTERINGのみ */}
+                        {isEntering && (
                           <>
                             <button
                               type="button"
@@ -580,8 +600,8 @@ export default function WarikanDetailPage() {
               </div>
             )}
 
-            {/* 明細追加フォーム */}
-            {event.status === 'ENTERING' && (
+            {/* 明細追加フォーム（ENTERINGのみ） */}
+            {isEntering && (
               <>
                 {showExpenseForm ? (
                   <div className="mt-4 bg-gray-50 rounded-lg p-3 border space-y-2">
@@ -692,19 +712,30 @@ export default function WarikanDetailPage() {
           </CardContent>
         </Card>
 
-        {/* 精算計算ボタン */}
-        {event.status === 'ENTERING' && event.expenses.length > 0 && (
+        {/* フェーズ遷移ボタン */}
+        {isEntering && (
           <Button
             className="w-full bg-amber-500 hover:bg-amber-600 text-white font-medium"
             onClick={handleCalculateSettlements}
-            disabled={isMutating}
+            disabled={isMutating || !canConfirmSettlement}
           >
-            精算を計算する
+            精算を確定する
           </Button>
         )}
 
-        {/* 精算結果 */}
-        {event.settlements.length > 0 && (
+        {isPaying && (
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={handleRevertToEntering}
+            disabled={isMutating}
+          >
+            明細を修正する
+          </Button>
+        )}
+
+        {/* 精算結果（PAYING/CLOSEDのみ表示） */}
+        {(isPaying || isClosed) && event.settlements.length > 0 && (
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -748,26 +779,31 @@ export default function WarikanDetailPage() {
                           Pay 送金
                         </a>
                       )}
-                      {!settlement.isPaid && event.status !== 'CLOSED' && (
+                      {/* 送金済みボタン: PAYINGで未送金のみ */}
+                      {isPaying && !settlement.isPaid && (
                         <Button
                           variant="outline"
                           size="sm"
                           disabled={isMutating}
-                          onClick={() => handleSettlementAction(settlement.id, 'pay')}
+                          onClick={() => handleMarkAsPaid(settlement)}
                         >
                           送金済み
                         </Button>
                       )}
-                      {settlement.isPaid && !settlement.isReceived && event.status !== 'CLOSED' && (
+                      {/* 受領確認ボタン: PAYINGで送金済み&未受領のみ */}
+                      {isPaying && settlement.isPaid && !settlement.isReceived && (
                         <Button
                           variant="outline"
                           size="sm"
                           className="text-green-600 border-green-300"
                           disabled={isMutating}
-                          onClick={() => handleSettlementAction(settlement.id, 'receive')}
+                          onClick={() => handleMarkAsReceived(settlement.id)}
                         >
                           受領確認
                         </Button>
+                      )}
+                      {settlement.isPaid && !settlement.isReceived && (
+                        <span className="text-xs text-amber-600 font-medium">送金済み</span>
                       )}
                       {settlement.isReceived && (
                         <span className="text-xs text-green-600 font-medium">受領済み</span>

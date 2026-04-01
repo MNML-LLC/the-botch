@@ -29,19 +29,15 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       )
     }
 
-    if (warikanEvent.status === 'CLOSED') {
+    if (warikanEvent.status !== 'PAYING') {
+      const msg = action === 'pay'
+        ? '送金中のイベントのみ送金済みにできます'
+        : '送金中のイベントのみ受領確認できます'
       return NextResponse.json(
-        { error: 'クローズ済みのイベントは更新できません' },
+        { error: msg },
         { status: 400 }
       )
     }
-
-    // 精算レコード更新
-    const now = new Date()
-    const updateData =
-      action === 'pay'
-        ? { isPaid: true, paidAt: now }
-        : { isReceived: true, receivedAt: now }
 
     // settlementがこのwarikanEventに属するか検証
     const existing = await prisma.warikanSettlement.findFirst({
@@ -53,6 +49,21 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         { status: 404 }
       )
     }
+
+    // 受領確認は送金済みの精算のみ
+    if (action === 'receive' && !existing.isPaid) {
+      return NextResponse.json(
+        { error: '送金済みでない精算は受領確認できません' },
+        { status: 400 }
+      )
+    }
+
+    // 精算レコード更新
+    const now = new Date()
+    const updateData =
+      action === 'pay'
+        ? { isPaid: true, paidAt: now }
+        : { isReceived: true, receivedAt: now }
 
     const settlement = await prisma.warikanSettlement.update({
       where: { id: settlementId },
