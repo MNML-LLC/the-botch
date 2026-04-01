@@ -18,7 +18,9 @@ export async function GET(_request: NextRequest, { params }: Params) {
       )
     }
 
-    return NextResponse.json(member)
+    return NextResponse.json(member, {
+      headers: { 'Cache-Control': 'private, max-age=600' },
+    })
   } catch (error) {
     console.error('メンバー詳細取得エラー:', error)
     return NextResponse.json(

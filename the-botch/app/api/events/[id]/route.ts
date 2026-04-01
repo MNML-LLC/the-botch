@@ -28,7 +28,9 @@ export async function GET(
       return NextResponse.json({ error: 'イベントが見つかりません' }, { status: 404 })
     }
 
-    return NextResponse.json(event)
+    return NextResponse.json(event, {
+      headers: { 'Cache-Control': 'private, max-age=600' },
+    })
   } catch (error) {
     console.error('イベント取得エラー:', error)
     return NextResponse.json({ error: 'イベントの取得に失敗しました' }, { status: 500 })

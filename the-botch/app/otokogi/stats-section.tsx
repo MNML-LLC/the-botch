@@ -71,7 +71,8 @@ export default function StatsSection() {
       if (!res.ok) throw new Error('統計データの取得に失敗しました');
       return res.json() as Promise<StatsData>;
     },
-
+    staleTime: 5 * 60 * 1000,  // 5分キャッシュ（統計は頻繁に変わらない）
+    gcTime: 10 * 60 * 1000,    // 10分GC
   });
 
   const deviationChartData = stats?.deviationScores

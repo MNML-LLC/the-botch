@@ -133,7 +133,7 @@ export default function WarikanDetailPage() {
       if (!res.ok) throw new Error('割り勘イベントの取得に失敗しました');
       return res.json() as Promise<WarikanDetail>;
     },
-    staleTime: 0,
+    staleTime: 60 * 1000, // 1分（頻繁なリフェッチを抑制）
   });
 
   const invalidateDetail = () => queryClient.invalidateQueries({ queryKey: ['warikan-detail', id] });

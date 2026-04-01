@@ -85,6 +85,8 @@ export default function OtokogiPage() {
     queryFn: fetchOtokogiEvents,
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
+    staleTime: 60 * 1000,      // 1分キャッシュ
+    gcTime: 5 * 60 * 1000,     // 5分GC
   });
 
   const events = eventsData?.pages.flatMap((page) => page.data) ?? [];
@@ -99,7 +101,8 @@ export default function OtokogiPage() {
       if (!res.ok) throw new Error('ランキングの取得に失敗しました');
       return res.json() as Promise<{ ranking: RankingEntry[] }>;
     },
-
+    staleTime: 60 * 1000,      // 1分キャッシュ
+    gcTime: 5 * 60 * 1000,     // 5分GC
   });
   const rankingData = rankingResponse?.ranking ?? [];
 

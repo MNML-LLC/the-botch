@@ -39,7 +39,9 @@ export async function GET(request: NextRequest) {
       orderBy: { date: 'desc' },
     })
 
-    return NextResponse.json(events)
+    return NextResponse.json(events, {
+      headers: { 'Cache-Control': 'private, max-age=300' },
+    })
   } catch (error) {
     console.error('イベント一覧取得エラー:', error)
     return NextResponse.json({ error: 'イベント一覧の取得に失敗しました' }, { status: 500 })

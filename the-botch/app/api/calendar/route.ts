@@ -71,7 +71,9 @@ export async function GET(request: NextRequest) {
       return { ...w, displayDate: displayDateStr }
     })
 
-    return NextResponse.json({ events, otokogiEvents, warikanEvents: warikanEventsWithDisplay })
+    return NextResponse.json({ events, otokogiEvents, warikanEvents: warikanEventsWithDisplay }, {
+      headers: { 'Cache-Control': 'private, max-age=300' },
+    })
   } catch (error) {
     console.error('カレンダーデータ取得エラー:', error)
     return NextResponse.json({ error: 'カレンダーデータの取得に失敗しました' }, { status: 500 })

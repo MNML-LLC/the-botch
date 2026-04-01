@@ -23,7 +23,9 @@ export async function GET(_request: NextRequest, { params }: Params) {
     })
 
     // 未登録の場合はnullを返す
-    return NextResponse.json(bankAccount)
+    return NextResponse.json(bankAccount, {
+      headers: { 'Cache-Control': 'private, max-age=600' },
+    })
   } catch (error) {
     console.error('口座情報取得エラー:', error)
     return NextResponse.json(

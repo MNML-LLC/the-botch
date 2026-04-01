@@ -25,7 +25,9 @@ export async function GET(_request: NextRequest, { params }: Params) {
       )
     }
 
-    return NextResponse.json(event)
+    return NextResponse.json(event, {
+      headers: { 'Cache-Control': 'private, max-age=600' },
+    })
   } catch (error) {
     console.error('男気イベント詳細取得エラー:', error)
     return NextResponse.json(

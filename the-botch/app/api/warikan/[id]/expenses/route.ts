@@ -23,7 +23,9 @@ export async function GET(_request: NextRequest, { params }: Params) {
       orderBy: { createdAt: 'desc' },
     })
 
-    return NextResponse.json(expenses)
+    return NextResponse.json(expenses, {
+      headers: { 'Cache-Control': 'private, max-age=60' },
+    })
   } catch (error) {
     console.error('立替明細一覧取得エラー:', error)
     return NextResponse.json(

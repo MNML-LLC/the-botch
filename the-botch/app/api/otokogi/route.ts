@@ -45,7 +45,9 @@ export async function GET(request: NextRequest) {
       nextCursor = nextItem.id
     }
 
-    return NextResponse.json({ data: events, nextCursor })
+    return NextResponse.json({ data: events, nextCursor }, {
+      headers: { 'Cache-Control': 'private, max-age=60' },
+    })
   } catch (error) {
     console.error('男気イベント一覧取得エラー:', error)
     return NextResponse.json(

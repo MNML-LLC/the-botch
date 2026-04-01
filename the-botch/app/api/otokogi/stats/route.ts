@@ -73,32 +73,51 @@ export async function GET(request: NextRequest) {
         _count: true,
       }),
 
-      // 4+5. 最高額・最低額イベント統合（Raw SQL 1本）
+      // 4+5. 最高額・最低額イベント統合（Window関数+CTE、1スキャンで完結）
       year
         ? prisma.$queryRaw<MaxMinResult[]>`
+            WITH ranked AS (
+              SELECT oe.id, oe.amount, oe.event_name, m.id AS payer_id, m.name AS payer_name,
+                ROW_NUMBER() OVER (ORDER BY oe.amount DESC) AS rn_max,
+                ROW_NUMBER() OVER (ORDER BY oe.amount ASC) AS rn_min
+              FROM otokogi_events oe
+              JOIN members m ON oe.payer_id = m.id
+              WHERE oe.event_date >= ${new Date(`${year}-01-01`)} AND oe.event_date < ${new Date(`${Number(year) + 1}-01-01`)}
+            )
             SELECT
-              (SELECT id FROM otokogi_events WHERE event_date >= ${new Date(`${year}-01-01`)} AND event_date < ${new Date(`${Number(year) + 1}-01-01`)} ORDER BY amount DESC LIMIT 1) AS max_id,
-              (SELECT amount FROM otokogi_events WHERE event_date >= ${new Date(`${year}-01-01`)} AND event_date < ${new Date(`${Number(year) + 1}-01-01`)} ORDER BY amount DESC LIMIT 1) AS max_amount,
-              (SELECT event_name FROM otokogi_events WHERE event_date >= ${new Date(`${year}-01-01`)} AND event_date < ${new Date(`${Number(year) + 1}-01-01`)} ORDER BY amount DESC LIMIT 1) AS max_event_name,
-              (SELECT m.id FROM otokogi_events oe JOIN members m ON oe.payer_id = m.id WHERE oe.event_date >= ${new Date(`${year}-01-01`)} AND oe.event_date < ${new Date(`${Number(year) + 1}-01-01`)} ORDER BY oe.amount DESC LIMIT 1) AS max_payer_id,
-              (SELECT m.name FROM otokogi_events oe JOIN members m ON oe.payer_id = m.id WHERE oe.event_date >= ${new Date(`${year}-01-01`)} AND oe.event_date < ${new Date(`${Number(year) + 1}-01-01`)} ORDER BY oe.amount DESC LIMIT 1) AS max_payer_name,
-              (SELECT id FROM otokogi_events WHERE event_date >= ${new Date(`${year}-01-01`)} AND event_date < ${new Date(`${Number(year) + 1}-01-01`)} ORDER BY amount ASC LIMIT 1) AS min_id,
-              (SELECT amount FROM otokogi_events WHERE event_date >= ${new Date(`${year}-01-01`)} AND event_date < ${new Date(`${Number(year) + 1}-01-01`)} ORDER BY amount ASC LIMIT 1) AS min_amount,
-              (SELECT event_name FROM otokogi_events WHERE event_date >= ${new Date(`${year}-01-01`)} AND event_date < ${new Date(`${Number(year) + 1}-01-01`)} ORDER BY amount ASC LIMIT 1) AS min_event_name,
-              (SELECT m.id FROM otokogi_events oe JOIN members m ON oe.payer_id = m.id WHERE oe.event_date >= ${new Date(`${year}-01-01`)} AND oe.event_date < ${new Date(`${Number(year) + 1}-01-01`)} ORDER BY oe.amount ASC LIMIT 1) AS min_payer_id,
-              (SELECT m.name FROM otokogi_events oe JOIN members m ON oe.payer_id = m.id WHERE oe.event_date >= ${new Date(`${year}-01-01`)} AND oe.event_date < ${new Date(`${Number(year) + 1}-01-01`)} ORDER BY oe.amount ASC LIMIT 1) AS min_payer_name`
+              MAX(CASE WHEN rn_max = 1 THEN id END) AS max_id,
+              MAX(CASE WHEN rn_max = 1 THEN amount END) AS max_amount,
+              MAX(CASE WHEN rn_max = 1 THEN event_name END) AS max_event_name,
+              MAX(CASE WHEN rn_max = 1 THEN payer_id END) AS max_payer_id,
+              MAX(CASE WHEN rn_max = 1 THEN payer_name END) AS max_payer_name,
+              MAX(CASE WHEN rn_min = 1 THEN id END) AS min_id,
+              MAX(CASE WHEN rn_min = 1 THEN amount END) AS min_amount,
+              MAX(CASE WHEN rn_min = 1 THEN event_name END) AS min_event_name,
+              MAX(CASE WHEN rn_min = 1 THEN payer_id END) AS min_payer_id,
+              MAX(CASE WHEN rn_min = 1 THEN payer_name END) AS min_payer_name
+            FROM ranked
+            WHERE rn_max = 1 OR rn_min = 1`
         : prisma.$queryRaw<MaxMinResult[]>`
+            WITH ranked AS (
+              SELECT oe.id, oe.amount, oe.event_name, m.id AS payer_id, m.name AS payer_name,
+                ROW_NUMBER() OVER (ORDER BY oe.amount DESC) AS rn_max,
+                ROW_NUMBER() OVER (ORDER BY oe.amount ASC) AS rn_min
+              FROM otokogi_events oe
+              JOIN members m ON oe.payer_id = m.id
+            )
             SELECT
-              (SELECT id FROM otokogi_events ORDER BY amount DESC LIMIT 1) AS max_id,
-              (SELECT amount FROM otokogi_events ORDER BY amount DESC LIMIT 1) AS max_amount,
-              (SELECT event_name FROM otokogi_events ORDER BY amount DESC LIMIT 1) AS max_event_name,
-              (SELECT m.id FROM otokogi_events oe JOIN members m ON oe.payer_id = m.id ORDER BY oe.amount DESC LIMIT 1) AS max_payer_id,
-              (SELECT m.name FROM otokogi_events oe JOIN members m ON oe.payer_id = m.id ORDER BY oe.amount DESC LIMIT 1) AS max_payer_name,
-              (SELECT id FROM otokogi_events ORDER BY amount ASC LIMIT 1) AS min_id,
-              (SELECT amount FROM otokogi_events ORDER BY amount ASC LIMIT 1) AS min_amount,
-              (SELECT event_name FROM otokogi_events ORDER BY amount ASC LIMIT 1) AS min_event_name,
-              (SELECT m.id FROM otokogi_events oe JOIN members m ON oe.payer_id = m.id ORDER BY oe.amount ASC LIMIT 1) AS min_payer_id,
-              (SELECT m.name FROM otokogi_events oe JOIN members m ON oe.payer_id = m.id ORDER BY oe.amount ASC LIMIT 1) AS min_payer_name`,
+              MAX(CASE WHEN rn_max = 1 THEN id END) AS max_id,
+              MAX(CASE WHEN rn_max = 1 THEN amount END) AS max_amount,
+              MAX(CASE WHEN rn_max = 1 THEN event_name END) AS max_event_name,
+              MAX(CASE WHEN rn_max = 1 THEN payer_id END) AS max_payer_id,
+              MAX(CASE WHEN rn_max = 1 THEN payer_name END) AS max_payer_name,
+              MAX(CASE WHEN rn_min = 1 THEN id END) AS min_id,
+              MAX(CASE WHEN rn_min = 1 THEN amount END) AS min_amount,
+              MAX(CASE WHEN rn_min = 1 THEN event_name END) AS min_event_name,
+              MAX(CASE WHEN rn_min = 1 THEN payer_id END) AS min_payer_id,
+              MAX(CASE WHEN rn_min = 1 THEN payer_name END) AS min_payer_name
+            FROM ranked
+            WHERE rn_max = 1 OR rn_min = 1`,
 
       // 6. 最多参加者イベント
       prisma.otokogiEvent.findFirst({

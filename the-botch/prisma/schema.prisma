@@ -261,6 +261,8 @@ model Event {
   @@index([date])
   // カレンダーの複数日イベント日付範囲クエリ用
   @@index([endDate])
+  // カレンダーAPI: 開始日〜終了日の範囲クエリ用複合インデックス
+  @@index([date, endDate])
   // 作成者FK
   @@index([createdById])
   @@map("events")

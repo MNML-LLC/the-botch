@@ -85,7 +85,8 @@ export default function CalendarPage() {
         warikanEvents: WarikanEvent[];
       }>;
     },
-    staleTime: 2 * 60 * 1000, // 2分
+    staleTime: 10 * 60 * 1000, // 10分（月切替時の再フェッチ抑制）
+    gcTime: 30 * 60 * 1000,    // 30分GC（前後月をキャッシュ保持）
   });
 
   // 月の日数と開始曜日
