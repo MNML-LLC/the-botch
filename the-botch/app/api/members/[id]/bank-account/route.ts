@@ -9,7 +9,15 @@ export async function GET(_request: NextRequest, { params }: Params) {
   try {
     const { id } = await params
 
-    // FK制約があるため、bankAccountの検索のみで十分
+    // メンバー存在チェック
+    const member = await prisma.member.findUnique({ where: { id } })
+    if (!member) {
+      return NextResponse.json(
+        { error: 'メンバーが見つかりません' },
+        { status: 404 }
+      )
+    }
+
     const bankAccount = await prisma.bankAccount.findUnique({
       where: { memberId: id },
     })

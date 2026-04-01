@@ -1093,6 +1093,6 @@ describe('シナリオ6: PAYING状態での参加者変更禁止 (Issue #174)', 
     )
     const { status, data } = await parseResponse<{ error: string }>(res)
     expect(status).toBe(400)
-    expect(data.error).toContain('精算中')
+    expect(data.error).toContain('明細入力中のイベントのみ参加者を変更できます')
   })
 })
