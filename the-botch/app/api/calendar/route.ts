@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
     // 3種類のデータを並行取得
     const [events, otokogiEvents, warikanEvents] = await Promise.all([
-      // カレンダーイベント
+      // カレンダーイベント（カレンダー表示に必要なフィールドのみ取得）
       prisma.event.findMany({
         where: {
           OR: [
@@ -26,26 +26,36 @@ export async function GET(request: NextRequest) {
             { AND: [{ date: { lt: startDate } }, { endDate: { gte: endDate } }] },
           ],
         },
-        include: {
+        select: {
+          id: true,
+          title: true,
+          date: true,
+          endDate: true,
+          eventType: true,
           createdBy: { select: memberSelect },
-          participants: { include: { member: { select: memberSelect } } },
+          participants: { select: { member: { select: memberSelect } } },
         },
         orderBy: { date: 'asc' },
       }),
 
-      // 男気イベント
+      // 男気イベント（カレンダー表示に必要なフィールドのみ取得）
       prisma.otokogiEvent.findMany({
         where: {
           eventDate: { gte: startDate, lt: endDate },
         },
-        include: {
+        select: {
+          id: true,
+          eventName: true,
+          eventDate: true,
+          amount: true,
+          place: true,
           payer: { select: memberSelect },
-          participants: { include: { member: { select: memberSelect } } },
+          participants: { select: { member: { select: memberSelect } } },
         },
         orderBy: { eventDate: 'asc' },
       }),
 
-      // 割り勘イベント（displayDate + deadline でDB側フィルタ完結）
+      // 割り勘イベント（カレンダー表示に必要なフィールドのみ取得）
       prisma.warikanEvent.findMany({
         where: {
           OR: [
@@ -54,9 +64,15 @@ export async function GET(request: NextRequest) {
             { displayDate: { gte: startDate, lt: endDate } },
           ],
         },
-        include: {
+        select: {
+          id: true,
+          eventName: true,
+          status: true,
+          detailDeadline: true,
+          paymentDeadline: true,
+          displayDate: true,
           manager: { select: memberSelect },
-          participants: { include: { member: { select: memberSelect } } },
+          participants: { select: { member: { select: memberSelect } } },
         },
         orderBy: { createdAt: 'asc' },
       }),

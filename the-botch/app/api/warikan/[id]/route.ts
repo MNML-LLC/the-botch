@@ -35,7 +35,20 @@ const warikanDetailInclude = {
         select: { ...memberSelect, paypayId: true },
       },
       toMember: {
-        select: { ...memberSelect, paypayId: true, bankAccount: true },
+        select: {
+          ...memberSelect,
+          paypayId: true,
+          bankAccount: {
+            select: {
+              id: true,
+              bankName: true,
+              branchName: true,
+              accountType: true,
+              accountNumber: true,
+              accountHolder: true,
+            },
+          },
+        },
       },
     },
     orderBy: { amount: 'desc' as const },
