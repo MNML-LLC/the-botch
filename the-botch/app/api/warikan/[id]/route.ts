@@ -7,8 +7,8 @@ type Params = { params: Promise<{ id: string }> }
 // メンバー表示用の共通フィールド
 const memberSelect = { id: true, name: true, initial: true, colorBg: true, colorText: true } as const
 
-// 割り勘詳細の共通 include 定義
-const warikanDetailInclude = {
+// 割り勘サマリー include 定義（ヘッダー + 参加者のみ。expenses/settlementsは個別API）
+const warikanSummaryInclude = {
   manager: { select: memberSelect },
   event: { select: { id: true, title: true, date: true } },
   participants: {
@@ -18,40 +18,8 @@ const warikanDetailInclude = {
       },
     },
   },
-  expenses: {
-    include: {
-      payer: { select: memberSelect },
-      debtors: {
-        include: {
-          member: { select: { id: true, name: true } },
-        },
-      },
-    },
-    orderBy: { createdAt: 'desc' as const },
-  },
-  settlements: {
-    include: {
-      fromMember: {
-        select: { ...memberSelect, paypayId: true },
-      },
-      toMember: {
-        select: {
-          ...memberSelect,
-          paypayId: true,
-          bankAccount: {
-            select: {
-              id: true,
-              bankName: true,
-              branchName: true,
-              accountType: true,
-              accountNumber: true,
-              accountHolder: true,
-            },
-          },
-        },
-      },
-    },
-    orderBy: { amount: 'desc' as const },
+  _count: {
+    select: { expenses: true, settlements: true },
   },
 } as const
 
@@ -64,7 +32,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
     const { id } = await params
     const event = await prisma.warikanEvent.findUnique({
       where: { id },
-      include: warikanDetailInclude,
+      include: warikanSummaryInclude,
     })
 
     if (!event) {
@@ -183,7 +151,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
           ...(eventId !== undefined && { eventId: eventId || null }),
           ...displayDateUpdate,
         },
-        include: warikanDetailInclude,
+        include: warikanSummaryInclude,
       })
     })
 

@@ -93,8 +93,8 @@ export default function WarikanListPage() {
     queryFn: fetchWarikanEvents,
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
-    staleTime: 5 * 60 * 1000, // 5分キャッシュ
-    gcTime: 10 * 60 * 1000,   // 10分GC
+    staleTime: 5 * 60 * 1000,  // 5分キャッシュ
+    gcTime: 30 * 60 * 1000,    // 30分GC
   });
 
   const events = data?.pages.flatMap((page) => page.data) ?? [];

@@ -183,17 +183,28 @@ describe('シナリオ1: 割り勘フロー（完全ライフサイクル）', (
   })
 
   test('割り勘詳細を取得（対象者情報含む）', async () => {
-    const res = await getWarikanById(
+    // サマリーAPI（expenses/settlementsは含まない）
+    const summaryRes = await getWarikanById(
       createRequest(`/api/warikan/${warikanId}`),
       makeParams({ id: warikanId })
     )
-    const { status, data } = await parseResponse<{
-      expenses: { debtors: { memberId: string }[] }[]
-    }>(res)
+    const { status: summaryStatus, data: summaryData } = await parseResponse<{
+      _count: { expenses: number; settlements: number }
+    }>(summaryRes)
+    expect(summaryStatus).toBe(200)
+    expect(summaryData._count.expenses).toBe(2)
+
+    // 経費APIから対象者情報を取得
+    const res = await getExpenses(
+      createRequest(`/api/warikan/${warikanId}/expenses`),
+      makeParams({ id: warikanId })
+    )
+    const { status, data } = await parseResponse<
+      { debtors: { memberId: string }[] }[]
+    >(res)
     expect(status).toBe(200)
-    // 各明細に対象者が含まれている
-    const expense1 = data.expenses.find((e: { debtors: { memberId: string }[] }) => e.debtors.length === 4)
-    const expense2 = data.expenses.find((e: { debtors: { memberId: string }[] }) => e.debtors.length === 2)
+    const expense1 = data.find((e: { debtors: { memberId: string }[] }) => e.debtors.length === 4)
+    const expense2 = data.find((e: { debtors: { memberId: string }[] }) => e.debtors.length === 2)
     expect(expense1).toBeDefined()
     expect(expense2).toBeDefined()
   })

@@ -26,15 +26,20 @@ export async function GET(request: NextRequest) {
       ]
     }
 
-    const memberSelect = { id: true, name: true, initial: true, colorBg: true, colorText: true } as const
-
     const events = await prisma.event.findMany({
       where,
-      include: {
-        createdBy: { select: memberSelect },
-        participants: { include: { member: { select: memberSelect } } },
-        otokogiEvents: { select: { id: true, eventName: true, amount: true } },
-        warikanEvents: { select: { id: true, eventName: true, status: true } },
+      select: {
+        id: true,
+        title: true,
+        date: true,
+        endDate: true,
+        createdAt: true,
+        createdBy: { select: { id: true, name: true } },
+        _count: {
+          select: { participants: true },
+        },
+        otokogiEvents: { select: { id: true } },
+        warikanEvents: { select: { id: true } },
       },
       orderBy: { date: 'desc' },
     })

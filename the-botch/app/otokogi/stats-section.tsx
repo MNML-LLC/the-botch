@@ -72,7 +72,7 @@ export default function StatsSection() {
       return res.json() as Promise<StatsData>;
     },
     staleTime: 5 * 60 * 1000,  // 5分キャッシュ（統計は頻繁に変わらない）
-    gcTime: 10 * 60 * 1000,    // 10分GC
+    gcTime: 30 * 60 * 1000,    // 30分GC
   });
 
   const deviationChartData = stats?.deviationScores

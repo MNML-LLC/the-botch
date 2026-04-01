@@ -79,8 +79,7 @@ type WarikanDetail = {
   manager: Member | null;
   event: LinkedEvent | null;
   participants: { member: Member }[];
-  expenses: Expense[];
-  settlements: Settlement[];
+  _count: { expenses: number; settlements: number };
 };
 
 function statusBadge(status: string) {
@@ -125,7 +124,7 @@ export default function WarikanDetailPage() {
   const [editAmount, setEditAmount] = useState('');
   const [editDebtorIds, setEditDebtorIds] = useState<Set<string>>(new Set());
 
-  // イベント詳細取得
+  // イベントサマリー取得（ヘッダー + 参加者）
   const { data: event, isLoading: loading } = useQuery({
     queryKey: ['warikan-detail', id],
     queryFn: async () => {
@@ -133,10 +132,37 @@ export default function WarikanDetailPage() {
       if (!res.ok) throw new Error('割り勘イベントの取得に失敗しました');
       return res.json() as Promise<WarikanDetail>;
     },
-    staleTime: 60 * 1000, // 1分（頻繁なリフェッチを抑制）
+    staleTime: 60 * 1000,
   });
 
-  const invalidateDetail = () => queryClient.invalidateQueries({ queryKey: ['warikan-detail', id] });
+  // 経費一覧（即時fetch）
+  const { data: expenses = [] } = useQuery({
+    queryKey: ['warikan-expenses', id],
+    queryFn: async () => {
+      const res = await fetch(`/api/warikan/${id}/expenses`);
+      if (!res.ok) throw new Error('経費一覧の取得に失敗しました');
+      return res.json() as Promise<Expense[]>;
+    },
+    staleTime: 60 * 1000,
+  });
+
+  // 精算一覧（PAYING/CLOSEDの場合のみfetch）
+  const { data: settlements = [] } = useQuery({
+    queryKey: ['warikan-settlements', id],
+    queryFn: async () => {
+      const res = await fetch(`/api/warikan/${id}/settlements`);
+      if (!res.ok) throw new Error('精算一覧の取得に失敗しました');
+      return res.json() as Promise<Settlement[]>;
+    },
+    staleTime: 60 * 1000,
+    enabled: !!event && event.status !== 'ENTERING',
+  });
+
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ['warikan-detail', id] });
+    queryClient.invalidateQueries({ queryKey: ['warikan-expenses', id] });
+    queryClient.invalidateQueries({ queryKey: ['warikan-settlements', id] });
+  };
 
   // 明細追加
   const addExpenseMutation = useMutation({
@@ -162,7 +188,7 @@ export default function WarikanDetailPage() {
       setExpenseAmount('');
       setExpenseDebtorIds(new Set());
       setShowExpenseForm(false);
-      invalidateDetail();
+      invalidateAll();
     },
     onError: () => {
       alert('追加に失敗しました');
@@ -215,7 +241,7 @@ export default function WarikanDetailPage() {
     },
     onSuccess: () => {
       setEditingExpenseId(null);
-      invalidateDetail();
+      invalidateAll();
     },
     onError: (error: Error) => {
       alert(error.message);
@@ -246,7 +272,7 @@ export default function WarikanDetailPage() {
       return res.json();
     },
     onSuccess: () => {
-      invalidateDetail();
+      invalidateAll();
     },
     onError: (error: Error) => {
       alert(error.message);
@@ -273,7 +299,7 @@ export default function WarikanDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warikan'] });
-      invalidateDetail();
+      invalidateAll();
     },
     onError: (error: Error) => {
       alert(error.message);
@@ -299,7 +325,7 @@ export default function WarikanDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warikan'] });
-      invalidateDetail();
+      invalidateAll();
     },
     onError: (error: Error) => {
       alert(error.message);
@@ -308,7 +334,7 @@ export default function WarikanDetailPage() {
 
   const handleRevertToEntering = () => {
     if (isMutating || !event) return;
-    const paidCount = event.settlements.filter((s) => s.isPaid).length;
+    const paidCount = settlements.filter((s) => s.isPaid).length;
     if (paidCount > 0) {
       // 送金済みがある場合は確認ダイアログ
       if (!confirm(`送金済みの精算が${paidCount}件あります。明細を修正すると精算結果がリセットされ、再度精算をやり直す必要があります。`)) return;
@@ -331,7 +357,7 @@ export default function WarikanDetailPage() {
       return res.json();
     },
     onSuccess: () => {
-      invalidateDetail();
+      invalidateAll();
     },
     onError: (error: Error) => {
       alert(error.message);
@@ -385,11 +411,11 @@ export default function WarikanDetailPage() {
   const isEntering = event.status === 'ENTERING';
   const isPaying = event.status === 'PAYING';
   const isClosed = event.status === 'CLOSED';
-  const totalExpenses = event.expenses.reduce((sum, e) => sum + e.amount, 0);
+  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
   const perPerson = event.participants.length > 0 ? Math.floor(totalExpenses / event.participants.length) : 0;
-  const receivedCount = event.settlements.filter((s) => s.isReceived).length;
+  const receivedCount = settlements.filter((s) => s.isReceived).length;
   // 精算確定の有効化条件: 明細1件以上 & 参加者2人以上
-  const canConfirmSettlement = isEntering && event.expenses.length > 0 && event.participants.length >= 2;
+  const canConfirmSettlement = isEntering && expenses.length > 0 && event.participants.length >= 2;
 
   return (
     <div>
@@ -451,11 +477,11 @@ export default function WarikanDetailPage() {
             <CardTitle className="text-slate-800">立替明細</CardTitle>
           </CardHeader>
           <CardContent>
-            {event.expenses.length === 0 ? (
+            {expenses.length === 0 ? (
               <p className="text-sm text-gray-500">まだ明細がありません</p>
             ) : (
               <div className="space-y-2">
-                {event.expenses.map((expense) => {
+                {expenses.map((expense) => {
                   const isAllMembers = expense.debtors.length === 0 || expense.debtors.length === event.participants.length;
                   const debtorNames = isAllMembers ? '全員' : expense.debtors.map((d) => d.member.name).join('・');
 
@@ -735,19 +761,19 @@ export default function WarikanDetailPage() {
         )}
 
         {/* 精算結果（PAYING/CLOSEDのみ表示） */}
-        {(isPaying || isClosed) && event.settlements.length > 0 && (
+        {(isPaying || isClosed) && settlements.length > 0 && (
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-slate-800">精算結果</CardTitle>
                 <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
-                  {receivedCount}/{event.settlements.length} 受領済
+                  {receivedCount}/{settlements.length} 受領済
                 </span>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {event.settlements.map((settlement) => (
+                {settlements.map((settlement) => (
                   <div key={settlement.id} className="bg-gray-50 rounded-lg p-3 border">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-1.5 text-sm min-w-0">

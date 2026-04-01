@@ -25,8 +25,8 @@ export default function MembersPage() {
       if (!res.ok) throw new Error('API error');
       return res.json() as Promise<Member[]>;
     },
-    staleTime: 5 * 60 * 1000, // 5分キャッシュ
-    gcTime: 10 * 60 * 1000,   // 10分GC
+    staleTime: 5 * 60 * 1000,  // 5分キャッシュ
+    gcTime: 30 * 60 * 1000,    // 30分GC
   });
 
   return (
