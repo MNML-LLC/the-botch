@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -146,7 +147,8 @@ export default function NewEventPage() {
         {/* メモ */}
         <div>
           <Label>メモ（任意）</Label>
-          <Input
+          <Textarea
+            rows={3}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="場所、集合時間など"

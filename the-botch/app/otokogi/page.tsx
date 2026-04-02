@@ -33,6 +33,7 @@ type OtokogiEvent = {
   eventName: string;
   amount: number;
   place: string | null;
+  memo: string | null;
   hasAlbum: boolean;
   payer: Member;
   participants: { member: Member }[];
@@ -180,6 +181,9 @@ export default function OtokogiPage() {
                           {formatDate(event.eventDate)} / {event.payer.name}
                           {event.place && ` / ${event.place}`}
                         </p>
+                        {event.memo && (
+                          <p className="text-sm text-gray-500 mt-1 line-clamp-2 whitespace-pre-wrap">{event.memo}</p>
+                        )}
                         <div className="flex flex-wrap gap-1 mt-1.5">
                           {event.participants.map((p) => (
                             <div

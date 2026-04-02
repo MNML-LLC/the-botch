@@ -266,7 +266,7 @@ export default function OtokogiNewPage() {
             <Label>メモ（任意）</Label>
             <Textarea
               className="mt-1"
-              rows={2}
+              rows={3}
               value={memo}
               onChange={(e) => setMemo(e.target.value)}
               placeholder="備考があれば"

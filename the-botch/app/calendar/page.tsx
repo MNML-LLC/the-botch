@@ -19,6 +19,7 @@ type CalendarEvent = {
   title: string;
   date: string;
   endDate: string | null;
+  description: string | null;
   eventType: string;
   createdBy: Member;
   participants: { member: Member }[];
@@ -29,6 +30,7 @@ type OtokogiEvent = {
   eventDate: string;
   eventName: string;
   amount: number;
+  memo: string | null;
   payer: Member;
 };
 
@@ -36,6 +38,7 @@ type WarikanEvent = {
   id: string;
   eventName: string;
   status: string;
+  memo: string | null;
   createdAt: string;
   displayDate: string | null;
   manager: Member | null;
@@ -266,6 +269,9 @@ export default function CalendarPage() {
                     {eventTypeLabel(e.eventType)}
                     {e.endDate && e.endDate !== e.date && ` (〜${new Date(e.endDate).getMonth() + 1}/${new Date(e.endDate).getDate()})`}
                   </p>
+                  {e.description && (
+                    <p className="text-sm text-gray-500 mt-1 whitespace-pre-wrap">{e.description}</p>
+                  )}
                   <div className="flex flex-wrap gap-1 mt-1">
                     {e.participants.map((p) => (
                       <span key={p.member.id} className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">
@@ -289,6 +295,9 @@ export default function CalendarPage() {
                     <p className="text-sm font-bold text-slate-800 shrink-0">¥{o.amount.toLocaleString()}</p>
                   </div>
                   <p className="text-xs text-gray-500">男気 — {o.payer.name}</p>
+                  {o.memo && (
+                    <p className="text-sm text-gray-500 mt-1 whitespace-pre-wrap">{o.memo}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -303,6 +312,9 @@ export default function CalendarPage() {
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-slate-800 text-sm truncate">{w.eventName}</p>
                     <p className="text-xs text-gray-500">割り勘 — {w.manager?.name ?? '未設定'}</p>
+                    {w.memo && (
+                      <p className="text-sm text-gray-500 mt-1 whitespace-pre-wrap">{w.memo}</p>
+                    )}
                   </div>
                 </div>
               </div>

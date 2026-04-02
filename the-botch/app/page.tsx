@@ -39,7 +39,7 @@ async function fetchDashboardData() {
       orderBy: { createdAt: 'desc' },
     }),
     prisma.otokogiEvent.findMany({
-      include: { payer: true },
+      select: { id: true, eventDate: true, eventName: true, amount: true, memo: true, payer: { select: { id: true, name: true, initial: true, colorBg: true, colorText: true } } },
       orderBy: { eventDate: 'desc' },
       take: 5,
     }),
@@ -154,6 +154,9 @@ export default async function DashboardPage() {
                       <p className="text-xs text-gray-500 mt-1">
                         管理: {w.manager?.name ?? '未設定'} / {w.participants.length}人参加
                       </p>
+                      {w.memo && (
+                        <p className="text-sm text-gray-500 mt-1 line-clamp-2 whitespace-pre-wrap">{w.memo}</p>
+                      )}
                     </div>
                     {statusBadge(w.status)}
                   </div>
@@ -195,6 +198,9 @@ export default async function DashboardPage() {
                       <p className="text-xs text-gray-500">
                         {formatShortDate(o.eventDate)} / {o.payer.name}
                       </p>
+                      {o.memo && (
+                        <p className="text-sm text-gray-500 mt-1 line-clamp-2 whitespace-pre-wrap">{o.memo}</p>
+                      )}
                     </div>
                   </div>
                   <p className="font-bold text-slate-800">¥{o.amount.toLocaleString()}</p>

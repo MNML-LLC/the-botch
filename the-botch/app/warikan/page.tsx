@@ -161,6 +161,9 @@ export default function WarikanListPage() {
                       <p className="text-xs text-gray-500 mt-1">
                         管理: {event.manager?.name ?? '未設定'}
                       </p>
+                      {event.memo && (
+                        <p className="text-sm text-gray-500 mt-1 line-clamp-2 whitespace-pre-wrap">{event.memo}</p>
+                      )}
                     </div>
                     {statusBadge(event.status)}
                   </div>
