@@ -27,8 +27,7 @@ function formatShortDate(date: Date | string | null) {
 }
 
 async function fetchDashboardData() {
-  // 5クエリを並行実行（全件フェッチを排除）
-  const [openWarikan, recentOtokogi, otokogiStats, topPayerGroup, topOtokogiDb] = await Promise.all([
+  const [openWarikan, recentOtokogi] = await Promise.all([
     prisma.warikanEvent.findMany({
       where: { status: { not: 'CLOSED' } },
       include: {
@@ -43,52 +42,9 @@ async function fetchDashboardData() {
       orderBy: { eventDate: 'desc' },
       take: 5,
     }),
-    // count + sum をDB集計で取得（全件フェッチ不要）
-    prisma.otokogiEvent.aggregate({
-      _count: true,
-      _sum: { amount: true },
-    }),
-    // 最多支払者をDB側でグループ集計
-    prisma.otokogiEvent.groupBy({
-      by: ['payerId'],
-      _sum: { amount: true },
-      orderBy: { _sum: { amount: 'desc' } },
-      take: 1,
-    }),
-    // 最多漢気者（amount × (N-1)/N の累計が最大のメンバー）
-    prisma.$queryRaw<{ payer_id: string; payer_name: string; otokogi_amount: bigint }[]>`
-      SELECT oe.payer_id, m.name AS payer_name,
-        ROUND(SUM(oe.amount::float * (cnt.participant_count - 1)::float / GREATEST(cnt.participant_count, 1)::float))::bigint AS otokogi_amount
-      FROM otokogi_events oe
-      JOIN members m ON oe.payer_id = m.id
-      JOIN (
-        SELECT otokogi_event_id, COUNT(*) AS participant_count
-        FROM otokogi_participants
-        GROUP BY otokogi_event_id
-      ) cnt ON oe.id = cnt.otokogi_event_id
-      GROUP BY oe.payer_id, m.name
-      ORDER BY otokogi_amount DESC
-      LIMIT 1`,
   ]);
 
-  const totalEvents = otokogiStats._count;
-  const totalAmount = otokogiStats._sum.amount ?? 0;
-
-  // topPayerの名前を取得（1件だけ）
-  let topPayer: { name: string; total: number } | undefined;
-  if (topPayerGroup.length > 0) {
-    const member = await prisma.member.findUnique({
-      where: { id: topPayerGroup[0].payerId },
-      select: { name: true },
-    });
-    topPayer = { name: member?.name ?? '-', total: topPayerGroup[0]._sum.amount ?? 0 };
-  }
-
-  const topOtokogi = topOtokogiDb.length > 0
-    ? { name: topOtokogiDb[0].payer_name, amount: Number(topOtokogiDb[0].otokogi_amount) }
-    : undefined;
-
-  return { openWarikan, recentOtokogi, totalEvents, totalAmount, topPayer, topOtokogi };
+  return { openWarikan, recentOtokogi };
 }
 
 export default async function DashboardPage() {
@@ -123,37 +79,10 @@ export default async function DashboardPage() {
     );
   }
 
-  const { openWarikan, recentOtokogi, totalEvents, totalAmount, topPayer, topOtokogi } = data;
+  const { openWarikan, recentOtokogi } = data;
 
   return (
     <div className="grid gap-4">
-      {/* 累計統計サマリー */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-slate-800">累計統計</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
-            <div>
-              <p className="text-xl sm:text-2xl font-bold text-slate-800">{totalEvents}</p>
-              <p className="text-[10px] sm:text-xs text-gray-500">総イベント数</p>
-            </div>
-            <div>
-              <p className="text-base sm:text-2xl font-bold text-slate-800 truncate">¥{totalAmount.toLocaleString()}</p>
-              <p className="text-[10px] sm:text-xs text-gray-500">累計金額</p>
-            </div>
-            <div>
-              <p className="text-xl sm:text-2xl font-bold text-amber-600 truncate">{topPayer?.name ?? '-'}</p>
-              <p className="text-[10px] sm:text-xs text-gray-500">最多支払者</p>
-            </div>
-            <div>
-              <p className="text-xl sm:text-2xl font-bold text-amber-600 truncate">{topOtokogi?.name ?? '-'}</p>
-              <p className="text-[10px] sm:text-xs text-gray-500">最多漢気者</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* 未精算の割り勘 */}
       <Card>
         <CardHeader>
