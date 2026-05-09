@@ -27,8 +27,8 @@ function formatShortDate(date: Date | string | null) {
 }
 
 async function fetchDashboardData() {
-  // 3クエリを並行実行（全件フェッチを排除）
-  const [openWarikan, recentOtokogi, otokogiStats, topPayerGroup] = await Promise.all([
+  // 5クエリを並行実行（全件フェッチを排除）
+  const [openWarikan, recentOtokogi, otokogiStats, topPayerGroup, topOtokogiDb] = await Promise.all([
     prisma.warikanEvent.findMany({
       where: { status: { not: 'CLOSED' } },
       include: {
@@ -55,6 +55,20 @@ async function fetchDashboardData() {
       orderBy: { _sum: { amount: 'desc' } },
       take: 1,
     }),
+    // 最多漢気者（amount × (N-1)/N の累計が最大のメンバー）
+    prisma.$queryRaw<{ payer_id: string; payer_name: string; otokogi_amount: bigint }[]>`
+      SELECT oe.payer_id, m.name AS payer_name,
+        ROUND(SUM(oe.amount::float * (cnt.participant_count - 1)::float / GREATEST(cnt.participant_count, 1)::float))::bigint AS otokogi_amount
+      FROM otokogi_events oe
+      JOIN members m ON oe.payer_id = m.id
+      JOIN (
+        SELECT otokogi_event_id, COUNT(*) AS participant_count
+        FROM otokogi_participants
+        GROUP BY otokogi_event_id
+      ) cnt ON oe.id = cnt.otokogi_event_id
+      GROUP BY oe.payer_id, m.name
+      ORDER BY otokogi_amount DESC
+      LIMIT 1`,
   ]);
 
   const totalEvents = otokogiStats._count;
@@ -70,7 +84,11 @@ async function fetchDashboardData() {
     topPayer = { name: member?.name ?? '-', total: topPayerGroup[0]._sum.amount ?? 0 };
   }
 
-  return { openWarikan, recentOtokogi, totalEvents, totalAmount, topPayer };
+  const topOtokogi = topOtokogiDb.length > 0
+    ? { name: topOtokogiDb[0].payer_name, amount: Number(topOtokogiDb[0].otokogi_amount) }
+    : undefined;
+
+  return { openWarikan, recentOtokogi, totalEvents, totalAmount, topPayer, topOtokogi };
 }
 
 export default async function DashboardPage() {
@@ -105,7 +123,7 @@ export default async function DashboardPage() {
     );
   }
 
-  const { openWarikan, recentOtokogi, totalEvents, totalAmount, topPayer } = data;
+  const { openWarikan, recentOtokogi, totalEvents, totalAmount, topPayer, topOtokogi } = data;
 
   return (
     <div className="grid gap-4">
@@ -115,7 +133,7 @@ export default async function DashboardPage() {
           <CardTitle className="text-slate-800">累計統計</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
             <div>
               <p className="text-xl sm:text-2xl font-bold text-slate-800">{totalEvents}</p>
               <p className="text-[10px] sm:text-xs text-gray-500">総イベント数</p>
@@ -127,6 +145,10 @@ export default async function DashboardPage() {
             <div>
               <p className="text-xl sm:text-2xl font-bold text-amber-600 truncate">{topPayer?.name ?? '-'}</p>
               <p className="text-[10px] sm:text-xs text-gray-500">最多支払者</p>
+            </div>
+            <div>
+              <p className="text-xl sm:text-2xl font-bold text-amber-600 truncate">{topOtokogi?.name ?? '-'}</p>
+              <p className="text-[10px] sm:text-xs text-gray-500">最多漢気者</p>
             </div>
           </div>
         </CardContent>
