@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import MemberSummaryTable from './member-summary-table';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid,
@@ -165,6 +166,9 @@ export default function StatsSection() {
               </CardContent>
             </Card>
           )}
+
+          {/* 収支分析テーブル */}
+          <MemberSummaryTable />
 
           {/* 月別支払額推移 */}
           {stats.monthlyTrend.length > 0 && (
