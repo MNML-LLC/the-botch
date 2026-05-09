@@ -23,6 +23,7 @@ const contentSecurityPolicy = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ['@line/bot-sdk'],
   async headers() {
     return [
       {

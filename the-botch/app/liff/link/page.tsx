@@ -3,10 +3,17 @@
 import { useEffect, useState } from 'react'
 import liff from '@line/liff'
 
+type Member = {
+  id: string
+  name: string
+  lineAccount: { isActive: boolean } | null
+}
+
 type Status = 'loading' | 'selecting' | 'linking' | 'done' | 'error'
 
 export default function LiffLinkPage() {
   const [status, setStatus] = useState<Status>('loading')
+  const [members, setMembers] = useState<Member[]>([])
   const [memberId, setMemberId] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -20,11 +27,16 @@ export default function LiffLinkPage() {
 
     liff
       .init({ liffId })
-      .then(() => {
+      .then(async () => {
         if (!liff.isLoggedIn()) {
           liff.login()
           return
         }
+
+        const res = await fetch('/api/members/list')
+        if (!res.ok) throw new Error('メンバー一覧の取得に失敗しました')
+        const data = (await res.json()) as Member[]
+        setMembers(data)
         setStatus('selecting')
       })
       .catch((err: unknown) => {
@@ -34,7 +46,7 @@ export default function LiffLinkPage() {
   }, [])
 
   async function handleLink() {
-    if (!memberId.trim()) return
+    if (!memberId) return
     setStatus('linking')
 
     try {
@@ -44,7 +56,7 @@ export default function LiffLinkPage() {
       const res = await fetch('/api/line/link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken, memberId: memberId.trim() }),
+        body: JSON.stringify({ idToken, memberId }),
       })
 
       if (!res.ok) {
@@ -91,6 +103,8 @@ export default function LiffLinkPage() {
     )
   }
 
+  const linkedCount = members.filter((m) => m.lineAccount?.isActive).length
+
   return (
     <div className="flex min-h-screen items-center justify-center p-6">
       <div className="w-full max-w-sm space-y-6">
@@ -103,23 +117,34 @@ export default function LiffLinkPage() {
 
         <div className="space-y-2">
           <label htmlFor="memberId" className="block text-sm font-medium text-gray-700">
-            メンバー ID
+            自分のメンバーを選択
           </label>
-          <input
+          <select
             id="memberId"
-            type="text"
             value={memberId}
             onChange={(e) => setMemberId(e.target.value)}
-            placeholder="メンバー ID を入力"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             disabled={status === 'linking'}
-          />
-          <p className="text-xs text-gray-400">管理者から共有されたメンバー ID を入力してください。</p>
+            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <option value="">選択してください</option>
+            {members.map((m) => {
+              const linked = m.lineAccount?.isActive === true
+              return (
+                <option key={m.id} value={m.id} disabled={linked}>
+                  {m.name}
+                  {linked ? '（連携済）' : ''}
+                </option>
+              )
+            })}
+          </select>
+          {linkedCount > 0 && (
+            <p className="text-xs text-gray-400">「連携済」のメンバーは選択できません。</p>
+          )}
         </div>
 
         <button
           onClick={handleLink}
-          disabled={!memberId.trim() || status === 'linking'}
+          disabled={!memberId || status === 'linking'}
           className="w-full rounded-md bg-green-500 px-4 py-2 text-sm font-medium text-white hover:bg-green-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {status === 'linking' ? '連携中...' : '連携する'}
