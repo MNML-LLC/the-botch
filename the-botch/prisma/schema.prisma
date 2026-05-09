@@ -26,6 +26,7 @@ model Member {
 
   // リレーション
   bankAccount            BankAccount?
+  lineAccount            MemberLineAccount?
   otokogiEventsPaid      OtokogiEvent[]
   otokogiParticipations  OtokogiParticipant[]
   warikanManaged         WarikanEvent[]        @relation("WarikanManager")
@@ -66,6 +67,22 @@ model BankAccount {
   member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
 
   @@map("bank_accounts")
+}
+
+// ============================================================
+// 1-2. LINE アカウント連携（Member と 1:1）
+// ============================================================
+model MemberLineAccount {
+  id          String   @id @default(uuid())
+  memberId    String   @unique @map("member_id")
+  lineUserId  String   @unique @map("line_user_id")
+  displayName String?  @map("display_name")
+  linkedAt    DateTime @default(now()) @map("linked_at")
+  isActive    Boolean  @default(true) @map("is_active")
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@map("member_line_accounts")
 }
 
 // ============================================================
