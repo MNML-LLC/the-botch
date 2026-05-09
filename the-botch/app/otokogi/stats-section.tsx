@@ -24,6 +24,15 @@ type PerMember = {
   winRate: number;
 };
 
+type OtokogiByMember = {
+  id: string;
+  name: string;
+  initial: string;
+  colorBg: string;
+  colorText: string;
+  otokogiAmount: number;
+};
+
 type StatsData = {
   totalCount: number;
   totalAmount: number;
@@ -35,6 +44,8 @@ type StatsData = {
   streaks: { id: string; name: string; maxStreak: number; currentStreak: number }[];
   cumulativeRace: { month: string; [memberId: string]: string | number }[];
   records: { label: string; value: number | string; detail?: string }[];
+  otokogiByMember: OtokogiByMember[];
+  totalOtokogiAmount: number;
 };
 
 const MEMBER_COLORS = ['#d97706', '#2563eb', '#dc2626', '#059669', '#7c3aed', '#ec4899'];
@@ -126,6 +137,34 @@ export default function StatsSection() {
               </div>
             </CardContent>
           </Card>
+
+          {/* 漢気ランキング */}
+          {stats.otokogiByMember.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-slate-800">漢気ランキング</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-gray-500 mb-3">多く払えた額（支払額 × (参加人数−1) ÷ 参加人数）の累計</p>
+                <div className="space-y-2">
+                  {stats.otokogiByMember.map((member, i) => (
+                    <div key={member.id} className="flex items-center gap-3 py-1">
+                      <span className={`w-6 text-sm font-bold text-right shrink-0 ${
+                        i === 0 ? 'text-amber-500' : i === 1 ? 'text-gray-400' : i === 2 ? 'text-orange-400' : 'text-gray-300'
+                      }`}>
+                        {i + 1}
+                      </span>
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${member.colorBg} ${member.colorText}`}>
+                        {member.initial}
+                      </div>
+                      <span className="text-sm text-slate-800 flex-1">{member.name}</span>
+                      <span className="font-bold text-sm text-amber-600">¥{member.otokogiAmount.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* 月別支払額推移 */}
           {stats.monthlyTrend.length > 0 && (

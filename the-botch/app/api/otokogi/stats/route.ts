@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
       ? { otokogiEvent: { eventDate: { gte: new Date(`${year}-01-01`), lt: new Date(`${Number(year) + 1}-01-01`) } } }
       : {}
 
-    // --- DB並行クエリ（11本: max/min を1本に統合） ---
+    // --- DB並行クエリ（12本: max/min を1本に統合） ---
     const [
       totals,
       payerStats,
@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
       heatmapDb,
       maxDayDb,
       cumulativeRaceDb,
+      otokogiAmountDb,
     ] = await Promise.all([
       // 1. 全体集計（aggregate）
       prisma.otokogiEvent.aggregate({
@@ -223,6 +224,30 @@ export async function GET(request: NextRequest) {
             FROM grid g
             LEFT JOIN monthly mp ON g.month = mp.month AND g.payer_id = mp.payer_id
             ORDER BY g.month, g.payer_id`,
+
+      // 13. 漢気額計算（支払者別: amount × (N-1)/N の累計、N=参加人数）
+      year
+        ? prisma.$queryRaw<{ payer_id: string; otokogi_amount: bigint }[]>`
+            SELECT oe.payer_id,
+              ROUND(SUM(oe.amount::float * (cnt.participant_count - 1)::float / GREATEST(cnt.participant_count, 1)::float))::bigint AS otokogi_amount
+            FROM otokogi_events oe
+            JOIN (
+              SELECT otokogi_event_id, COUNT(*) AS participant_count
+              FROM otokogi_participants
+              GROUP BY otokogi_event_id
+            ) cnt ON oe.id = cnt.otokogi_event_id
+            WHERE oe.event_date >= ${new Date(`${year}-01-01`)} AND oe.event_date < ${new Date(`${Number(year) + 1}-01-01`)}
+            GROUP BY oe.payer_id`
+        : prisma.$queryRaw<{ payer_id: string; otokogi_amount: bigint }[]>`
+            SELECT oe.payer_id,
+              ROUND(SUM(oe.amount::float * (cnt.participant_count - 1)::float / GREATEST(cnt.participant_count, 1)::float))::bigint AS otokogi_amount
+            FROM otokogi_events oe
+            JOIN (
+              SELECT otokogi_event_id, COUNT(*) AS participant_count
+              FROM otokogi_participants
+              GROUP BY otokogi_event_id
+            ) cnt ON oe.id = cnt.otokogi_event_id
+            GROUP BY oe.payer_id`,
     ])
 
     // max/min 結果の展開
@@ -348,6 +373,20 @@ export async function GET(request: NextRequest) {
       cumulativeRace.push(entry)
     }
 
+    // --- 漢気額（メンバー別累計: 多く払えた額） ---
+    const otokogiAmountMap = new Map(otokogiAmountDb.map((r) => [r.payer_id, Number(r.otokogi_amount)]))
+    const otokogiByMember = members
+      .map((member) => ({
+        id: member.id,
+        name: member.name,
+        initial: member.initial,
+        colorBg: member.colorBg,
+        colorText: member.colorText,
+        otokogiAmount: otokogiAmountMap.get(member.id) ?? 0,
+      }))
+      .sort((a, b) => b.otokogiAmount - a.otokogiAmount)
+    const totalOtokogiAmount = otokogiByMember.reduce((sum, m) => sum + m.otokogiAmount, 0)
+
     // --- 記録 ---
     const records: { label: string; value: number | string; detail?: string }[] = []
 
@@ -400,6 +439,8 @@ export async function GET(request: NextRequest) {
       streaks,
       cumulativeRace,
       records,
+      otokogiByMember,
+      totalOtokogiAmount,
     }
 
     // キャッシュに保存
