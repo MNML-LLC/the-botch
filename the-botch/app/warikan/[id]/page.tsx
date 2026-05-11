@@ -760,8 +760,8 @@ export default function WarikanDetailPage() {
           </CardContent>
         </Card>
 
-        {/* 各人の収支（ENTERINGのみ） */}
-        {isEntering && event.participants.length >= 2 && (
+        {/* 各人の収支（全フェーズ） */}
+        {event.participants.length >= 2 && (
           <Card>
             <CardHeader>
               <CardTitle className="text-slate-800">各人の収支</CardTitle>
@@ -860,12 +860,12 @@ export default function WarikanDetailPage() {
           </Button>
         )}
 
-        {/* 精算結果（PAYING/CLOSEDのみ表示） */}
+        {/* 送金フロー（PAYING/CLOSEDのみ表示） */}
         {(isPaying || isClosed) && settlements.length > 0 && (
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="text-slate-800">精算結果</CardTitle>
+                <CardTitle className="text-slate-800">送金フロー</CardTitle>
                 <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
                   {receivedCount}/{settlements.length} 受領済
                 </span>
@@ -932,7 +932,7 @@ export default function WarikanDetailPage() {
                         <span className="text-xs text-amber-600 font-medium">送金済み</span>
                       )}
                       {settlement.isReceived && (
-                        <span className="text-xs text-green-600 font-medium">受領済み</span>
+                        <span className="text-xs text-green-600 font-medium">✓ 受領済み</span>
                       )}
                     </div>
                   </div>
