@@ -17,6 +17,55 @@ export interface SettlementEntry {
   amount: number
 }
 
+export interface MemberBalance {
+  memberId: string
+  paid: number
+  owed: number
+  balance: number
+}
+
+/**
+ * 各参加者の立替済み額・払うべき額・収支を計算する。
+ * リアルタイムプレビュー用。DB操作なし。
+ */
+export function calculateMemberBalances(
+  expenses: Expense[],
+  participantIds: string[]
+): MemberBalance[] {
+  const paidByMember: Record<string, number> = {}
+  const owedByMember: Record<string, number> = {}
+  for (const memberId of participantIds) {
+    paidByMember[memberId] = 0
+    owedByMember[memberId] = 0
+  }
+
+  for (const expense of expenses) {
+    if (paidByMember[expense.payerId] !== undefined) {
+      paidByMember[expense.payerId] += expense.amount
+    }
+
+    const filteredDebtors =
+      expense.debtors.length > 0
+        ? expense.debtors.map((d) => d.memberId).filter((id) => participantIds.includes(id))
+        : []
+    const debtorMemberIds = filteredDebtors.length > 0 ? filteredDebtors : participantIds
+
+    const baseShare = Math.floor(expense.amount / debtorMemberIds.length)
+    const remainder = expense.amount % debtorMemberIds.length
+    for (let i = 0; i < debtorMemberIds.length; i++) {
+      const share = baseShare + (i < remainder ? 1 : 0)
+      owedByMember[debtorMemberIds[i]] = (owedByMember[debtorMemberIds[i]] ?? 0) + share
+    }
+  }
+
+  return participantIds.map((memberId) => ({
+    memberId,
+    paid: paidByMember[memberId],
+    owed: owedByMember[memberId],
+    balance: paidByMember[memberId] - owedByMember[memberId],
+  }))
+}
+
 /**
  * 立替明細と参加者IDから精算フロー（誰が誰にいくら送金するか）を計算する。
  * 全て整数演算。浮動小数点を使わない。

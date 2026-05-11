@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { calculateSettlements, calculateMemberBalances } from '@/lib/warikan-calc';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -405,6 +406,27 @@ export default function WarikanDetailPage() {
 
   const isMutating = addExpenseMutation.isPending || updateExpenseMutation.isPending || deleteExpenseMutation.isPending || calculateSettlementsMutation.isPending || settlementActionMutation.isPending || revertToEnteringMutation.isPending || deleteEventMutation.isPending;
 
+  // useMemo は早期 return より前に呼ぶ必要がある（Rules of Hooks）
+  const participantIds = useMemo(
+    () => event?.participants.map((p) => p.member.id) ?? [],
+    [event]
+  );
+
+  const memberMap = useMemo(
+    () => new Map((event?.participants ?? []).map((p) => [p.member.id, p.member])),
+    [event]
+  );
+
+  const memberBalances = useMemo(
+    () => calculateMemberBalances(expenses, participantIds),
+    [expenses, participantIds]
+  );
+
+  const previewSettlements = useMemo(
+    () => calculateSettlements(expenses, participantIds).settlements,
+    [expenses, participantIds]
+  );
+
   if (loading) return <p className="text-sm text-gray-500">読み込み中...</p>;
   if (!event) return <p className="text-sm text-gray-500">イベントが見つかりません</p>;
 
@@ -737,6 +759,84 @@ export default function WarikanDetailPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* 各人の収支（ENTERINGのみ） */}
+        {isEntering && event.participants.length >= 2 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-slate-800">各人の収支</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-xs text-gray-500">
+                      <th className="text-left py-1.5 pr-2 font-medium">メンバー</th>
+                      <th className="text-right py-1.5 px-2 font-medium">払うべき</th>
+                      <th className="text-right py-1.5 px-2 font-medium">立替済み</th>
+                      <th className="text-right py-1.5 pl-2 font-medium">収支</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {memberBalances.map((mb) => {
+                      const member = memberMap.get(mb.memberId);
+                      return (
+                        <tr key={mb.memberId} className="border-b last:border-b-0">
+                          <td className="py-2 pr-2 font-medium text-slate-800">{member?.name ?? mb.memberId}</td>
+                          <td className="py-2 px-2 text-right text-gray-600">¥{mb.owed.toLocaleString()}</td>
+                          <td className="py-2 px-2 text-right text-gray-600">¥{mb.paid.toLocaleString()}</td>
+                          <td className="py-2 pl-2 text-right font-medium">
+                            {mb.balance > 0 ? (
+                              <span className="text-green-600">+¥{mb.balance.toLocaleString()}（受取）</span>
+                            ) : mb.balance < 0 ? (
+                              <span className="text-amber-600">-¥{Math.abs(mb.balance).toLocaleString()}（払う）</span>
+                            ) : (
+                              <span className="text-gray-400">±0</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* 送金フロー（ENTERINGのみ） */}
+        {isEntering && event.participants.length >= 2 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-slate-800">送金フロー（精算プレビュー）</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {previewSettlements.length === 0 ? (
+                <p className="text-sm text-gray-500">
+                  {expenses.length === 0 ? '明細を追加すると精算フローが表示されます' : '精算不要です（全員均等に立替済み）'}
+                </p>
+              ) : (
+                <ol className="space-y-2">
+                  {previewSettlements.map((s, i) => {
+                    const fromMember = memberMap.get(s.fromMemberId);
+                    const toMember = memberMap.get(s.toMemberId);
+                    return (
+                      <li key={i} className="flex items-center gap-2 text-sm">
+                        <span className="text-gray-400 text-xs font-mono w-5 shrink-0">
+                          {String.fromCharCode(0x2460 + i)}
+                        </span>
+                        <span className="font-medium text-slate-800">{fromMember?.name ?? s.fromMemberId}</span>
+                        <span className="text-gray-400">&rarr;</span>
+                        <span className="font-medium text-slate-800">{toMember?.name ?? s.toMemberId}</span>
+                        <span className="ml-auto font-bold text-slate-800">¥{s.amount.toLocaleString()}</span>
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* フェーズ遷移ボタン */}
         {isEntering && (
