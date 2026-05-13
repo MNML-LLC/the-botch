@@ -20,6 +20,7 @@ model Member {
   colorBg   String   @default("bg-gray-100") @map("color_bg")
   colorText String   @default("text-gray-700") @map("color_text")
   paypayId  String?  @map("paypay_id") // PayPay ID（@xxx）
+  email     String?  @unique // Outlook 同期用メールアドレス
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -242,15 +243,16 @@ enum EventType {
 }
 
 model Event {
-  id          String    @id @default(uuid())
-  title       String    @db.VarChar(200)
-  date        DateTime  @db.Date // 開始日
-  endDate     DateTime? @map("end_date") @db.Date // 終了日（複数日の場合）
-  description String?
-  eventType   EventType @default(HANGOUT) @map("event_type")
-  createdById String    @map("created_by_id")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id             String    @id @default(uuid())
+  title          String    @db.VarChar(200)
+  date           DateTime  @db.Date // 開始日
+  endDate        DateTime? @map("end_date") @db.Date // 終了日（複数日の場合）
+  description    String?
+  eventType      EventType @default(HANGOUT) @map("event_type")
+  createdById    String    @map("created_by_id")
+  outlookEventId String?   @map("outlook_event_id") @db.VarChar(500) // MS Graph イベント ID
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   // リレーション
   createdBy    Member             @relation("EventCreator", fields: [createdById], references: [id])

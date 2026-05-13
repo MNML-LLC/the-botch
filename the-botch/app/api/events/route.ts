@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { isMsGraphEnabled, createOutlookEvent } from '@/lib/msgraph'
 
 // GET /api/events — イベント一覧
 export async function GET(request: NextRequest) {
@@ -79,9 +80,33 @@ export async function POST(request: NextRequest) {
       },
       include: {
         createdBy: true,
-        participants: { include: { member: true } },
+        participants: { include: { member: { select: { id: true, name: true, email: true } } } },
       },
     })
+
+    // Outlook 同期 (ベストエフォート — 失敗してもイベント作成は成功扱い)
+    if (isMsGraphEnabled()) {
+      try {
+        const attendeeEmails = event.participants
+          .map((p) => p.member.email)
+          .filter((e): e is string => e !== null)
+
+        const outlookEventId = await createOutlookEvent({
+          title: event.title,
+          date: event.date,
+          endDate: event.endDate,
+          description: event.description,
+          attendeeEmails,
+        })
+
+        await prisma.event.update({
+          where: { id: event.id },
+          data: { outlookEventId },
+        })
+      } catch (syncErr) {
+        console.error('[msgraph] createOutlookEvent 失敗 eventId=%s:', event.id, syncErr)
+      }
+    }
 
     return NextResponse.json(event, { status: 201 })
   } catch (error) {

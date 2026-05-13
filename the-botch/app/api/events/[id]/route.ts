@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { isMsGraphEnabled, updateOutlookEvent, deleteOutlookEvent } from '@/lib/msgraph'
 
 // GET /api/events/:id — イベント詳細
 export async function GET(
@@ -64,9 +65,28 @@ export async function PUT(
       },
       include: {
         createdBy: true,
-        participants: { include: { member: true } },
+        participants: { include: { member: { select: { id: true, name: true, email: true } } } },
       },
     })
+
+    // Outlook 同期 (ベストエフォート)
+    if (isMsGraphEnabled() && event.outlookEventId) {
+      try {
+        const attendeeEmails = event.participants
+          .map((p) => p.member.email)
+          .filter((e): e is string => e !== null)
+
+        await updateOutlookEvent(event.outlookEventId, {
+          title: event.title,
+          date: event.date,
+          endDate: event.endDate,
+          description: event.description,
+          attendeeEmails,
+        })
+      } catch (syncErr) {
+        console.error('[msgraph] updateOutlookEvent 失敗 eventId=%s:', id, syncErr)
+      }
+    }
 
     return NextResponse.json(event)
   } catch (error) {
@@ -82,7 +102,28 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
+
+    // Outlook 同期: DB 削除前に outlookEventId を取得
+    let outlookEventId: string | null = null
+    if (isMsGraphEnabled()) {
+      const existing = await prisma.event.findUnique({
+        where: { id },
+        select: { outlookEventId: true },
+      })
+      outlookEventId = existing?.outlookEventId ?? null
+    }
+
     await prisma.event.delete({ where: { id } })
+
+    // Outlook 側のイベントを削除 (ベストエフォート)
+    if (outlookEventId) {
+      try {
+        await deleteOutlookEvent(outlookEventId)
+      } catch (syncErr) {
+        console.error('[msgraph] deleteOutlookEvent 失敗 eventId=%s:', id, syncErr)
+      }
+    }
+
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('イベント削除エラー:', error)
