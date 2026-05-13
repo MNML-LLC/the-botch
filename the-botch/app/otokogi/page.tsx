@@ -169,7 +169,7 @@ export default function OtokogiPage() {
           ) : (
             <div className="space-y-2">
               {events.map((event) => (
-                <div key={event.id} className="bg-white rounded-lg p-3 border shadow-sm">
+                <Link key={event.id} href={`/otokogi/${event.id}`} className="block bg-white rounded-lg p-3 border shadow-sm hover:bg-gray-50 transition-colors">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-start gap-3 min-w-0">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${event.payer.colorBg} ${event.payer.colorText}`}>
@@ -194,12 +194,15 @@ export default function OtokogiPage() {
                               {p.member.initial}
                             </div>
                           ))}
+                          {event.hasAlbum && (
+                            <span className="text-[10px] text-gray-400 self-center ml-0.5">📷</span>
+                          )}
                         </div>
                       </div>
                     </div>
                     <p className="font-bold text-slate-800 shrink-0 text-sm">¥{event.amount.toLocaleString()}</p>
                   </div>
-                </div>
+                </Link>
               ))}
 
               {/* もっと見るボタン */}

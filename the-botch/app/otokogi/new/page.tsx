@@ -42,7 +42,6 @@ export default function OtokogiNewPage() {
   const [payerId, setPayerId] = useState('');
   const [amount, setAmount] = useState('');
   const [place, setPlace] = useState('');
-  const [hasAlbum, setHasAlbum] = useState(false);
   const [memo, setMemo] = useState('');
   const [participantIds, setParticipantIds] = useState<string[]>([]);
 
@@ -84,21 +83,21 @@ export default function OtokogiNewPage() {
           payerId,
           amount: amountNum,
           place: place || null,
-          hasAlbum,
+          hasAlbum: false,
           memo: memo || null,
           eventId: (eventId && eventId !== 'none') ? eventId : null,
           participantIds,
         }),
       });
       if (!res.ok) throw new Error('登録に失敗しました');
-      return res.json();
+      return res.json() as Promise<{ id: string }>;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['otokogi'] });
       queryClient.invalidateQueries({ queryKey: ['otokogi-ranking'] });
       queryClient.invalidateQueries({ queryKey: ['otokogi-stats'] });
       queryClient.invalidateQueries({ queryKey: ['calendar'] });
-      router.push('/otokogi');
+      router.push(`/otokogi/${data.id}`);
     },
     onError: () => {
       alert('登録に失敗しました');
@@ -251,16 +250,6 @@ export default function OtokogiNewPage() {
               </p>
             </div>
           )}
-
-          <div>
-            <label className="flex items-center gap-2">
-              <Checkbox
-                checked={hasAlbum}
-                onCheckedChange={(checked) => setHasAlbum(checked === true)}
-              />
-              <span className="text-sm">アルバムあり</span>
-            </label>
-          </div>
 
           <div>
             <Label>メモ（任意）</Label>
