@@ -3,7 +3,6 @@
 import { useState, useCallback } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import dynamic from 'next/dynamic';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,11 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-
-// 統計タブのrecharts (~150KB gzipped) を遅延読み込み（初期バンドルから除外）
-const StatsSection = dynamic(() => import('./stats-section'), {
-  loading: () => <p className="text-sm text-gray-500">統計データを準備中...</p>,
-});
 
 type Member = {
   id: string;
@@ -55,7 +49,7 @@ type RankingEntry = {
   totalPaid: number;
 };
 
-type Tab = 'history' | 'ranking' | 'stats';
+type Tab = 'history' | 'ranking';
 
 export default function OtokogiPage() {
   const [activeTab, setActiveTab] = useState<Tab>('history');
@@ -128,7 +122,6 @@ export default function OtokogiPage() {
         {[
           { key: 'history' as Tab, label: '履歴' },
           { key: 'ranking' as Tab, label: 'ランキング' },
-          { key: 'stats' as Tab, label: '統計' },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -140,24 +133,28 @@ export default function OtokogiPage() {
             {tab.label}
           </button>
         ))}
+        <Link
+          href="/otokogi/stats"
+          className="flex-1 py-2 text-sm font-medium rounded-md transition text-gray-600 hover:text-gray-900 text-center"
+        >
+          統計
+        </Link>
       </div>
 
-      {/* 年度フィルタ（履歴・ランキング） */}
-      {activeTab !== 'stats' && (
-        <div className="flex gap-2 mb-4">
-          <Select value={yearFilter} onValueChange={setYearFilter}>
-            <SelectTrigger className="w-auto">
-              <SelectValue>{yearFilter === 'all' ? '全期間' : `${yearFilter}年`}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全期間</SelectItem>
-              {years.map((y) => (
-                <SelectItem key={y} value={String(y)}>{y}年</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
+      {/* 年度フィルタ */}
+      <div className="flex gap-2 mb-4">
+        <Select value={yearFilter} onValueChange={setYearFilter}>
+          <SelectTrigger className="w-auto">
+            <SelectValue>{yearFilter === 'all' ? '全期間' : `${yearFilter}年`}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全期間</SelectItem>
+            {years.map((y) => (
+              <SelectItem key={y} value={String(y)}>{y}年</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
       {/* 履歴タブ */}
       {activeTab === 'history' && (
@@ -255,8 +252,6 @@ export default function OtokogiPage() {
         </Card>
       )}
 
-      {/* 統計タブ（recharts遅延読み込み） */}
-      {activeTab === 'stats' && <StatsSection />}
     </div>
   );
 }

@@ -96,11 +96,17 @@ function buildMaxSingleOtokogiQuery(fromDate: Date | null, toDate: Date | null) 
 }
 
 // GET /api/otokogi/member-summary
+// クエリパラメータ:
+//   from=YYYY-MM-DD    — 開始日
+//   to=YYYY-MM-DD      — 終了日
+//   memberIds=id1,id2  — 表示するメンバー絞り込み（省略時は全員）
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const from = searchParams.get('from')
     const to = searchParams.get('to')
+    const memberIdsParam = searchParams.get('memberIds')
+    const memberIdList = memberIdsParam ? memberIdsParam.split(',').filter(Boolean) : []
 
     const fromDate = from ? new Date(from) : null
     const toDate = to ? new Date(to) : null
@@ -115,7 +121,10 @@ export async function GET(request: NextRequest) {
     const [members, payerStats, participationStats, shouldHavePaidRows, maxSingleOtokogiRows] =
       await Promise.all([
         prisma.member.findMany({
-          where: { isActive: true },
+          where: {
+            isActive: true,
+            ...(memberIdList.length > 0 ? { id: { in: memberIdList } } : {}),
+          },
           select: { id: true, name: true },
           orderBy: { name: 'asc' },
         }),
