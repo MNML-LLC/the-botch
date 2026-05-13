@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
@@ -35,10 +35,11 @@ type CalendarEvent = {
 
 export default function OtokogiNewPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [eventDate, setEventDate] = useState(new Date().toISOString().slice(0, 10));
   const [eventName, setEventName] = useState('');
-  const [eventId, setEventId] = useState('');
+  const [eventId, setEventId] = useState(searchParams.get('eventId') ?? '');
   const [payerId, setPayerId] = useState('');
   const [amount, setAmount] = useState('');
   const [place, setPlace] = useState('');
@@ -98,7 +99,8 @@ export default function OtokogiNewPage() {
       queryClient.invalidateQueries({ queryKey: ['otokogi-ranking'] });
       queryClient.invalidateQueries({ queryKey: ['otokogi-stats'] });
       queryClient.invalidateQueries({ queryKey: ['calendar'] });
-      router.push('/otokogi');
+      const from = searchParams.get('from');
+      router.push(from ?? '/otokogi');
     },
     onError: () => {
       alert('登録に失敗しました');

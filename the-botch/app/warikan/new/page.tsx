@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
@@ -33,10 +33,11 @@ type CalendarEvent = {
 
 export default function WarikanNewPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [eventName, setEventName] = useState('');
   const [managerId, setManagerId] = useState('');
-  const [eventId, setEventId] = useState('');
+  const [eventId, setEventId] = useState(searchParams.get('eventId') ?? '');
   const [detailDeadline, setDetailDeadline] = useState('');
   const [paymentDeadline, setPaymentDeadline] = useState('');
   const [memo, setMemo] = useState('');
@@ -87,7 +88,8 @@ export default function WarikanNewPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warikan'] });
       queryClient.invalidateQueries({ queryKey: ['calendar'] });
-      router.push('/warikan');
+      const from = searchParams.get('from');
+      router.push(from ?? '/warikan');
     },
     onError: () => {
       alert('作成に失敗しました');
