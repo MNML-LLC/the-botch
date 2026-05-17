@@ -22,6 +22,7 @@ jobs:
 
       - name: Deploy to Vercel (Production)
         if: github.ref == 'refs/heads/main'
+        working-directory: ./the-botch
         run: |
           vercel deploy --prod \
             --token=${{ secrets.VERCEL_TOKEN }} \
@@ -32,6 +33,7 @@ jobs:
 
       - name: Deploy to Vercel (Preview)
         if: github.ref != 'refs/heads/main'
+        working-directory: ./the-botch
         run: |
           vercel deploy \
             --token=${{ secrets.VERCEL_TOKEN }} \
