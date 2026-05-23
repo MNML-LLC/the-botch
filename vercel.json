@@ -3,10 +3,5 @@
   "framework": "nextjs",
   "installCommand": "cd the-botch && npm ci",
   "buildCommand": "cd the-botch && npm run build",
-  "outputDirectory": "the-botch/.next",
-  "functions": {
-    "the-botch/app/api/**/*.ts": {
-      "maxDuration": 10
-    }
-  }
+  "outputDirectory": "the-botch/.next"
 }
