@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { maskAccountNumber } from '@/lib/utils';
 
 type BankAccountData = {
   bankName: string;
@@ -65,6 +66,8 @@ export default function MemberEditPage() {
   const [accountNumber, setAccountNumber] = useState('');
   const [accountHolder, setAccountHolder] = useState('');
   const [hasBankAccount, setHasBankAccount] = useState(false);
+  const [revealAccountNumber, setRevealAccountNumber] = useState(false);
+  const [accountNumberCopied, setAccountNumberCopied] = useState(false);
 
   // メンバー情報取得
   const { data: member, isPending: memberLoading } = useQuery({
@@ -108,6 +111,7 @@ export default function MemberEditPage() {
       setAccountNumber(bankAccount.accountNumber);
       setAccountHolder(bankAccount.accountHolder);
       setHasBankAccount(true);
+      setRevealAccountNumber(false);
     }
   }, [bankAccount]);
 
@@ -192,6 +196,7 @@ export default function MemberEditPage() {
       setAccountNumber('');
       setAccountHolder('');
       setHasBankAccount(false);
+      setRevealAccountNumber(false);
       queryClient.invalidateQueries({ queryKey: ['member-bank-account', id] });
       alert('口座情報を削除しました');
     },
@@ -225,6 +230,16 @@ export default function MemberEditPage() {
   const handleDeleteBankAccount = () => {
     if (!confirm('口座情報を削除しますか？')) return;
     deleteBankMutation.mutate();
+  };
+
+  const handleCopyAccountNumber = async () => {
+    try {
+      await navigator.clipboard.writeText(accountNumber);
+      setAccountNumberCopied(true);
+      setTimeout(() => setAccountNumberCopied(false), 1500);
+    } catch {
+      // クリップボードAPIが使えない環境では何もしない
+    }
   };
 
   const isBankMutating = saveBankMutation.isPending || deleteBankMutation.isPending;
@@ -377,17 +392,41 @@ export default function MemberEditPage() {
                 </div>
                 <div>
                   <Label>口座番号</Label>
-                  <Input
-                    className="mt-1 font-mono"
-                    value={accountNumber}
-                    onChange={(e) => {
-                      const v = e.target.value.replace(/\D/g, '').slice(0, 7);
-                      setAccountNumber(v);
-                    }}
-                    placeholder="例: 1234567"
-                    inputMode="numeric"
-                    maxLength={7}
-                  />
+                  {hasBankAccount && !revealAccountNumber ? (
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className="font-mono text-sm border rounded-md px-3 py-2 bg-gray-50 flex-1 truncate">
+                        {maskAccountNumber(accountNumber)}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setRevealAccountNumber(true)}
+                      >
+                        全表示
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCopyAccountNumber}
+                      >
+                        {accountNumberCopied ? 'コピー済' : 'コピー'}
+                      </Button>
+                    </div>
+                  ) : (
+                    <Input
+                      className="mt-1 font-mono"
+                      value={accountNumber}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/\D/g, '').slice(0, 7);
+                        setAccountNumber(v);
+                      }}
+                      placeholder="例: 1234567"
+                      inputMode="numeric"
+                      maxLength={7}
+                    />
+                  )}
                 </div>
               </div>
               <div>

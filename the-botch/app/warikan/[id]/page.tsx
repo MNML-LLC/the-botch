@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { MaskedAccountNumber } from '@/components/masked-account-number';
 import {
   Select,
   SelectContent,
@@ -892,7 +893,7 @@ export default function WarikanDetailPage() {
                       <p className="text-xs text-gray-500 mb-2">
                         振込先: {settlement.toMember.bankAccount.bankName} {settlement.toMember.bankAccount.branchName}{' '}
                         {accountTypeLabel(settlement.toMember.bankAccount.accountType)}{' '}
-                        <span className="font-mono">{settlement.toMember.bankAccount.accountNumber}</span>{' '}
+                        <MaskedAccountNumber accountNumber={settlement.toMember.bankAccount.accountNumber} />{' '}
                         {settlement.toMember.bankAccount.accountHolder}
                       </p>
                     )}
