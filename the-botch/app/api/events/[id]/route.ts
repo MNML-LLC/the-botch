@@ -16,10 +16,19 @@ export async function GET(
         createdBy: { select: memberSelect },
         participants: { include: { member: { select: memberSelect } } },
         otokogiEvents: {
-          include: { payer: { select: memberSelect } },
+          include: {
+            payer: { select: memberSelect },
+            participants: { include: { member: { select: memberSelect } } },
+          },
+          orderBy: { eventDate: 'desc' },
         },
         warikanEvents: {
-          include: { manager: { select: memberSelect } },
+          include: {
+            manager: { select: memberSelect },
+            participants: { include: { member: { select: memberSelect } } },
+            _count: { select: { expenses: true } },
+          },
+          orderBy: { createdAt: 'desc' },
         },
       },
     })
