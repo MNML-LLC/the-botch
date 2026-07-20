@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -31,7 +31,7 @@ type CalendarEvent = {
   date: string;
 };
 
-export default function WarikanNewPage() {
+function WarikanNewForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -225,5 +225,13 @@ export default function WarikanNewPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function WarikanNewPage() {
+  return (
+    <Suspense fallback={null}>
+      <WarikanNewForm />
+    </Suspense>
   );
 }
