@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { maskAccountNumber } from '@/lib/utils';
 
 type BankAccountData = {
   bankName: string;
@@ -65,6 +66,8 @@ export default function MemberEditPage() {
   const [accountNumber, setAccountNumber] = useState('');
   const [accountHolder, setAccountHolder] = useState('');
   const [hasBankAccount, setHasBankAccount] = useState(false);
+  const [isAccountRevealed, setIsAccountRevealed] = useState(false);
+  const [accountCopied, setAccountCopied] = useState(false);
 
   // メンバー情報取得
   const { data: member, isPending: memberLoading } = useQuery({
@@ -192,6 +195,7 @@ export default function MemberEditPage() {
       setAccountNumber('');
       setAccountHolder('');
       setHasBankAccount(false);
+      setIsAccountRevealed(false);
       queryClient.invalidateQueries({ queryKey: ['member-bank-account', id] });
       alert('口座情報を削除しました');
     },
@@ -225,6 +229,16 @@ export default function MemberEditPage() {
   const handleDeleteBankAccount = () => {
     if (!confirm('口座情報を削除しますか？')) return;
     deleteBankMutation.mutate();
+  };
+
+  const handleCopyAccountNumber = async () => {
+    try {
+      await navigator.clipboard.writeText(accountNumber);
+      setAccountCopied(true);
+      setTimeout(() => setAccountCopied(false), 2000);
+    } catch {
+      alert('コピーに失敗しました');
+    }
   };
 
   const isBankMutating = saveBankMutation.isPending || deleteBankMutation.isPending;
@@ -377,17 +391,63 @@ export default function MemberEditPage() {
                 </div>
                 <div>
                   <Label>口座番号</Label>
-                  <Input
-                    className="mt-1 font-mono"
-                    value={accountNumber}
-                    onChange={(e) => {
-                      const v = e.target.value.replace(/\D/g, '').slice(0, 7);
-                      setAccountNumber(v);
-                    }}
-                    placeholder="例: 1234567"
-                    inputMode="numeric"
-                    maxLength={7}
-                  />
+                  {hasBankAccount && !isAccountRevealed ? (
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className="border-input flex h-9 flex-1 items-center rounded-md border bg-gray-50 px-3 font-mono text-base md:text-sm">
+                        {maskAccountNumber(accountNumber)}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsAccountRevealed(true)}
+                      >
+                        全表示
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCopyAccountNumber}
+                      >
+                        {accountCopied ? 'コピー済' : 'コピー'}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="mt-1 flex items-center gap-2">
+                      <Input
+                        className="font-mono"
+                        value={accountNumber}
+                        onChange={(e) => {
+                          const v = e.target.value.replace(/\D/g, '').slice(0, 7);
+                          setAccountNumber(v);
+                        }}
+                        placeholder="例: 1234567"
+                        inputMode="numeric"
+                        maxLength={7}
+                      />
+                      {hasBankAccount && (
+                        <>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setIsAccountRevealed(false)}
+                          >
+                            隠す
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleCopyAccountNumber}
+                          >
+                            {accountCopied ? 'コピー済' : 'コピー'}
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               <div>
