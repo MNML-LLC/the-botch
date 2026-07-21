@@ -4,7 +4,7 @@
  * ローカルDB（the_botch）を使用。テストデータは各テスト後にクリーンアップ。
  * 実行: npx vitest run tests/scenarios.test.ts
  */
-import { describe, test, expect, afterAll } from 'vitest'
+import { describe, test, expect, afterAll, beforeAll } from 'vitest'
 import { prisma } from '@/lib/prisma'
 import { createRequest, parseResponse, makeParams } from './helpers'
 
@@ -72,12 +72,40 @@ const createdIds = {
 // テスト用のメンバーIDを先に取得
 let testMembers: { id: string; name: string }[] = []
 
-// テスト開始前に既存メンバーを取得
+// テスト開始前に既存メンバーを取得（後方互換のため残す）
 async function getExistingMembers() {
   const res = await getMembersAll(createRequest('/api/members'))
   const { data } = await parseResponse<{ id: string; name: string }[]>(res)
   return data
 }
+
+// グローバルセットアップ: テスト用シードメンバーを作成（CI の新規DBに対応）
+beforeAll(async () => {
+  // 既存メンバーを確認
+  const existing = await getExistingMembers()
+  if (existing.length >= 4) {
+    testMembers = existing
+    return
+  }
+  // 4名未満の場合はテスト用メンバーを作成
+  const seedMembers = [
+    { name: '田中', fullName: '田中一郎', initial: 'T', colorBg: 'bg-blue-100', colorText: 'text-blue-700' },
+    { name: '佐藤', fullName: '佐藤花子', initial: 'S', colorBg: 'bg-red-100', colorText: 'text-red-700' },
+    { name: '鈴木', fullName: '鈴木次郎', initial: 'Z', colorBg: 'bg-green-100', colorText: 'text-green-700' },
+    { name: '山田', fullName: '山田三郎', initial: 'Y', colorBg: 'bg-yellow-100', colorText: 'text-yellow-700' },
+    { name: '伊藤', fullName: '伊藤四郎', initial: 'I', colorBg: 'bg-purple-100', colorText: 'text-purple-700' },
+  ]
+  for (const member of seedMembers) {
+    const res = await createMember(
+      createRequest('/api/members', { method: 'POST', body: member })
+    )
+    const { data } = await parseResponse<{ id: string; name: string }>(res)
+    if (data?.id) {
+      testMembers.push({ id: data.id, name: data.name })
+      createdIds.members.push(data.id)
+    }
+  }
+})
 
 // クリーンアップ: テストで作成したデータを削除
 afterAll(async () => {
@@ -108,7 +136,6 @@ describe('シナリオ1: 割り勘フロー（完全ライフサイクル）', (
   let settlementIds: string[]
 
   test('既存メンバーを取得', async () => {
-    testMembers = await getExistingMembers()
     expect(testMembers.length).toBeGreaterThanOrEqual(2)
   })
 
