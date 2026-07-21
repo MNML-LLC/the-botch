@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { MaskedAccountNumber } from '@/components/masked-account-number';
 
 type BankAccount = {
   bankName: string;
@@ -892,7 +893,7 @@ export default function WarikanDetailPage() {
                       <p className="text-xs text-gray-500 mb-2">
                         振込先: {settlement.toMember.bankAccount.bankName} {settlement.toMember.bankAccount.branchName}{' '}
                         {accountTypeLabel(settlement.toMember.bankAccount.accountType)}{' '}
-                        <span className="font-mono">{settlement.toMember.bankAccount.accountNumber}</span>{' '}
+                        <MaskedAccountNumber accountNumber={settlement.toMember.bankAccount.accountNumber} />{' '}
                         {settlement.toMember.bankAccount.accountHolder}
                       </p>
                     )}

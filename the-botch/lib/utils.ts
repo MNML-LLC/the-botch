@@ -27,4 +27,13 @@ export function formatDateTime(date: Date | string): string {
   })
 }
 
+/**
+ * 口座番号を末尾4桁のみ表示にマスキングする（例: "1234567" → "***4567"）
+ * 4桁以下の場合はマスキングの意味がない（全桁が末尾4桁に含まれる）ため、そのまま返す
+ */
+export function maskAccountNumber(accountNumber: string): string {
+  if (accountNumber.length <= 4) return accountNumber
+  return '*'.repeat(accountNumber.length - 4) + accountNumber.slice(-4)
+}
+
 // DBマイグレーション後は不要なLocalStorage関連の関数を削除
