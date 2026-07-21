@@ -30,8 +30,27 @@ beforeAll(async () => {
   // 既存メンバーを取得
   const res = await getMembersAll(createRequest('/api/members'))
   const { data: members } = await parseResponse<{ id: string; name: string }[]>(res)
-  expect(members.length).toBeGreaterThan(0)
-  existingMemberId = members[0].id
+
+  if (members.length > 0) {
+    existingMemberId = members[0].id
+  } else {
+    // CI の新規 DB にメンバーがいない場合はシードメンバーを作成
+    const seedRes = await createMember(
+      createRequest('/api/members', {
+        method: 'POST',
+        body: {
+          name: '田中',
+          fullName: '田中一郎',
+          initial: 'T',
+          colorBg: 'bg-blue-100',
+          colorText: 'text-blue-700',
+        },
+      })
+    )
+    const { data: seedMember } = await parseResponse<{ id: string }>(seedRes)
+    existingMemberId = seedMember.id
+    createdMemberIds.push(existingMemberId)
+  }
 
   // テスト専用メンバーを作成
   const createRes = await createMember(
