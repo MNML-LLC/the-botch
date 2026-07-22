@@ -32,7 +32,7 @@
     "next": "^16.2.10",
     "prisma": "^6.5.0",
     "react": "^19.0.0",
-    "react-day-picker": "^9.14.0",
+    "react-day-picker": "^10.0.1",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.55.0",
     "recharts": "^3.8.0",
