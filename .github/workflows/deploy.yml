@@ -8,6 +8,10 @@ on:
 
 jobs:
   deploy:
+    # Dependabot PRs do not receive repository secrets (VERCEL_TOKEN etc.),
+    # so the deploy would always fail. Skip it — dependency-only changes
+    # are verified by lint-and-test.
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
