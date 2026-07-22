@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { WarikanStatus } from '@prisma/client'
+import { WarikanStatus } from '@/lib/generated/prisma/client'
 import { computeDisplayDate } from '@/lib/date-utils'
 
 // GET /api/warikan — 割り勘イベント一覧（フィルタ: status, year、カーソルベースページネーション）

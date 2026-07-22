@@ -9,6 +9,7 @@ const eslintConfig = [
       'out/**',
       'build/**',
       'next-env.d.ts',
+      'lib/generated/**',
       'test-results/**',
       'playwright-report/**',
     ],

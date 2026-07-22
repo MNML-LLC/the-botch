@@ -1,6 +1,8 @@
-import { PrismaClient, WarikanStatus } from '@prisma/client'
+import { PrismaPg } from '@prisma/adapter-pg'
+import { PrismaClient, WarikanStatus } from '../lib/generated/prisma/client'
 
-const prisma = new PrismaClient()
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL })
+const prisma = new PrismaClient({ adapter })
 
 // ============================================================
 // 固定UUID（冪等性のため決定論的）

@@ -7,9 +7,21 @@
  * 実行: npx tsx scripts/migrate-walica.ts
  * ドライラン: npx tsx scripts/migrate-walica.ts --dry-run
  */
-import { PrismaClient } from '@prisma/client'
+import { PrismaPg } from '@prisma/adapter-pg'
+import { PrismaClient } from '../lib/generated/prisma/client'
 
-const prisma = new PrismaClient()
+// Prisma 7 は .env を自動読み込みしないため明示的に読み込む（既存の環境変数は上書きしない）
+for (const file of ['.env.local', '.env']) {
+  try {
+    process.loadEnvFile(file)
+  } catch {
+    // ファイルが無ければスキップ
+  }
+}
+
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+})
 const WALICA_API = 'https://manage-expence-api-prod.herokuapp.com/api'
 const DRY_RUN = process.argv.includes('--dry-run')
 
