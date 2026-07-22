@@ -15,7 +15,7 @@
     "test:e2e:mobile": "playwright test --project=mobile"
   },
   "dependencies": {
-    "@hookform/resolvers": "^5.0.1",
+    "@hookform/resolvers": "^5.4.0",
     "@prisma/client": "^6.5.0",
     "@radix-ui/react-checkbox": "^1.1.5",
     "@radix-ui/react-label": "^2.1.2",
