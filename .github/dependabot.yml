@@ -8,6 +8,6 @@ updates:
       timezone: "Asia/Tokyo"
     labels:
       - "dependencies"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 3
     commit-message:
       prefix: "chore"
