@@ -1,18 +1,20 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaPg } from '@prisma/adapter-pg'
+import { PrismaClient } from '@/lib/generated/prisma/client'
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient }
 
 // コネクションプール設定をコードで付与（Vercel環境変数の設定漏れ防止）
-function buildDatasourceUrl(): string {
-  const base = process.env.DATABASE_URL ?? ''
-  const separator = base.includes('?') ? '&' : '?'
-  return `${base}${separator}connection_limit=20&pool_timeout=10`
-}
+// Prisma 7: URL クエリの connection_limit / pool_timeout は廃止。pg Pool のオプションで指定する
+const adapter = new PrismaPg({
+  connectionString: process.env.DATABASE_URL,
+  max: 20,
+  connectionTimeoutMillis: 10_000,
+})
 
 export const prisma =
   globalForPrisma.prisma ||
   new PrismaClient({
-    datasourceUrl: buildDatasourceUrl(),
+    adapter,
     log:
       process.env.NODE_ENV === 'production'
         ? ['error']

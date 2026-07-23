@@ -7,7 +7,17 @@
  * 実行: npx tsx scripts/backfill-display-date.ts
  * ドライラン: npx tsx scripts/backfill-display-date.ts --dry-run
  */
-import { PrismaClient } from '@prisma/client'
+import { PrismaPg } from '@prisma/adapter-pg'
+import { PrismaClient } from '../lib/generated/prisma/client'
+
+// Prisma 7 は .env を自動読み込みしないため明示的に読み込む（既存の環境変数は上書きしない）
+for (const file of ['.env.local', '.env']) {
+  try {
+    process.loadEnvFile(file)
+  } catch {
+    // ファイルが無ければスキップ
+  }
+}
 
 // parseEventDate: eventName の先頭8桁が YYYYMMDD パターンなら日付を返す
 function parseEventDate(eventName: string): string | null {
@@ -34,7 +44,9 @@ function computeDisplayDate(
 
 async function main() {
   const dryRun = process.argv.includes('--dry-run')
-  const prisma = new PrismaClient()
+  const prisma = new PrismaClient({
+    adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+  })
 
   try {
     const events = await prisma.warikanEvent.findMany({
