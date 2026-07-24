@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { WarikanStatus } from '@/lib/generated/prisma/client'
 import { computeDisplayDate } from '@/lib/date-utils'
+import {
+  readJsonBody,
+  validationErrorResponse,
+  idString,
+  limitedString,
+  dateString,
+  memberIdArray,
+} from '@/lib/api-validation'
 
 // GET /api/warikan — 割り勘イベント一覧（フィルタ: status, year、カーソルベースページネーション）
 export async function GET(request: NextRequest) {
@@ -62,25 +71,30 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// リクエストボディ検証スキーマ（文字列長は DB カラム定義に対応）
+const createWarikanSchema = z.object({
+  eventName: limitedString('eventName', 200).min(1, { error: 'eventName は必須です' }),
+  managerId: idString('managerId').nullable().optional(),
+  detailDeadline: dateString('detailDeadline').nullable().optional(),
+  paymentDeadline: dateString('paymentDeadline').nullable().optional(),
+  memo: limitedString('memo', 1000).nullable().optional(),
+  walicaUrl: limitedString('walicaUrl', 255).nullable().optional(),
+  eventId: idString('eventId').nullable().optional(),
+  participantIds: memberIdArray('participantIds').min(1, {
+    error: 'participantIds（参加者配列）は必須です',
+  }),
+})
+
 // POST /api/warikan — 割り勘イベント作成
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { eventName, managerId, detailDeadline, paymentDeadline, memo, walicaUrl, eventId, participantIds } = body
+    const parsed = await readJsonBody(request)
+    if (!parsed.ok) return parsed.response
 
-    if (!eventName) {
-      return NextResponse.json(
-        { error: 'eventName は必須です' },
-        { status: 400 }
-      )
-    }
+    const result = createWarikanSchema.safeParse(parsed.body)
+    if (!result.success) return validationErrorResponse(result.error)
 
-    if (!participantIds || !Array.isArray(participantIds) || participantIds.length === 0) {
-      return NextResponse.json(
-        { error: 'participantIds（参加者配列）は必須です' },
-        { status: 400 }
-      )
-    }
+    const { eventName, managerId, detailDeadline, paymentDeadline, memo, walicaUrl, eventId, participantIds } = result.data
 
     // displayDate を算出（カレンダー表示用）
     const ddl = detailDeadline ? new Date(detailDeadline) : null
@@ -98,7 +112,7 @@ export async function POST(request: NextRequest) {
         walicaUrl: walicaUrl ?? null,
         eventId: eventId ?? null,
         participants: {
-          create: (participantIds as string[]).map((memberId) => ({
+          create: participantIds.map((memberId) => ({
             memberId,
           })),
         },

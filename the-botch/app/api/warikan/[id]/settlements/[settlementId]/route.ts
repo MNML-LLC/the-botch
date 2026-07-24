@@ -1,21 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { readJsonBody, validationErrorResponse } from '@/lib/api-validation'
 
 type Params = { params: Promise<{ id: string; settlementId: string }> }
+
+// リクエストボディ検証スキーマ
+const updateSettlementSchema = z.object({
+  action: z.enum(['pay', 'receive'], {
+    error: "action は 'pay' または 'receive' を指定してください",
+  }),
+})
 
 // PATCH /api/warikan/[id]/settlements/[settlementId] — 精算ステータス更新
 export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const { id, settlementId } = await params
-    const body = await request.json()
-    const { action } = body as { action?: 'pay' | 'receive' }
+    const parsed = await readJsonBody(request)
+    if (!parsed.ok) return parsed.response
 
-    if (action !== 'pay' && action !== 'receive') {
-      return NextResponse.json(
-        { error: "action は 'pay' または 'receive' を指定してください" },
-        { status: 400 }
-      )
-    }
+    const result = updateSettlementSchema.safeParse(parsed.body)
+    if (!result.success) return validationErrorResponse(result.error)
+
+    const { action } = result.data
 
     // 割り勘イベントの存在確認
     const warikanEvent = await prisma.warikanEvent.findUnique({

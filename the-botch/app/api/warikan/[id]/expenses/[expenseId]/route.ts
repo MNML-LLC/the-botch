@@ -1,15 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { calculateSettlements } from '@/lib/warikan-calc'
+import {
+  readJsonBody,
+  validationErrorResponse,
+  idString,
+  limitedString,
+  positiveInt,
+  memberIdArray,
+} from '@/lib/api-validation'
 
 type Params = { params: Promise<{ id: string; expenseId: string }> }
+
+// リクエストボディ検証スキーマ（部分更新のため全フィールド optional）
+const updateExpenseSchema = z.object({
+  payerId: idString('payerId').optional(),
+  description: limitedString('description', 200).min(1, { error: 'description は必須です' }).optional(),
+  amount: positiveInt('amount').optional(),
+  debtorIds: memberIdArray('debtorIds')
+    .min(1, { error: '対象者を1人以上指定してください' })
+    .optional(),
+})
 
 // PUT /api/warikan/[id]/expenses/[expenseId] — 立替明細更新
 export async function PUT(request: NextRequest, { params }: Params) {
   try {
     const { id, expenseId } = await params
-    const body = await request.json()
-    const { payerId, description, amount, debtorIds } = body
+    const parsed = await readJsonBody(request)
+    if (!parsed.ok) return parsed.response
+
+    const result = updateExpenseSchema.safeParse(parsed.body)
+    if (!result.success) return validationErrorResponse(result.error)
+
+    const { payerId, description, amount, debtorIds } = result.data
 
     // 割り勘イベントの存在・ステータス確認
     const warikanEvent = await prisma.warikanEvent.findUnique({
@@ -31,23 +55,10 @@ export async function PUT(request: NextRequest, { params }: Params) {
       )
     }
 
-    if (amount !== undefined && (typeof amount !== 'number' || !Number.isInteger(amount) || amount <= 0)) {
-      return NextResponse.json(
-        { error: 'amount は1以上の整数を指定してください' },
-        { status: 400 }
-      )
-    }
-
-    // debtorIdsのバリデーション
+    // debtorIds がイベント参加者に含まれるか検証
     if (debtorIds !== undefined) {
-      if (!Array.isArray(debtorIds) || debtorIds.length === 0) {
-        return NextResponse.json(
-          { error: '対象者を1人以上指定してください' },
-          { status: 400 }
-        )
-      }
       const participantIds = new Set(warikanEvent.participants.map((p) => p.memberId))
-      const invalidIds = debtorIds.filter((did: string) => !participantIds.has(did))
+      const invalidIds = debtorIds.filter((did) => !participantIds.has(did))
       if (invalidIds.length > 0) {
         return NextResponse.json(
           { error: 'イベント参加者でないメンバーが含まれています' },
@@ -84,7 +95,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
           where: { expenseId },
         })
         await tx.warikanExpenseDebtor.createMany({
-          data: (debtorIds as string[]).map((memberId: string) => ({
+          data: debtorIds.map((memberId) => ({
             expenseId,
             memberId,
           })),

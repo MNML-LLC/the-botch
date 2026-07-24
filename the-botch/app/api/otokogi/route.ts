@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { invalidateStatsCache } from '@/lib/stats-cache'
+import {
+  readJsonBody,
+  validationErrorResponse,
+  idString,
+  limitedString,
+  dateString,
+  positiveInt,
+  memberIdArray,
+} from '@/lib/api-validation'
 
 // GET /api/otokogi — 男気イベント一覧（フィルタ: year, payer、カーソルベースページネーション）
 export async function GET(request: NextRequest) {
@@ -57,32 +67,31 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// リクエストボディ検証スキーマ（文字列長は DB カラム定義に対応）
+const createOtokogiSchema = z.object({
+  eventDate: dateString('eventDate'),
+  eventName: limitedString('eventName', 100).min(1, { error: 'eventName は必須です' }),
+  payerId: idString('payerId'),
+  amount: positiveInt('amount'),
+  place: limitedString('place', 100).nullable().optional(),
+  hasAlbum: z.boolean({ error: 'hasAlbum は真偽値で指定してください' }).optional(),
+  memo: limitedString('memo', 1000).nullable().optional(),
+  eventId: idString('eventId').nullable().optional(),
+  participantIds: memberIdArray('participantIds').min(1, {
+    error: 'participantIds（参加者配列）は必須です',
+  }),
+})
+
 // POST /api/otokogi — 男気イベント作成
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { eventDate, eventName, payerId, amount, place, hasAlbum, memo, eventId, participantIds } = body
+    const parsed = await readJsonBody(request)
+    if (!parsed.ok) return parsed.response
 
-    if (!eventDate || !eventName || !payerId || amount === undefined || amount === null) {
-      return NextResponse.json(
-        { error: 'eventDate, eventName, payerId, amount は必須です' },
-        { status: 400 }
-      )
-    }
+    const result = createOtokogiSchema.safeParse(parsed.body)
+    if (!result.success) return validationErrorResponse(result.error)
 
-    if (typeof amount !== 'number' || !Number.isInteger(amount) || amount <= 0) {
-      return NextResponse.json(
-        { error: 'amount は1以上の整数を指定してください' },
-        { status: 400 }
-      )
-    }
-
-    if (!participantIds || !Array.isArray(participantIds) || participantIds.length === 0) {
-      return NextResponse.json(
-        { error: 'participantIds（参加者配列）は必須です' },
-        { status: 400 }
-      )
-    }
+    const { eventDate, eventName, payerId, amount, place, hasAlbum, memo, eventId, participantIds } = result.data
 
     const event = await prisma.otokogiEvent.create({
       data: {
@@ -95,7 +104,7 @@ export async function POST(request: NextRequest) {
         memo: memo ?? null,
         eventId: eventId ?? null,
         participants: {
-          create: (participantIds as string[]).map((memberId) => ({
+          create: participantIds.map((memberId) => ({
             memberId,
           })),
         },

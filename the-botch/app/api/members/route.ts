@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { readJsonBody, validationErrorResponse, limitedString } from '@/lib/api-validation'
 
 // GET /api/members — メンバー一覧
 export async function GET() {
@@ -22,18 +24,26 @@ export async function GET() {
   }
 }
 
+// リクエストボディ検証スキーマ（initial は DB の Char(1) に対応）
+const createMemberSchema = z.object({
+  name: limitedString('name', 100).min(1, { error: 'name は必須です' }),
+  fullName: limitedString('fullName', 100).min(1, { error: 'fullName は必須です' }),
+  initial: limitedString('initial', 1).min(1, { error: 'initial は必須です' }),
+  colorBg: limitedString('colorBg', 50).optional(),
+  colorText: limitedString('colorText', 50).optional(),
+  paypayId: limitedString('paypayId', 100).nullable().optional(),
+})
+
 // POST /api/members — メンバー作成
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { name, fullName, initial, colorBg, colorText, paypayId } = body
+    const parsed = await readJsonBody(request)
+    if (!parsed.ok) return parsed.response
 
-    if (!name || !fullName || !initial) {
-      return NextResponse.json(
-        { error: 'name, fullName, initial は必須です' },
-        { status: 400 }
-      )
-    }
+    const result = createMemberSchema.safeParse(parsed.body)
+    if (!result.success) return validationErrorResponse(result.error)
+
+    const { name, fullName, initial, colorBg, colorText, paypayId } = result.data
 
     const member = await prisma.member.create({
       data: {
