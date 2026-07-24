@@ -27,7 +27,7 @@ export const prisma =
     adapter,
     log:
       process.env.NODE_ENV === 'production'
-        ? ['error']
+        ? ['warn', 'error']
         : ['query', 'error', 'warn'],
   })
 
