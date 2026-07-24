@@ -3,6 +3,7 @@ export const revalidate = 300;
 
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
+import { MEMBER_SELECT } from '@/lib/prisma-selects';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import MonthlyTrendChart from './monthly-trend-chart';
@@ -108,7 +109,7 @@ async function fetchDashboardData() {
         eventDate: true,
         eventName: true,
         amount: true,
-        payer: { select: { id: true, name: true, initial: true, colorBg: true, colorText: true } },
+        payer: { select: MEMBER_SELECT },
       },
       orderBy: { eventDate: 'desc' },
       take: 5,

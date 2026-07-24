@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@/lib/generated/prisma/client'
 import { prisma } from '@/lib/prisma'
 import { getCachedStats, setCachedStats } from '@/lib/stats-cache'
+import { MEMBER_SELECT } from '@/lib/prisma-selects'
 
 // max/min 統合クエリの結果型
 type MaxMinResult = {
@@ -207,7 +208,7 @@ export async function GET(request: NextRequest) {
           isActive: true,
           ...(memberIdList.length > 0 ? { id: { in: memberIdList } } : {}),
         },
-        select: { id: true, name: true, initial: true, colorBg: true, colorText: true },
+        select: MEMBER_SELECT,
         orderBy: { name: 'asc' },
       }),
 

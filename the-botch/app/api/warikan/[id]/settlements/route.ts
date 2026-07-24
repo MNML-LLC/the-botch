@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { calculateSettlements } from '@/lib/warikan-calc'
+import { MEMBER_SELECT_WITH_PAYPAY, MEMBER_SELECT_WITH_BANK } from '@/lib/prisma-selects'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -15,10 +16,10 @@ export async function GET(_request: NextRequest, { params }: Params) {
       where: { warikanEventId: id },
       include: {
         fromMember: {
-          select: { id: true, name: true, initial: true, colorBg: true, colorText: true, paypayId: true },
+          select: MEMBER_SELECT_WITH_PAYPAY,
         },
         toMember: {
-          select: { id: true, name: true, initial: true, colorBg: true, colorText: true, paypayId: true, bankAccount: true },
+          select: MEMBER_SELECT_WITH_BANK,
         },
       },
       orderBy: { amount: 'desc' },
