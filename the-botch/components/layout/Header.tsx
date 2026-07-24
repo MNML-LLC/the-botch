@@ -30,7 +30,6 @@ export default function Header() {
           return res.json();
         },
         initialPageParam: null,
-        staleTime: 5 * 60 * 1000,
       });
     } else if (href === '/members') {
       queryClient.prefetchQuery({
@@ -40,7 +39,6 @@ export default function Header() {
           if (!res.ok) throw new Error('prefetch failed');
           return res.json();
         },
-        staleTime: 5 * 60 * 1000,
       });
     }
   }, [queryClient]);
