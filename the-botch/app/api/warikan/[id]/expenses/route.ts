@@ -1,8 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { calculateSettlements } from '@/lib/warikan-calc'
+import {
+  readJsonBody,
+  validationErrorResponse,
+  idString,
+  limitedString,
+  positiveInt,
+  memberIdArray,
+} from '@/lib/api-validation'
 
 type Params = { params: Promise<{ id: string }> }
+
+// リクエストボディ検証スキーマ（description は DB の VarChar(200) に対応）
+const createExpenseSchema = z.object({
+  payerId: idString('payerId'),
+  description: limitedString('description', 200).min(1, { error: 'description は必須です' }),
+  amount: positiveInt('amount'),
+  // 対象者。省略・空配列時は全参加者
+  debtorIds: memberIdArray('debtorIds').optional(),
+})
 
 // GET /api/warikan/[id]/expenses — 割り勘立替明細一覧
 export async function GET(_request: NextRequest, { params }: Params) {
@@ -39,27 +57,13 @@ export async function GET(_request: NextRequest, { params }: Params) {
 export async function POST(request: NextRequest, { params }: Params) {
   try {
     const { id } = await params
-    const body = await request.json()
-    const { payerId, description, amount, debtorIds } = body as {
-      payerId: string
-      description: string
-      amount: number
-      debtorIds?: string[] // 対象者。省略時は全参加者
-    }
+    const parsed = await readJsonBody(request)
+    if (!parsed.ok) return parsed.response
 
-    if (!payerId || !description || amount === undefined) {
-      return NextResponse.json(
-        { error: 'payerId, description, amount は必須です' },
-        { status: 400 }
-      )
-    }
+    const result = createExpenseSchema.safeParse(parsed.body)
+    if (!result.success) return validationErrorResponse(result.error)
 
-    if (typeof amount !== 'number' || !Number.isInteger(amount) || amount <= 0) {
-      return NextResponse.json(
-        { error: 'amount は1以上の整数を指定してください' },
-        { status: 400 }
-      )
-    }
+    const { payerId, description, amount, debtorIds } = result.data
 
     // 割り勘イベント＋参加者を取得
     const warikanEvent = await prisma.warikanEvent.findUnique({

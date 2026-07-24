@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { EventType } from '@/lib/generated/prisma/client'
+import {
+  readJsonBody,
+  validationErrorResponse,
+  idString,
+  limitedString,
+  dateString,
+  memberIdArray,
+} from '@/lib/api-validation'
 
 // GET /api/events — イベント一覧
 export async function GET(request: NextRequest) {
@@ -53,15 +63,27 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// リクエストボディ検証スキーマ（title は DB の VarChar(200) に対応）
+const createEventSchema = z.object({
+  title: limitedString('title', 200).min(1, { error: 'タイトル、日付、作成者は必須です' }),
+  date: dateString('date'),
+  endDate: dateString('endDate').nullable().optional(),
+  description: limitedString('description', 1000).nullable().optional(),
+  eventType: z.enum(EventType, { error: 'eventType が不正です' }).optional(),
+  createdById: idString('createdById'),
+  participantIds: memberIdArray('participantIds').optional(),
+})
+
 // POST /api/events — イベント作成
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { title, date, endDate, description, eventType, createdById, participantIds } = body
+    const parsed = await readJsonBody(request)
+    if (!parsed.ok) return parsed.response
 
-    if (!title || !date || !createdById) {
-      return NextResponse.json({ error: 'タイトル、日付、作成者は必須です' }, { status: 400 })
-    }
+    const result = createEventSchema.safeParse(parsed.body)
+    if (!result.success) return validationErrorResponse(result.error)
+
+    const { title, date, endDate, description, eventType, createdById, participantIds } = result.data
 
     const event = await prisma.event.create({
       data: {
@@ -72,7 +94,7 @@ export async function POST(request: NextRequest) {
         eventType: eventType || 'HANGOUT',
         createdById,
         participants: {
-          create: (participantIds as string[] ?? []).map((memberId: string) => ({
+          create: (participantIds ?? []).map((memberId) => ({
             memberId,
           })),
         },

@@ -1,5 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { EventType } from '@/lib/generated/prisma/client'
+import {
+  readJsonBody,
+  validationErrorResponse,
+  limitedString,
+  dateString,
+  memberIdArray,
+} from '@/lib/api-validation'
+
+// リクエストボディ検証スキーマ（部分更新のため全フィールド optional）
+const updateEventSchema = z.object({
+  title: limitedString('title', 200).optional(),
+  date: dateString('date').optional(),
+  endDate: dateString('endDate').nullable().optional(),
+  description: limitedString('description', 1000).nullable().optional(),
+  eventType: z.enum(EventType, { error: 'eventType が不正です' }).optional(),
+  participantIds: memberIdArray('participantIds').optional(),
+})
 
 // GET /api/events/:id — イベント詳細
 export async function GET(
@@ -53,8 +72,13 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
-    const body = await request.json()
-    const { title, date, endDate, description, eventType, participantIds } = body
+    const parsed = await readJsonBody(request)
+    if (!parsed.ok) return parsed.response
+
+    const result = updateEventSchema.safeParse(parsed.body)
+    if (!result.success) return validationErrorResponse(result.error)
+
+    const { title, date, endDate, description, eventType, participantIds } = result.data
 
     const event = await prisma.event.update({
       where: { id },
@@ -67,7 +91,7 @@ export async function PUT(
         ...(participantIds && {
           participants: {
             deleteMany: {},
-            create: (participantIds as string[]).map((memberId: string) => ({ memberId })),
+            create: participantIds.map((memberId) => ({ memberId })),
           },
         }),
       },

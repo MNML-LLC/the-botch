@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import {
+  readJsonBody,
+  validationErrorResponse,
+  idString,
+  limitedString,
+  MAX_PARTICIPANTS,
+} from '@/lib/api-validation'
 
 const WALICA_API = 'https://manage-expence-api-prod.herokuapp.com/api'
 
@@ -24,29 +32,34 @@ type WalicaPaybackTransaction = {
   priceV2: number
 }
 
-type MemberMapping = {
-  walicaId: string
-  walicaName: string
-  appMemberId: string
-}
+// リクエストボディ検証スキーマ（walicaUrl は DB の VarChar(255) に対応）
+const importSchema = z.object({
+  walicaUrl: limitedString('walicaUrl', 255).min(1, { error: 'walicaUrl と memberMapping は必須です' }),
+  memberMapping: z
+    .array(
+      z.object({
+        walicaId: limitedString('walicaId', 50),
+        walicaName: limitedString('walicaName', 100),
+        appMemberId: idString('appMemberId'),
+      }),
+      { error: 'memberMapping の形式が正しくありません' }
+    )
+    .min(1, { error: 'walicaUrl と memberMapping は必須です' })
+    .max(MAX_PARTICIPANTS, { error: `memberMapping は最大${MAX_PARTICIPANTS}件までです` }),
+  warikanEventId: idString('warikanEventId').optional(), // 既存イベントに紐付ける場合
+})
 
 // POST /api/walica/import
 // Walica URLからデータをインポートして割り勘イベントを作成/更新
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { walicaUrl, memberMapping, warikanEventId } = body as {
-      walicaUrl: string
-      memberMapping: MemberMapping[]
-      warikanEventId?: string // 既存イベントに紐付ける場合
-    }
+    const parsed = await readJsonBody(request)
+    if (!parsed.ok) return parsed.response
 
-    if (!walicaUrl || !memberMapping || memberMapping.length === 0) {
-      return NextResponse.json(
-        { error: 'walicaUrl と memberMapping は必須です' },
-        { status: 400 }
-      )
-    }
+    const validated = importSchema.safeParse(parsed.body)
+    if (!validated.success) return validationErrorResponse(validated.error)
+
+    const { walicaUrl, memberMapping, warikanEventId } = validated.data
 
     // URLからgroup_idを抽出
     const groupId = extractGroupId(walicaUrl)

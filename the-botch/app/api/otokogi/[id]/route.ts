@@ -1,8 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { invalidateStatsCache } from '@/lib/stats-cache'
+import {
+  readJsonBody,
+  validationErrorResponse,
+  idString,
+  limitedString,
+  dateString,
+  positiveInt,
+  memberIdArray,
+} from '@/lib/api-validation'
 
 type Params = { params: Promise<{ id: string }> }
+
+// リクエストボディ検証スキーマ（部分更新のため全フィールド optional）
+const updateOtokogiSchema = z.object({
+  eventDate: dateString('eventDate').optional(),
+  eventName: limitedString('eventName', 100).min(1, { error: 'eventName は必須です' }).optional(),
+  payerId: idString('payerId').optional(),
+  amount: positiveInt('amount').optional(),
+  place: limitedString('place', 100).nullable().optional(),
+  hasAlbum: z.boolean({ error: 'hasAlbum は真偽値で指定してください' }).optional(),
+  memo: limitedString('memo', 1000).nullable().optional(),
+  participantIds: memberIdArray('participantIds')
+    .min(1, { error: 'participantIds（参加者配列）は必須です' })
+    .optional(),
+})
 
 // GET /api/otokogi/[id] — 男気イベント詳細
 export async function GET(_request: NextRequest, { params }: Params) {
@@ -41,17 +65,22 @@ export async function GET(_request: NextRequest, { params }: Params) {
 export async function PUT(request: NextRequest, { params }: Params) {
   try {
     const { id } = await params
-    const body = await request.json()
-    const { eventDate, eventName, payerId, amount, place, hasAlbum, memo, participantIds } = body
+    const parsed = await readJsonBody(request)
+    if (!parsed.ok) return parsed.response
+
+    const result = updateOtokogiSchema.safeParse(parsed.body)
+    if (!result.success) return validationErrorResponse(result.error)
+
+    const { eventDate, eventName, payerId, amount, place, hasAlbum, memo, participantIds } = result.data
 
     const event = await prisma.$transaction(async (tx) => {
       // 参加者の更新がある場合は差し替え
-      if (participantIds && Array.isArray(participantIds)) {
+      if (participantIds) {
         await tx.otokogiParticipant.deleteMany({
           where: { otokogiEventId: id },
         })
         await tx.otokogiParticipant.createMany({
-          data: (participantIds as string[]).map((memberId) => ({
+          data: participantIds.map((memberId) => ({
             otokogiEventId: id,
             memberId,
           })),

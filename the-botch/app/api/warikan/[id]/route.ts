@@ -1,8 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { computeDisplayDate } from '@/lib/date-utils'
+import {
+  readJsonBody,
+  validationErrorResponse,
+  idString,
+  limitedString,
+  dateString,
+  memberIdArray,
+} from '@/lib/api-validation'
 
 type Params = { params: Promise<{ id: string }> }
+
+// リクエストボディ検証スキーマ（部分更新のため全フィールド optional）
+// status は専用エンドポイント経由のみ変更可能なため、存在チェック用に unknown で受ける
+const updateWarikanSchema = z.object({
+  eventName: limitedString('eventName', 200).min(1, { error: 'eventName は必須です' }).optional(),
+  status: z.unknown().optional(),
+  managerId: idString('managerId').nullable().optional(),
+  detailDeadline: dateString('detailDeadline').nullable().optional(),
+  paymentDeadline: dateString('paymentDeadline').nullable().optional(),
+  memo: limitedString('memo', 1000).nullable().optional(),
+  walicaUrl: limitedString('walicaUrl', 255).nullable().optional(),
+  eventId: idString('eventId').nullable().optional(),
+  participantIds: memberIdArray('participantIds')
+    .min(1, { error: 'participantIds（参加者配列）は必須です' })
+    .optional(),
+})
 
 // メンバー表示用の共通フィールド
 const memberSelect = { id: true, name: true, initial: true, colorBg: true, colorText: true } as const
@@ -58,8 +83,13 @@ export async function GET(_request: NextRequest, { params }: Params) {
 export async function PUT(request: NextRequest, { params }: Params) {
   try {
     const { id } = await params
-    const body = await request.json()
-    const { eventName, status, managerId, detailDeadline, paymentDeadline, memo, walicaUrl, eventId, participantIds } = body
+    const parsed = await readJsonBody(request)
+    if (!parsed.ok) return parsed.response
+
+    const result = updateWarikanSchema.safeParse(parsed.body)
+    if (!result.success) return validationErrorResponse(result.error)
+
+    const { eventName, status, managerId, detailDeadline, paymentDeadline, memo, walicaUrl, eventId, participantIds } = result.data
 
     // ステータスの直接変更を禁止（専用エンドポイント経由のみ）
     if (status !== undefined) {
@@ -91,7 +121,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
     }
 
     // PAYING/CLOSED状態での参加者変更を禁止
-    if (participantIds && Array.isArray(participantIds)) {
+    if (participantIds) {
       if (currentEvent.status !== 'ENTERING') {
         return NextResponse.json(
           { error: '明細入力中のイベントのみ参加者を変更できます' },
@@ -102,12 +132,12 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
     const event = await prisma.$transaction(async (tx) => {
       // 参加者の更新がある場合は差し替え
-      if (participantIds && Array.isArray(participantIds)) {
+      if (participantIds) {
         await tx.warikanParticipant.deleteMany({
           where: { warikanEventId: id },
         })
         await tx.warikanParticipant.createMany({
-          data: (participantIds as string[]).map((memberId) => ({
+          data: participantIds.map((memberId) => ({
             warikanEventId: id,
             memberId,
           })),
