@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { handleApiError } from '@/lib/api-utils'
 import { readJsonBody, validationErrorResponse, limitedString } from '@/lib/api-validation'
 
 // GET /api/members — メンバー一覧
@@ -16,11 +17,7 @@ export async function GET() {
       headers: { 'Cache-Control': 'private, max-age=300' },
     })
   } catch (error) {
-    console.error('メンバー一覧取得エラー:', error)
-    return NextResponse.json(
-      { error: 'メンバー一覧の取得に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, { logLabel: 'メンバー一覧取得エラー', fallbackMessage: 'メンバー一覧の取得に失敗しました' })
   }
 }
 
@@ -58,16 +55,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(member, { status: 201 })
   } catch (error) {
-    console.error('メンバー作成エラー:', error)
-    if ((error as { code?: string }).code === 'P2002') {
-      return NextResponse.json(
-        { error: 'その名前は既に使用されています' },
-        { status: 409 }
-      )
-    }
-    return NextResponse.json(
-      { error: 'メンバーの作成に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, {
+      logLabel: 'メンバー作成エラー',
+      fallbackMessage: 'メンバーの作成に失敗しました',
+      prismaMessages: { P2002: 'その名前は既に使用されています' },
+    })
   }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { handleApiError } from '@/lib/api-utils'
 
 // Raw SQL 結果型
 type RankingRow = {
@@ -64,10 +65,6 @@ export async function GET(request: NextRequest) {
     response.headers.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=300')
     return response
   } catch (error) {
-    console.error('ランキング取得エラー:', error)
-    return NextResponse.json(
-      { error: 'ランキングの取得に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, { logLabel: 'ランキング取得エラー', fallbackMessage: 'ランキングの取得に失敗しました' })
   }
 }

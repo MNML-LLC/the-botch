@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { handleApiError } from '@/lib/api-utils'
 import { calculateSettlements } from '@/lib/warikan-calc'
 import { MEMBER_SELECT } from '@/lib/prisma-selects'
 import {
@@ -46,11 +47,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
       headers: { 'Cache-Control': 'private, max-age=60' },
     })
   } catch (error) {
-    console.error('立替明細一覧取得エラー:', error)
-    return NextResponse.json(
-      { error: '立替明細一覧の取得に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, { logLabel: '立替明細一覧取得エラー', fallbackMessage: '立替明細一覧の取得に失敗しました' })
   }
 }
 
@@ -131,10 +128,6 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     return NextResponse.json(expense, { status: 201 })
   } catch (error) {
-    console.error('立替明細追加エラー:', error)
-    return NextResponse.json(
-      { error: '立替明細の追加に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, { logLabel: '立替明細追加エラー', fallbackMessage: '立替明細の追加に失敗しました' })
   }
 }

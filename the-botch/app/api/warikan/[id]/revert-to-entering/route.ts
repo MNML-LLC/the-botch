@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { handleApiError } from '@/lib/api-utils'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -40,10 +41,6 @@ export async function POST(_request: NextRequest, { params }: Params) {
 
     return NextResponse.json(updated)
   } catch (error) {
-    console.error('明細修正に戻すエラー:', error)
-    return NextResponse.json(
-      { error: '明細修正に戻す処理に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, { logLabel: '明細修正に戻すエラー', fallbackMessage: '明細修正に戻す処理に失敗しました' })
   }
 }

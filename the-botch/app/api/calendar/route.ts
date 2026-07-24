@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { MEMBER_SELECT } from '@/lib/prisma-selects'
+import { handleApiError } from '@/lib/api-utils'
 
 // GET /api/calendar?year=2026&month=3 — 月のカレンダーデータ（イベント + 男気 + 割り勘）
 export async function GET(request: NextRequest) {
@@ -92,7 +93,6 @@ export async function GET(request: NextRequest) {
       headers: { 'Cache-Control': 'private, max-age=300' },
     })
   } catch (error) {
-    console.error('カレンダーデータ取得エラー:', error)
-    return NextResponse.json({ error: 'カレンダーデータの取得に失敗しました' }, { status: 500 })
+    return handleApiError(error, { logLabel: 'カレンダーデータ取得エラー', fallbackMessage: 'カレンダーデータの取得に失敗しました' })
   }
 }

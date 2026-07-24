@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { handleApiError } from '@/lib/api-utils'
 import { AccountType } from '@/lib/generated/prisma/client'
 import { readJsonBody, validationErrorResponse } from '@/lib/api-validation'
 
@@ -52,11 +53,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
       headers: { 'Cache-Control': 'private, max-age=600' },
     })
   } catch (error) {
-    console.error('口座情報取得エラー:', error)
-    return NextResponse.json(
-      { error: '口座情報の取得に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, { logLabel: '口座情報取得エラー', fallbackMessage: '口座情報の取得に失敗しました' })
   }
 }
 
@@ -94,18 +91,11 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
     return NextResponse.json(bankAccount)
   } catch (error) {
-    console.error('口座情報更新エラー:', error)
-    // FK制約違反 = メンバーが存在しない
-    if ((error as { code?: string }).code === 'P2003') {
-      return NextResponse.json(
-        { error: 'メンバーが見つかりません' },
-        { status: 404 }
-      )
-    }
-    return NextResponse.json(
-      { error: '口座情報の更新に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, {
+      logLabel: '口座情報更新エラー',
+      fallbackMessage: '口座情報の更新に失敗しました',
+      prismaMessages: { P2003: 'メンバーが見つかりません' },
+    })
   }
 }
 
@@ -121,16 +111,10 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('口座情報削除エラー:', error)
-    if ((error as { code?: string }).code === 'P2025') {
-      return NextResponse.json(
-        { error: '口座情報が登録されていません' },
-        { status: 404 }
-      )
-    }
-    return NextResponse.json(
-      { error: '口座情報の削除に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, {
+      logLabel: '口座情報削除エラー',
+      fallbackMessage: '口座情報の削除に失敗しました',
+      prismaMessages: { P2025: '口座情報が登録されていません' },
+    })
   }
 }

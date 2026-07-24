@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { handleApiError } from '@/lib/api-utils'
 
 const WALICA_API = 'https://manage-expence-api-prod.herokuapp.com/api'
 
@@ -129,11 +130,7 @@ export async function GET(request: NextRequest) {
       expenseCount: paymentsData.items.length,
     })
   } catch (error) {
-    console.error('Walicaプレビューエラー:', error)
-    return NextResponse.json(
-      { error: 'Walicaデータの取得に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, { logLabel: 'Walicaプレビューエラー', fallbackMessage: 'Walicaデータの取得に失敗しました' })
   }
 }
 

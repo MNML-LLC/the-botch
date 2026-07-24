@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { handleApiError } from '@/lib/api-utils'
 import { invalidateStatsCache } from '@/lib/stats-cache'
 import {
   readJsonBody,
@@ -53,11 +54,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
       headers: { 'Cache-Control': 'private, max-age=600' },
     })
   } catch (error) {
-    console.error('男気イベント詳細取得エラー:', error)
-    return NextResponse.json(
-      { error: '男気イベント詳細の取得に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, { logLabel: '男気イベント詳細取得エラー', fallbackMessage: '男気イベント詳細の取得に失敗しました' })
   }
 }
 
@@ -112,17 +109,11 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
     return NextResponse.json(event)
   } catch (error) {
-    console.error('男気イベント更新エラー:', error)
-    if ((error as { code?: string }).code === 'P2025') {
-      return NextResponse.json(
-        { error: '男気イベントが見つかりません' },
-        { status: 404 }
-      )
-    }
-    return NextResponse.json(
-      { error: '男気イベントの更新に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, {
+      logLabel: '男気イベント更新エラー',
+      fallbackMessage: '男気イベントの更新に失敗しました',
+      prismaMessages: { P2025: '男気イベントが見つかりません' },
+    })
   }
 }
 
@@ -139,16 +130,10 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('男気イベント削除エラー:', error)
-    if ((error as { code?: string }).code === 'P2025') {
-      return NextResponse.json(
-        { error: '男気イベントが見つかりません' },
-        { status: 404 }
-      )
-    }
-    return NextResponse.json(
-      { error: '男気イベントの削除に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, {
+      logLabel: '男気イベント削除エラー',
+      fallbackMessage: '男気イベントの削除に失敗しました',
+      prismaMessages: { P2025: '男気イベントが見つかりません' },
+    })
   }
 }

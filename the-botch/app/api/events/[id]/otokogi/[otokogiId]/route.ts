@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { handleApiError } from '@/lib/api-utils'
 
 type Params = { params: Promise<{ id: string; otokogiId: string }> }
 
@@ -20,10 +21,10 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('男気イベント紐付け解除エラー:', error)
-    if ((error as { code?: string }).code === 'P2025') {
-      return NextResponse.json({ error: '男気イベントが見つかりません' }, { status: 404 })
-    }
-    return NextResponse.json({ error: '紐付け解除に失敗しました' }, { status: 500 })
+    return handleApiError(error, {
+      logLabel: '男気イベント紐付け解除エラー',
+      fallbackMessage: '紐付け解除に失敗しました',
+      prismaMessages: { P2025: '男気イベントが見つかりません' },
+    })
   }
 }

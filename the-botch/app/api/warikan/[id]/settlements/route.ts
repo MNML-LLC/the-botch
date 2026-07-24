@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { handleApiError } from '@/lib/api-utils'
 import { calculateSettlements } from '@/lib/warikan-calc'
 import { MEMBER_SELECT_WITH_PAYPAY, MEMBER_SELECT_WITH_BANK } from '@/lib/prisma-selects'
 
@@ -29,11 +30,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
       headers: { 'Cache-Control': 'no-store, must-revalidate' },
     })
   } catch (error) {
-    console.error('精算結果一覧取得エラー:', error)
-    return NextResponse.json(
-      { error: '精算結果一覧の取得に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, { logLabel: '精算結果一覧取得エラー', fallbackMessage: '精算結果一覧の取得に失敗しました' })
   }
 }
 
@@ -139,10 +136,6 @@ export async function POST(_request: NextRequest, { params }: Params) {
       },
     })
   } catch (error) {
-    console.error('精算計算エラー:', error)
-    return NextResponse.json(
-      { error: '精算計算に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, { logLabel: '精算計算エラー', fallbackMessage: '精算計算に失敗しました' })
   }
 }

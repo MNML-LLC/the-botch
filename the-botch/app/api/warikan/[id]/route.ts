@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { handleApiError } from '@/lib/api-utils'
 import { computeDisplayDate } from '@/lib/date-utils'
 import { MEMBER_SELECT, MEMBER_SELECT_FULL } from '@/lib/prisma-selects'
 import {
@@ -69,11 +70,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
       headers: { 'Cache-Control': 'no-store, must-revalidate' },
     })
   } catch (error) {
-    console.error('割り勘イベント詳細取得エラー:', error)
-    return NextResponse.json(
-      { error: '割り勘イベント詳細の取得に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, { logLabel: '割り勘イベント詳細取得エラー', fallbackMessage: '割り勘イベント詳細の取得に失敗しました' })
   }
 }
 
@@ -185,17 +182,11 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
     return NextResponse.json(event)
   } catch (error) {
-    console.error('割り勘イベント更新エラー:', error)
-    if ((error as { code?: string }).code === 'P2025') {
-      return NextResponse.json(
-        { error: '割り勘イベントが見つかりません' },
-        { status: 404 }
-      )
-    }
-    return NextResponse.json(
-      { error: '割り勘イベントの更新に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, {
+      logLabel: '割り勘イベント更新エラー',
+      fallbackMessage: '割り勘イベントの更新に失敗しました',
+      prismaMessages: { P2025: '割り勘イベントが見つかりません' },
+    })
   }
 }
 
@@ -209,16 +200,10 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('割り勘イベント削除エラー:', error)
-    if ((error as { code?: string }).code === 'P2025') {
-      return NextResponse.json(
-        { error: '割り勘イベントが見つかりません' },
-        { status: 404 }
-      )
-    }
-    return NextResponse.json(
-      { error: '割り勘イベントの削除に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, {
+      logLabel: '割り勘イベント削除エラー',
+      fallbackMessage: '割り勘イベントの削除に失敗しました',
+      prismaMessages: { P2025: '割り勘イベントが見つかりません' },
+    })
   }
 }
