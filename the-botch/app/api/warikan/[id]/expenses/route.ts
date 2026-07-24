@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { calculateSettlements } from '@/lib/warikan-calc'
+import { MEMBER_SELECT } from '@/lib/prisma-selects'
 import {
   readJsonBody,
   validationErrorResponse,
@@ -30,7 +31,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
       where: { warikanEventId: id },
       include: {
         payer: {
-          select: { id: true, name: true, initial: true, colorBg: true, colorText: true },
+          select: MEMBER_SELECT,
         },
         debtors: {
           include: {

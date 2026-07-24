@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { EventType } from '@/lib/generated/prisma/client'
+import { MEMBER_SELECT } from '@/lib/prisma-selects'
 import {
   readJsonBody,
   validationErrorResponse,
@@ -26,25 +27,23 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const memberSelect = { id: true, name: true, initial: true, colorBg: true, colorText: true } as const
-
     const { id } = await params
     const event = await prisma.event.findUnique({
       where: { id },
       include: {
-        createdBy: { select: memberSelect },
-        participants: { include: { member: { select: memberSelect } } },
+        createdBy: { select: MEMBER_SELECT },
+        participants: { include: { member: { select: MEMBER_SELECT } } },
         otokogiEvents: {
           include: {
-            payer: { select: memberSelect },
-            participants: { include: { member: { select: memberSelect } } },
+            payer: { select: MEMBER_SELECT },
+            participants: { include: { member: { select: MEMBER_SELECT } } },
           },
           orderBy: { eventDate: 'desc' },
         },
         warikanEvents: {
           include: {
-            manager: { select: memberSelect },
-            participants: { include: { member: { select: memberSelect } } },
+            manager: { select: MEMBER_SELECT },
+            participants: { include: { member: { select: MEMBER_SELECT } } },
             _count: { select: { expenses: true } },
           },
           orderBy: { createdAt: 'desc' },

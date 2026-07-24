@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { WarikanStatus } from '@/lib/generated/prisma/client'
 import { computeDisplayDate } from '@/lib/date-utils'
+import { MEMBER_SELECT } from '@/lib/prisma-selects'
 import {
   readJsonBody,
   validationErrorResponse,
@@ -33,12 +34,10 @@ export async function GET(request: NextRequest) {
       where.createdAt = { gte: startDate, lt: endDate }
     }
 
-    const memberSelect = { id: true, name: true, initial: true, colorBg: true, colorText: true } as const
-
     const events = await prisma.warikanEvent.findMany({
       where,
       include: {
-        manager: { select: memberSelect },
+        manager: { select: MEMBER_SELECT },
         participants: {
           select: { member: { select: { id: true, name: true } } },
         },

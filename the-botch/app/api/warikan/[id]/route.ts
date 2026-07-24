@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { computeDisplayDate } from '@/lib/date-utils'
+import { MEMBER_SELECT, MEMBER_SELECT_FULL } from '@/lib/prisma-selects'
 import {
   readJsonBody,
   validationErrorResponse,
@@ -29,17 +30,14 @@ const updateWarikanSchema = z.object({
     .optional(),
 })
 
-// メンバー表示用の共通フィールド
-const memberSelect = { id: true, name: true, initial: true, colorBg: true, colorText: true } as const
-
 // 割り勘サマリー include 定義（ヘッダー + 参加者のみ。expenses/settlementsは個別API）
 const warikanSummaryInclude = {
-  manager: { select: memberSelect },
+  manager: { select: MEMBER_SELECT },
   event: { select: { id: true, title: true, date: true } },
   participants: {
     include: {
       member: {
-        select: { ...memberSelect, fullName: true },
+        select: MEMBER_SELECT_FULL,
       },
     },
   },

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-
-// メンバー表示用の共通フィールド
-const memberSelect = { id: true, name: true, initial: true, colorBg: true, colorText: true } as const
+import { MEMBER_SELECT } from '@/lib/prisma-selects'
 
 // GET /api/calendar?year=2026&month=3 — 月のカレンダーデータ（イベント + 男気 + 割り勘）
 export async function GET(request: NextRequest) {
@@ -33,8 +31,8 @@ export async function GET(request: NextRequest) {
           endDate: true,
           description: true,
           eventType: true,
-          createdBy: { select: memberSelect },
-          participants: { select: { member: { select: memberSelect } } },
+          createdBy: { select: MEMBER_SELECT },
+          participants: { select: { member: { select: MEMBER_SELECT } } },
         },
         orderBy: { date: 'asc' },
       }),
@@ -51,8 +49,8 @@ export async function GET(request: NextRequest) {
           amount: true,
           place: true,
           memo: true,
-          payer: { select: memberSelect },
-          participants: { select: { member: { select: memberSelect } } },
+          payer: { select: MEMBER_SELECT },
+          participants: { select: { member: { select: MEMBER_SELECT } } },
         },
         orderBy: { eventDate: 'asc' },
       }),
@@ -74,8 +72,8 @@ export async function GET(request: NextRequest) {
           detailDeadline: true,
           paymentDeadline: true,
           displayDate: true,
-          manager: { select: memberSelect },
-          participants: { select: { member: { select: memberSelect } } },
+          manager: { select: MEMBER_SELECT },
+          participants: { select: { member: { select: MEMBER_SELECT } } },
         },
         orderBy: { createdAt: 'asc' },
       }),
