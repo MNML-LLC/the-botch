@@ -2,9 +2,9 @@ import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV === "development";
 
-// 段階的導入: まず Report-Only で違反がないことを確認し、
-// 問題がなければ false に切り替えて Enforce する
-const CSP_REPORT_ONLY = true;
+// 段階的導入: Report-Only で違反がないことを確認済みのため Enforce に切り替え
+// (Issue #77)。問題が発生した場合は true に戻すと Report-Only に復帰できる
+const CSP_REPORT_ONLY = false;
 
 // Next.js は本番でもハイドレーション用のインラインスクリプトを注入するため
 // script-src に 'unsafe-inline' が必要（nonce 化する場合は middleware 導入が必要）。
