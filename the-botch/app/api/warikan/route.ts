@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { handleApiError } from '@/lib/api-utils'
 import { WarikanStatus } from '@/lib/generated/prisma/client'
 import { computeDisplayDate } from '@/lib/date-utils'
 import { MEMBER_SELECT } from '@/lib/prisma-selects'
@@ -62,11 +63,7 @@ export async function GET(request: NextRequest) {
       { headers: { 'Cache-Control': 'private, max-age=300' } },
     )
   } catch (error) {
-    console.error('割り勘イベント一覧取得エラー:', error)
-    return NextResponse.json(
-      { error: '割り勘イベント一覧の取得に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, { logLabel: '割り勘イベント一覧取得エラー', fallbackMessage: '割り勘イベント一覧の取得に失敗しました' })
   }
 }
 
@@ -126,10 +123,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(event, { status: 201 })
   } catch (error) {
-    console.error('割り勘イベント作成エラー:', error)
-    return NextResponse.json(
-      { error: '割り勘イベントの作成に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, { logLabel: '割り勘イベント作成エラー', fallbackMessage: '割り勘イベントの作成に失敗しました' })
   }
 }

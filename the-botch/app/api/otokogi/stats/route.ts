@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Prisma } from '@/lib/generated/prisma/client'
 import { prisma } from '@/lib/prisma'
+import { handleApiError } from '@/lib/api-utils'
 import { getCachedStats, setCachedStats } from '@/lib/stats-cache'
 import { MEMBER_SELECT } from '@/lib/prisma-selects'
 
@@ -458,10 +459,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(result)
   } catch (error) {
-    console.error('統計情報取得エラー:', error)
-    return NextResponse.json(
-      { error: '統計情報の取得に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, { logLabel: '統計情報取得エラー', fallbackMessage: '統計情報の取得に失敗しました' })
   }
 }

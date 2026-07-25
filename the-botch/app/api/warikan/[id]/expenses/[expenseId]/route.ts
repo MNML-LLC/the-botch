@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { handleApiError } from '@/lib/api-utils'
 import { calculateSettlements } from '@/lib/warikan-calc'
 import {
   readJsonBody,
@@ -128,17 +129,11 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
     return NextResponse.json(expense)
   } catch (error) {
-    console.error('立替明細更新エラー:', error)
-    if ((error as { code?: string }).code === 'P2025') {
-      return NextResponse.json(
-        { error: '立替明細が見つかりません' },
-        { status: 404 }
-      )
-    }
-    return NextResponse.json(
-      { error: '立替明細の更新に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, {
+      logLabel: '立替明細更新エラー',
+      fallbackMessage: '立替明細の更新に失敗しました',
+      prismaMessages: { P2025: '立替明細が見つかりません' },
+    })
   }
 }
 
@@ -210,16 +205,10 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('立替明細削除エラー:', error)
-    if ((error as { code?: string }).code === 'P2025') {
-      return NextResponse.json(
-        { error: '立替明細が見つかりません' },
-        { status: 404 }
-      )
-    }
-    return NextResponse.json(
-      { error: '立替明細の削除に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, {
+      logLabel: '立替明細削除エラー',
+      fallbackMessage: '立替明細の削除に失敗しました',
+      prismaMessages: { P2025: '立替明細が見つかりません' },
+    })
   }
 }

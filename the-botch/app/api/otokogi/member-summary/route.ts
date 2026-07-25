@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { handleApiError } from '@/lib/api-utils'
 
 type ShouldHavePaidRow = {
   member_id: string
@@ -181,10 +182,6 @@ export async function GET(request: NextRequest) {
       hasJankenData: false,
     })
   } catch (error) {
-    console.error('収支分析取得エラー:', error)
-    return NextResponse.json(
-      { error: '収支分析データの取得に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, { logLabel: '収支分析取得エラー', fallbackMessage: '収支分析データの取得に失敗しました' })
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { handleApiError } from '@/lib/api-utils'
 import { EventType } from '@/lib/generated/prisma/client'
 import {
   readJsonBody,
@@ -58,8 +59,7 @@ export async function GET(request: NextRequest) {
       headers: { 'Cache-Control': 'private, max-age=300' },
     })
   } catch (error) {
-    console.error('イベント一覧取得エラー:', error)
-    return NextResponse.json({ error: 'イベント一覧の取得に失敗しました' }, { status: 500 })
+    return handleApiError(error, { logLabel: 'イベント一覧取得エラー', fallbackMessage: 'イベント一覧の取得に失敗しました' })
   }
 }
 
@@ -107,7 +107,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(event, { status: 201 })
   } catch (error) {
-    console.error('イベント作成エラー:', error)
-    return NextResponse.json({ error: 'イベントの作成に失敗しました' }, { status: 500 })
+    return handleApiError(error, { logLabel: 'イベント作成エラー', fallbackMessage: 'イベントの作成に失敗しました' })
   }
 }

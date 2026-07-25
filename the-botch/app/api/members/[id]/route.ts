@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { handleApiError } from '@/lib/api-utils'
 import { readJsonBody, validationErrorResponse, limitedString } from '@/lib/api-validation'
 
 type Params = { params: Promise<{ id: string }> }
@@ -35,11 +36,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
       headers: { 'Cache-Control': 'private, max-age=600' },
     })
   } catch (error) {
-    console.error('メンバー詳細取得エラー:', error)
-    return NextResponse.json(
-      { error: 'メンバー詳細の取得に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, { logLabel: 'メンバー詳細取得エラー', fallbackMessage: 'メンバー詳細の取得に失敗しました' })
   }
 }
 
@@ -70,17 +67,11 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
     return NextResponse.json(member)
   } catch (error) {
-    console.error('メンバー更新エラー:', error)
-    if ((error as { code?: string }).code === 'P2025') {
-      return NextResponse.json(
-        { error: 'メンバーが見つかりません' },
-        { status: 404 }
-      )
-    }
-    return NextResponse.json(
-      { error: 'メンバーの更新に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, {
+      logLabel: 'メンバー更新エラー',
+      fallbackMessage: 'メンバーの更新に失敗しました',
+      prismaMessages: { P2025: 'メンバーが見つかりません' },
+    })
   }
 }
 
@@ -95,16 +86,10 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
 
     return NextResponse.json(member)
   } catch (error) {
-    console.error('メンバー削除エラー:', error)
-    if ((error as { code?: string }).code === 'P2025') {
-      return NextResponse.json(
-        { error: 'メンバーが見つかりません' },
-        { status: 404 }
-      )
-    }
-    return NextResponse.json(
-      { error: 'メンバーの削除に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, {
+      logLabel: 'メンバー削除エラー',
+      fallbackMessage: 'メンバーの削除に失敗しました',
+      prismaMessages: { P2025: 'メンバーが見つかりません' },
+    })
   }
 }

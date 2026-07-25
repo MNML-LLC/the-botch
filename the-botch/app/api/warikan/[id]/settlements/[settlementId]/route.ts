@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { handleApiError } from '@/lib/api-utils'
 import { readJsonBody, validationErrorResponse } from '@/lib/api-validation'
 
 type Params = { params: Promise<{ id: string; settlementId: string }> }
@@ -97,16 +98,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       eventClosed: allReceived,
     })
   } catch (error) {
-    console.error('精算ステータス更新エラー:', error)
-    if ((error as { code?: string }).code === 'P2025') {
-      return NextResponse.json(
-        { error: '精算レコードが見つかりません' },
-        { status: 404 }
-      )
-    }
-    return NextResponse.json(
-      { error: '精算ステータスの更新に失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, {
+      logLabel: '精算ステータス更新エラー',
+      fallbackMessage: '精算ステータスの更新に失敗しました',
+      prismaMessages: { P2025: '精算レコードが見つかりません' },
+    })
   }
 }

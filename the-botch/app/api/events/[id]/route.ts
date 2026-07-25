@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { handleApiError } from '@/lib/api-utils'
 import { EventType } from '@/lib/generated/prisma/client'
 import { MEMBER_SELECT } from '@/lib/prisma-selects'
 import {
@@ -59,8 +60,7 @@ export async function GET(
       headers: { 'Cache-Control': 'private, max-age=600' },
     })
   } catch (error) {
-    console.error('イベント取得エラー:', error)
-    return NextResponse.json({ error: 'イベントの取得に失敗しました' }, { status: 500 })
+    return handleApiError(error, { logLabel: 'イベント取得エラー', fallbackMessage: 'イベントの取得に失敗しました' })
   }
 }
 
@@ -102,8 +102,7 @@ export async function PUT(
 
     return NextResponse.json(event)
   } catch (error) {
-    console.error('イベント更新エラー:', error)
-    return NextResponse.json({ error: 'イベントの更新に失敗しました' }, { status: 500 })
+    return handleApiError(error, { logLabel: 'イベント更新エラー', fallbackMessage: 'イベントの更新に失敗しました' })
   }
 }
 
@@ -117,10 +116,10 @@ export async function DELETE(
     await prisma.event.delete({ where: { id } })
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('イベント削除エラー:', error)
-    if ((error as { code?: string }).code === 'P2025') {
-      return NextResponse.json({ error: 'イベントが見つかりません' }, { status: 404 })
-    }
-    return NextResponse.json({ error: 'イベントの削除に失敗しました' }, { status: 500 })
+    return handleApiError(error, {
+      logLabel: 'イベント削除エラー',
+      fallbackMessage: 'イベントの削除に失敗しました',
+      prismaMessages: { P2025: 'イベントが見つかりません' },
+    })
   }
 }

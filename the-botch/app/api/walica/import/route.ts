@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { handleApiError } from '@/lib/api-utils'
 import {
   readJsonBody,
   validationErrorResponse,
@@ -218,11 +219,7 @@ export async function POST(request: NextRequest) {
       },
     }, { status: 201 })
   } catch (error) {
-    console.error('Walicaインポートエラー:', error)
-    return NextResponse.json(
-      { error: 'Walicaデータのインポートに失敗しました' },
-      { status: 500 }
-    )
+    return handleApiError(error, { logLabel: 'Walicaインポートエラー', fallbackMessage: 'Walicaデータのインポートに失敗しました' })
   }
 }
 
