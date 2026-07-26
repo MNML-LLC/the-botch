@@ -10,6 +10,8 @@ import {
   useUnlinkEventOtokogi,
   useUnlinkEventWarikan,
 } from '@/hooks/use-events';
+import { EVENT_TYPE_LABELS, WARIKAN_STATUS_LABELS } from '@/lib/constants';
+import { toast } from '@/hooks/use-toast';
 
 type Member = {
   id: string;
@@ -46,12 +48,10 @@ type WarikanItem = {
 type Tab = 'warikan' | 'otokogi';
 
 function eventTypeLabel(type: string) {
-  switch (type) {
-    case 'TRIP': return '旅行';
-    case 'HANGOUT': return '飲み会';
-    case 'ACTIVITY': return 'アクティビティ';
-    default: return 'その他';
+  if (type in EVENT_TYPE_LABELS) {
+    return EVENT_TYPE_LABELS[type as keyof typeof EVENT_TYPE_LABELS];
   }
+  return EVENT_TYPE_LABELS.OTHER;
 }
 
 function eventTypeBadgeColor(type: string) {
@@ -66,11 +66,11 @@ function eventTypeBadgeColor(type: string) {
 function warikanStatusBadge(status: string) {
   switch (status) {
     case 'ENTERING':
-      return <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">明細入力中</span>;
+      return <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">{WARIKAN_STATUS_LABELS.ENTERING}</span>;
     case 'PAYING':
-      return <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">支払待ち</span>;
+      return <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">{WARIKAN_STATUS_LABELS.PAYING}</span>;
     case 'CLOSED':
-      return <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">クローズ</span>;
+      return <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">{WARIKAN_STATUS_LABELS.CLOSED}</span>;
     default:
       return null;
   }
@@ -206,11 +206,23 @@ export default function EventDetailPage() {
   const { data: event, isLoading, error } = useEventDetail(id);
 
   const unlinkOtokogiMutation = useUnlinkEventOtokogi(id, {
-    onError: () => alert('紐付け解除に失敗しました'),
+    onSuccess: () => {
+      toast({ title: '男気の紐付けを解除しました' });
+    },
+    onError: (error) => {
+      console.error(error);
+      toast({ variant: 'destructive', title: '紐付け解除に失敗しました', description: error.message });
+    },
   });
 
   const unlinkWarikanMutation = useUnlinkEventWarikan(id, {
-    onError: () => alert('紐付け解除に失敗しました'),
+    onSuccess: () => {
+      toast({ title: '割り勘の紐付けを解除しました' });
+    },
+    onError: (error) => {
+      console.error(error);
+      toast({ variant: 'destructive', title: '紐付け解除に失敗しました', description: error.message });
+    },
   });
 
   if (isLoading) {

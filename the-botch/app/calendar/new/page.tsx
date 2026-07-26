@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { toast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,12 +19,13 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { useMembers } from '@/hooks/use-members';
 import { useCreateEvent } from '@/hooks/use-events';
+import { EVENT_TYPE_LABELS } from '@/lib/constants';
 
-const EVENT_TYPES = [
-  { value: 'HANGOUT', label: '飲み会' },
-  { value: 'TRIP', label: '旅行' },
-  { value: 'ACTIVITY', label: 'アクティビティ' },
-  { value: 'OTHER', label: 'その他' },
+const EVENT_TYPES: { value: keyof typeof EVENT_TYPE_LABELS; label: string }[] = [
+  { value: 'HANGOUT', label: EVENT_TYPE_LABELS.HANGOUT },
+  { value: 'TRIP', label: EVENT_TYPE_LABELS.TRIP },
+  { value: 'ACTIVITY', label: EVENT_TYPE_LABELS.ACTIVITY },
+  { value: 'OTHER', label: EVENT_TYPE_LABELS.OTHER },
 ];
 
 export default function NewEventPage() {
@@ -53,10 +55,12 @@ export default function NewEventPage() {
 
   const createMutation = useCreateEvent({
     onSuccess: () => {
+      toast({ title: '予定を登録しました' });
       router.push('/calendar');
     },
     onError: (error) => {
-      alert(error.message);
+      console.error(error);
+      toast({ variant: 'destructive', title: '登録に失敗しました', description: error.message });
     },
   });
 

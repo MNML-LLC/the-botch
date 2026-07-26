@@ -22,6 +22,7 @@ import {
   useSaveMemberBankAccount,
   useUpdateMember,
 } from '@/hooks/use-members';
+import { toast } from '@/hooks/use-toast';
 
 const COLOR_OPTIONS = [
   { label: 'アンバー', bg: 'bg-amber-100', text: 'text-amber-700', accent: 'border-amber-400 bg-amber-50', dot: 'bg-amber-400' },
@@ -86,20 +87,23 @@ export default function MemberEditPage() {
 
   const updateMutation = useUpdateMember(id, {
     onSuccess: () => {
+      toast({ title: 'メンバー情報を更新しました' });
       router.push('/members');
     },
     onError: (error) => {
-      alert(error.message);
+      console.error(error);
+      toast({ variant: 'destructive', title: '更新に失敗しました', description: error.message });
     },
   });
 
   const saveBankMutation = useSaveMemberBankAccount(id, {
     onSuccess: () => {
       setHasBankAccount(true);
-      alert('口座情報を保存しました');
+      toast({ title: '口座情報を保存しました' });
     },
     onError: (error) => {
-      alert(error.message);
+      console.error(error);
+      toast({ variant: 'destructive', title: '口座情報の保存に失敗しました', description: error.message });
     },
   });
 
@@ -112,10 +116,11 @@ export default function MemberEditPage() {
       setAccountHolder('');
       setHasBankAccount(false);
       setIsAccountRevealed(false);
-      alert('口座情報を削除しました');
+      toast({ title: '口座情報を削除しました' });
     },
     onError: (error) => {
-      alert(error.message);
+      console.error(error);
+      toast({ variant: 'destructive', title: '口座情報の削除に失敗しました', description: error.message });
     },
   });
 
@@ -139,11 +144,11 @@ export default function MemberEditPage() {
 
   const handleSaveBankAccount = () => {
     if (!bankName || !branchName || !accountNumber || !accountHolder) {
-      alert('口座情報を全て入力してください');
+      toast({ variant: 'destructive', title: '口座情報を全て入力してください' });
       return;
     }
     if (!/^\d{1,7}$/.test(accountNumber)) {
-      alert('口座番号は7桁以下の数字で入力してください');
+      toast({ variant: 'destructive', title: '口座番号は7桁以下の数字で入力してください' });
       return;
     }
     saveBankMutation.mutate({
@@ -165,8 +170,9 @@ export default function MemberEditPage() {
       await navigator.clipboard.writeText(accountNumber);
       setAccountCopied(true);
       setTimeout(() => setAccountCopied(false), 2000);
-    } catch {
-      alert('コピーに失敗しました');
+    } catch (error) {
+      console.error(error);
+      toast({ variant: 'destructive', title: 'コピーに失敗しました' });
     }
   };
 

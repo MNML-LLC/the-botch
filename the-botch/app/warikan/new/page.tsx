@@ -3,6 +3,7 @@
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { toast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,11 +43,13 @@ function WarikanNewForm() {
 
   const createMutation = useCreateWarikan({
     onSuccess: () => {
+      toast({ title: '割り勘イベントを作成しました' });
       const from = searchParams.get('from');
       router.push(from ?? '/warikan');
     },
-    onError: () => {
-      alert('作成に失敗しました');
+    onError: (error) => {
+      console.error(error);
+      toast({ variant: 'destructive', title: '作成に失敗しました', description: error.message });
     },
   });
 

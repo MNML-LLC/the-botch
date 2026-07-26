@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { handleApiError } from '@/lib/api-utils'
+import { WARIKAN_STATUS_LABELS } from '@/lib/constants'
 import { calculateSettlements } from '@/lib/warikan-calc'
 import { MEMBER_SELECT } from '@/lib/prisma-selects'
 import {
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     if (warikanEvent.status !== 'ENTERING') {
       return NextResponse.json(
-        { error: '明細入力中のイベントのみ編集できます' },
+        { error: `${WARIKAN_STATUS_LABELS.ENTERING}のイベントのみ編集できます` },
         { status: 400 }
       )
     }

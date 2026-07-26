@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { toast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,10 +35,12 @@ export default function MemberNewPage() {
 
   const createMutation = useCreateMember({
     onSuccess: () => {
+      toast({ title: 'メンバーを追加しました' });
       router.push('/members');
     },
     onError: (error) => {
-      alert(error.message);
+      console.error(error);
+      toast({ variant: 'destructive', title: '作成に失敗しました', description: error.message });
     },
   });
 

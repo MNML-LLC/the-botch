@@ -3,6 +3,7 @@
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { toast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,11 +48,13 @@ function OtokogiNewForm() {
 
   const createMutation = useCreateOtokogi({
     onSuccess: () => {
+      toast({ title: '男気イベントを登録しました' });
       const from = searchParams.get('from');
       router.push(from ?? '/otokogi');
     },
-    onError: () => {
-      alert('登録に失敗しました');
+    onError: (error) => {
+      console.error(error);
+      toast({ variant: 'destructive', title: '登録に失敗しました', description: error.message });
     },
   });
 

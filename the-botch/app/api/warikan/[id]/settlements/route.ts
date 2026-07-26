@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { handleApiError } from '@/lib/api-utils'
+import { WARIKAN_STATUS_LABELS } from '@/lib/constants'
 import { calculateSettlements } from '@/lib/warikan-calc'
 import { MEMBER_SELECT_WITH_PAYPAY, MEMBER_SELECT_WITH_BANK } from '@/lib/prisma-selects'
 
@@ -61,7 +62,7 @@ export async function POST(_request: NextRequest, { params }: Params) {
 
     if (warikanEvent.status !== 'ENTERING') {
       return NextResponse.json(
-        { error: '明細入力中のイベントのみ精算を確定できます' },
+        { error: `${WARIKAN_STATUS_LABELS.ENTERING}のイベントのみ精算を確定できます` },
         { status: 400 }
       )
     }

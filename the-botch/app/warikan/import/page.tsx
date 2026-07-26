@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { toast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,9 +45,11 @@ export default function WalicaImportPage() {
       }
       setMemberMapping(mapping);
     },
-    onError: (err) => {
-      setError(err.message);
+    onError: (error) => {
+      console.error(error);
+      setError(error.message);
       setPreview(null);
+      toast({ variant: 'destructive', title: 'データの取得に失敗しました', description: error.message });
     },
   });
 
@@ -68,10 +71,13 @@ export default function WalicaImportPage() {
   // Step 3: インポート実行
   const importMutation = useWalicaImport({
     onSuccess: (data) => {
+      toast({ title: 'Walicaからインポートしました' });
       router.push(`/warikan/${data.event.id}`);
     },
-    onError: (err) => {
-      setError(err.message);
+    onError: (error) => {
+      console.error(error);
+      setError(error.message);
+      toast({ variant: 'destructive', title: 'インポートに失敗しました', description: error.message });
     },
   });
 
