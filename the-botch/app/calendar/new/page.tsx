@@ -17,14 +17,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { EVENT_TYPE_LABELS } from '@/lib/constants';
 
 type Member = { id: string; name: string; fullName: string };
 
-const EVENT_TYPES = [
-  { value: 'HANGOUT', label: '飲み会' },
-  { value: 'TRIP', label: '旅行' },
-  { value: 'ACTIVITY', label: 'アクティビティ' },
-  { value: 'OTHER', label: 'その他' },
+const EVENT_TYPES: { value: keyof typeof EVENT_TYPE_LABELS; label: string }[] = [
+  { value: 'HANGOUT', label: EVENT_TYPE_LABELS.HANGOUT },
+  { value: 'TRIP', label: EVENT_TYPE_LABELS.TRIP },
+  { value: 'ACTIVITY', label: EVENT_TYPE_LABELS.ACTIVITY },
+  { value: 'OTHER', label: EVENT_TYPE_LABELS.OTHER },
 ];
 
 export default function NewEventPage() {

@@ -4,17 +4,11 @@ export const revalidate = 300;
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { MEMBER_SELECT } from '@/lib/prisma-selects';
+import { EVENT_TYPE_LABELS, WARIKAN_STATUS_LABELS } from '@/lib/constants';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import MonthlyTrendChart from './monthly-trend-chart';
 import type { MonthlyTrendData } from './monthly-trend-chart';
-
-const EVENT_TYPE_LABELS: Record<string, string> = {
-  TRIP: '旅行',
-  HANGOUT: '飲み会',
-  ACTIVITY: 'アクティビティ',
-  OTHER: 'その他',
-};
 
 const EVENT_TYPE_COLORS: Record<string, string> = {
   TRIP: 'bg-blue-100 text-blue-700',
@@ -38,9 +32,10 @@ function formatShortDate(date: Date | string | null) {
 function statusBadge(status: string) {
   switch (status) {
     case 'ENTERING':
+      // ダッシュボードは幅が狭いためコンパクト表記
       return <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-medium">入力中</span>;
     case 'PAYING':
-      return <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">支払待ち</span>;
+      return <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">{WARIKAN_STATUS_LABELS.PAYING}</span>;
     default:
       return null;
   }
