@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useCallback } from 'react';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,42 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-
-type Member = {
-  id: string;
-  name: string;
-  initial: string;
-  colorBg: string;
-  colorText: string;
-};
-
-type OtokogiEvent = {
-  id: string;
-  eventDate: string;
-  eventName: string;
-  amount: number;
-  place: string | null;
-  memo: string | null;
-  hasAlbum: boolean;
-  payer: Member;
-  participants: { member: Member }[];
-};
-
-type OtokogiResponse = {
-  data: OtokogiEvent[];
-  nextCursor: string | null;
-};
-
-type RankingEntry = {
-  rank: number;
-  memberId: string;
-  name: string;
-  initial: string;
-  colorBg: string;
-  colorText: string;
-  count: number;
-  totalPaid: number;
-};
+import { useOtokogiEvents, useOtokogiRanking } from '@/hooks/use-otokogi';
 
 type Tab = 'history' | 'ranking';
 
@@ -58,47 +22,17 @@ export default function OtokogiPage() {
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 4 }, (_, i) => currentYear - i);
 
-  // 男気イベント一覧（カーソルベースページネーション）
-  const fetchOtokogiEvents = useCallback(async ({ pageParam }: { pageParam: string | null }) => {
-    const params = new URLSearchParams();
-    if (yearFilter !== 'all') params.set('year', yearFilter);
-    if (pageParam) params.set('cursor', pageParam);
-
-    const res = await fetch(`/api/otokogi?${params.toString()}`);
-    if (!res.ok) throw new Error('男気イベントの取得に失敗しました');
-    return res.json() as Promise<OtokogiResponse>;
-  }, [yearFilter]);
-
   const {
     data: eventsData,
     isLoading: eventsLoading,
     isFetchingNextPage,
     hasNextPage,
     fetchNextPage,
-  } = useInfiniteQuery({
-    queryKey: ['otokogi', yearFilter],
-    queryFn: fetchOtokogiEvents,
-    initialPageParam: null as string | null,
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
-    staleTime: 60 * 1000,       // 1分キャッシュ
-    gcTime: 30 * 60 * 1000,     // 30分GC
-  });
+  } = useOtokogiEvents(yearFilter);
 
   const events = eventsData?.pages.flatMap((page) => page.data) ?? [];
 
-  // ランキングデータ取得（ページネーション対象外）
-  const { data: rankingResponse, isLoading: rankingLoading } = useQuery({
-    queryKey: ['otokogi-ranking', yearFilter],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (yearFilter !== 'all') params.set('year', yearFilter);
-      const res = await fetch(`/api/otokogi/ranking?${params.toString()}`);
-      if (!res.ok) throw new Error('ランキングの取得に失敗しました');
-      return res.json() as Promise<{ ranking: RankingEntry[] }>;
-    },
-    staleTime: 60 * 1000,       // 1分キャッシュ
-    gcTime: 30 * 60 * 1000,     // 30分GC
-  });
+  const { data: rankingResponse, isLoading: rankingLoading } = useOtokogiRanking(yearFilter);
   const rankingData = rankingResponse?.ranking ?? [];
 
   const loading = activeTab === 'history' ? eventsLoading : rankingLoading;

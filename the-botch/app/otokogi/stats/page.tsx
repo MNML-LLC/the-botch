@@ -2,12 +2,16 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList, Cell,
 } from 'recharts';
+import { useMembers } from '@/hooks/use-members';
+import {
+  useOtokogiMemberSummary,
+  useOtokogiStatsMain,
+} from '@/hooks/use-otokogi';
 
 // ---- 型定義 ----
 
@@ -260,24 +264,11 @@ function MemberBalanceSection({
   to?: string;
   memberIds: string[];
 }) {
-  const params = useMemo(() => {
-    const p = new URLSearchParams();
-    if (from) p.set('from', from);
-    if (to) p.set('to', to);
-    if (memberIds.length > 0) p.set('memberIds', memberIds.join(','));
-    return p.toString();
-  }, [from, to, memberIds]);
-
-  const { data, isFetching } = useQuery({
-    queryKey: ['otokogi-member-summary', from, to, memberIds.join(',')],
-    queryFn: async () => {
-      const res = await fetch(`/api/otokogi/member-summary?${params}`);
-      if (!res.ok) throw new Error('収支データの取得に失敗しました');
-      return res.json() as Promise<{ members: MemberSummaryEntry[] }>;
-    },
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
-  });
+  const { data, isFetching } = useOtokogiMemberSummary<{ members: MemberSummaryEntry[] }>(
+    from,
+    to,
+    memberIds
+  );
 
   const members = data?.members ?? [];
 
@@ -458,36 +449,14 @@ export default function OtokogiStatsPage() {
   );
 
   // メンバー一覧（フィルタバー用）
-  const { data: membersData } = useQuery({
-    queryKey: ['members'],
-    queryFn: async () => {
-      const res = await fetch('/api/members');
-      if (!res.ok) throw new Error('メンバー取得に失敗しました');
-      return res.json() as Promise<Member[]>;
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-  const members = membersData ?? [];
+  const { data: membersData } = useMembers({ staleTime: 5 * 60 * 1000 });
+  const members: Member[] = membersData ?? [];
 
-  // 統計データ（月別推移・ランキング）
-  const statsParams = useMemo(() => {
-    const p = new URLSearchParams();
-    if (from) p.set('from', from);
-    if (to) p.set('to', to);
-    if (selectedMemberIds.length > 0) p.set('memberIds', selectedMemberIds.join(','));
-    return p.toString();
-  }, [from, to, selectedMemberIds]);
-
-  const { data: stats, isFetching: statsFetching } = useQuery({
-    queryKey: ['otokogi-stats-main', from, to, selectedMemberIds.join(',')],
-    queryFn: async () => {
-      const res = await fetch(`/api/otokogi/stats?${statsParams}`);
-      if (!res.ok) throw new Error('統計データの取得に失敗しました');
-      return res.json() as Promise<StatsData>;
-    },
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
-  });
+  const { data: stats, isFetching: statsFetching } = useOtokogiStatsMain<StatsData>(
+    from,
+    to,
+    selectedMemberIds
+  );
 
   return (
     <div>

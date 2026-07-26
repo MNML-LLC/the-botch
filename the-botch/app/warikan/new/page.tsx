@@ -2,7 +2,6 @@
 
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,24 +16,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-
-type Member = {
-  id: string;
-  name: string;
-  fullName: string;
-  initial: string;
-};
-
-type CalendarEvent = {
-  id: string;
-  title: string;
-  date: string;
-};
+import { useMembers } from '@/hooks/use-members';
+import { useEvents } from '@/hooks/use-events';
+import { useCreateWarikan } from '@/hooks/use-warikan';
 
 function WarikanNewForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const queryClient = useQueryClient();
   const [eventName, setEventName] = useState('');
   const [managerId, setManagerId] = useState('');
   const [eventId, setEventId] = useState(searchParams.get('eventId') ?? '');
@@ -43,23 +31,8 @@ function WarikanNewForm() {
   const [memo, setMemo] = useState('');
   const [participantIds, setParticipantIds] = useState<string[]>([]);
 
-  const { data: members = [] } = useQuery({
-    queryKey: ['members'],
-    queryFn: async () => {
-      const res = await fetch('/api/members');
-      if (!res.ok) throw new Error('メンバーの取得に失敗しました');
-      return res.json() as Promise<Member[]>;
-    },
-  });
-
-  const { data: events = [] } = useQuery({
-    queryKey: ['events'],
-    queryFn: async () => {
-      const res = await fetch('/api/events');
-      if (!res.ok) throw new Error('イベントの取得に失敗しました');
-      return res.json() as Promise<CalendarEvent[]>;
-    },
-  });
+  const { data: members = [] } = useMembers();
+  const { data: events = [] } = useEvents();
 
   const toggleParticipant = (id: string) => {
     setParticipantIds((prev) =>
@@ -67,27 +40,8 @@ function WarikanNewForm() {
     );
   };
 
-  const createMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch('/api/warikan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          eventName,
-          managerId: managerId || null,
-          eventId: (eventId && eventId !== 'none') ? eventId : null,
-          detailDeadline: detailDeadline || null,
-          paymentDeadline: paymentDeadline || null,
-          memo: memo || null,
-          participantIds,
-        }),
-      });
-      if (!res.ok) throw new Error('作成に失敗しました');
-      return res.json();
-    },
+  const createMutation = useCreateWarikan({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['warikan'] });
-      queryClient.invalidateQueries({ queryKey: ['calendar'] });
       const from = searchParams.get('from');
       router.push(from ?? '/warikan');
     },
@@ -98,7 +52,15 @@ function WarikanNewForm() {
 
   const handleSubmit = () => {
     if (!eventName || participantIds.length === 0) return;
-    createMutation.mutate();
+    createMutation.mutate({
+      eventName,
+      managerId: managerId || null,
+      eventId: (eventId && eventId !== 'none') ? eventId : null,
+      detailDeadline: detailDeadline || null,
+      paymentDeadline: paymentDeadline || null,
+      memo: memo || null,
+      participantIds,
+    });
   };
 
   return (

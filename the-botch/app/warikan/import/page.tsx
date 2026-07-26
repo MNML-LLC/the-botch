@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,73 +14,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-
-type MemberMatch = {
-  walicaId: string;
-  walicaName: string;
-  matchedMemberId: string | null;
-  matchedMemberName: string | null;
-  confidence: number;
-};
-
-type Expense = {
-  itemName: string;
-  amount: number;
-  payerName: string;
-  debtorNames: string[];
-  date: string | null;
-};
-
-type Settlement = {
-  senderName: string;
-  receiverName: string;
-  amount: number;
-};
-
-type PreviewData = {
-  groupName: string;
-  currency: string;
-  members: MemberMatch[];
-  expenses: Expense[];
-  settlements: Settlement[];
-  totalAmount: number;
-  expenseCount: number;
-};
-
-type AppMember = {
-  id: string;
-  name: string;
-  fullName: string;
-};
+import { useMembers } from '@/hooks/use-members';
+import {
+  useWalicaImport,
+  useWalicaPreview,
+  type WalicaPreviewData,
+} from '@/hooks/use-walica';
 
 export default function WalicaImportPage() {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const [walicaUrl, setWalicaUrl] = useState('');
   const [error, setError] = useState('');
-  const [preview, setPreview] = useState<PreviewData | null>(null);
+  const [preview, setPreview] = useState<WalicaPreviewData | null>(null);
   const [memberMapping, setMemberMapping] = useState<Record<string, string>>({});
 
-  const { data: appMembers = [] } = useQuery({
-    queryKey: ['members'],
-    queryFn: async () => {
-      const res = await fetch('/api/members');
-      if (!res.ok) throw new Error('メンバーの取得に失敗しました');
-      return res.json() as Promise<AppMember[]>;
-    },
-
-  });
+  const { data: appMembers = [] } = useMembers();
 
   // Step 1: Walica URLからプレビュー取得
-  const previewMutation = useMutation({
-    mutationFn: async (url: string) => {
-      const res = await fetch(`/api/walica/preview?url=${encodeURIComponent(url)}`);
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'データの取得に失敗しました');
-      }
-      return res.json() as Promise<PreviewData>;
-    },
+  const previewMutation = useWalicaPreview({
     onSuccess: (data) => {
       setPreview(data);
       setError('');
@@ -94,8 +44,8 @@ export default function WalicaImportPage() {
       }
       setMemberMapping(mapping);
     },
-    onError: (error: Error) => {
-      setError(error.message);
+    onError: (err) => {
+      setError(err.message);
       setPreview(null);
     },
   });
@@ -116,33 +66,12 @@ export default function WalicaImportPage() {
   };
 
   // Step 3: インポート実行
-  const importMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch('/api/walica/import', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          walicaUrl: walicaUrl.trim(),
-          memberMapping: preview!.members.map((m) => ({
-            walicaId: m.walicaId,
-            walicaName: m.walicaName,
-            appMemberId: memberMapping[m.walicaId],
-          })),
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'インポートに失敗しました');
-      }
-      return res.json();
-    },
+  const importMutation = useWalicaImport({
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['warikan'] });
-      queryClient.invalidateQueries({ queryKey: ['calendar'] });
       router.push(`/warikan/${data.event.id}`);
     },
-    onError: (error: Error) => {
-      setError(error.message);
+    onError: (err) => {
+      setError(err.message);
     },
   });
 
@@ -154,7 +83,14 @@ export default function WalicaImportPage() {
       return;
     }
     setError('');
-    importMutation.mutate();
+    importMutation.mutate({
+      walicaUrl: walicaUrl.trim(),
+      memberMapping: preview.members.map((m) => ({
+        walicaId: m.walicaId,
+        walicaName: m.walicaName,
+        appMemberId: memberMapping[m.walicaId],
+      })),
+    });
   };
 
   // 全メンバーがマッチ済みか

@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useCreateMember } from '@/hooks/use-members';
 
 const COLOR_OPTIONS = [
   { label: 'アンバー', bg: 'bg-amber-100', text: 'text-amber-700', accent: 'border-amber-400 bg-amber-50', dot: 'bg-amber-400' },
@@ -20,7 +20,6 @@ const COLOR_OPTIONS = [
 
 export default function MemberNewPage() {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const [name, setName] = useState('');
   const [fullName, setFullName] = useState('');
   const [initial, setInitial] = useState('');
@@ -33,38 +32,25 @@ export default function MemberNewPage() {
     setColorText(text);
   };
 
-  const createMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch('/api/members', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          fullName,
-          initial,
-          colorBg,
-          colorText,
-          paypayId: paypayId || null,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || '作成に失敗しました');
-      }
-      return res.json();
-    },
+  const createMutation = useCreateMember({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['members'] });
       router.push('/members');
     },
-    onError: (error: Error) => {
+    onError: (error) => {
       alert(error.message);
     },
   });
 
   const handleSubmit = () => {
     if (!name || !fullName || !initial) return;
-    createMutation.mutate();
+    createMutation.mutate({
+      name,
+      fullName,
+      initial,
+      colorBg,
+      colorText,
+      paypayId: paypayId || null,
+    });
   };
 
   return (

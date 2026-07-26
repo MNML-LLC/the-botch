@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,24 +15,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { maskAccountNumber } from '@/lib/utils';
-
-type BankAccountData = {
-  bankName: string;
-  branchName: string;
-  accountType: 'SAVINGS' | 'CHECKING';
-  accountNumber: string;
-  accountHolder: string;
-};
-
-type MemberData = {
-  name: string;
-  fullName: string;
-  initial: string;
-  colorBg: string;
-  colorText: string;
-  paypayId: string | null;
-  isActive: boolean;
-};
+import {
+  useDeleteMemberBankAccount,
+  useMemberBankAccount,
+  useMemberDetail,
+  useSaveMemberBankAccount,
+  useUpdateMember,
+} from '@/hooks/use-members';
 
 const COLOR_OPTIONS = [
   { label: 'アンバー', bg: 'bg-amber-100', text: 'text-amber-700', accent: 'border-amber-400 bg-amber-50', dot: 'bg-amber-400' },
@@ -46,7 +34,6 @@ const COLOR_OPTIONS = [
 
 export default function MemberEditPage() {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const params = useParams();
   const id = params.id as string;
 
@@ -69,25 +56,8 @@ export default function MemberEditPage() {
   const [isAccountRevealed, setIsAccountRevealed] = useState(false);
   const [accountCopied, setAccountCopied] = useState(false);
 
-  // メンバー情報取得
-  const { data: member, isPending: memberLoading } = useQuery({
-    queryKey: ['member-detail', id],
-    queryFn: async () => {
-      const res = await fetch(`/api/members/${id}`);
-      if (!res.ok) throw new Error('メンバー情報の取得に失敗しました');
-      return res.json() as Promise<MemberData>;
-    },
-  });
-
-  // 口座情報取得（メンバー情報とは独立、失敗してもメンバー表示に影響しない）
-  const { data: bankAccount, isError: bankError } = useQuery({
-    queryKey: ['member-bank-account', id],
-    queryFn: async () => {
-      const res = await fetch(`/api/members/${id}/bank-account`);
-      if (!res.ok) throw new Error('口座情報の取得に失敗しました');
-      return res.json() as Promise<BankAccountData | null>;
-    },
-  });
+  const { data: member, isPending: memberLoading } = useMemberDetail(id);
+  const { data: bankAccount, isError: bankError } = useMemberBankAccount(id);
 
   // メンバー情報をフォームに反映
   useEffect(() => {
@@ -114,80 +84,26 @@ export default function MemberEditPage() {
     }
   }, [bankAccount]);
 
-  // メンバー更新
-  const updateMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/members/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          fullName,
-          initial,
-          colorBg,
-          colorText,
-          paypayId: paypayId || null,
-          isActive,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || '更新に失敗しました');
-      }
-      return res.json();
-    },
+  const updateMutation = useUpdateMember(id, {
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['members'] });
-      queryClient.invalidateQueries({ queryKey: ['member-detail', id] });
       router.push('/members');
     },
-    onError: (error: Error) => {
+    onError: (error) => {
       alert(error.message);
     },
   });
 
-  // 口座保存
-  const saveBankMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/members/${id}/bank-account`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          bankName,
-          branchName,
-          accountType,
-          accountNumber,
-          accountHolder,
-        } satisfies BankAccountData),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || '口座情報の保存に失敗しました');
-      }
-      return res.json();
-    },
+  const saveBankMutation = useSaveMemberBankAccount(id, {
     onSuccess: () => {
       setHasBankAccount(true);
-      queryClient.invalidateQueries({ queryKey: ['member-bank-account', id] });
       alert('口座情報を保存しました');
     },
-    onError: (error: Error) => {
+    onError: (error) => {
       alert(error.message);
     },
   });
 
-  // 口座削除
-  const deleteBankMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/members/${id}/bank-account`, {
-        method: 'DELETE',
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || '口座情報の削除に失敗しました');
-      }
-      return res.json();
-    },
+  const deleteBankMutation = useDeleteMemberBankAccount(id, {
     onSuccess: () => {
       setBankName('');
       setBranchName('');
@@ -196,10 +112,9 @@ export default function MemberEditPage() {
       setAccountHolder('');
       setHasBankAccount(false);
       setIsAccountRevealed(false);
-      queryClient.invalidateQueries({ queryKey: ['member-bank-account', id] });
       alert('口座情報を削除しました');
     },
-    onError: (error: Error) => {
+    onError: (error) => {
       alert(error.message);
     },
   });
@@ -211,7 +126,15 @@ export default function MemberEditPage() {
 
   const handleSubmit = () => {
     if (!name || !fullName || !initial) return;
-    updateMutation.mutate();
+    updateMutation.mutate({
+      name,
+      fullName,
+      initial,
+      colorBg,
+      colorText,
+      paypayId: paypayId || null,
+      isActive,
+    });
   };
 
   const handleSaveBankAccount = () => {
@@ -223,7 +146,13 @@ export default function MemberEditPage() {
       alert('口座番号は7桁以下の数字で入力してください');
       return;
     }
-    saveBankMutation.mutate();
+    saveBankMutation.mutate({
+      bankName,
+      branchName,
+      accountType,
+      accountNumber,
+      accountHolder,
+    });
   };
 
   const handleDeleteBankAccount = () => {

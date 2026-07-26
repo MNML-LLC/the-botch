@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useOtokogiMemberSummary } from '@/hooks/use-otokogi';
 
 type MemberSummaryEntry = {
   memberId: string;
@@ -141,19 +141,7 @@ export default function MemberSummaryTable() {
 
   const { from, to } = getPeriodDates(period, customFrom, customTo);
 
-  const { data, isFetching } = useQuery({
-    queryKey: ['otokogi-member-summary', from, to],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (from) params.set('from', from);
-      if (to) params.set('to', to);
-      const res = await fetch(`/api/otokogi/member-summary?${params.toString()}`);
-      if (!res.ok) throw new Error('収支分析データの取得に失敗しました');
-      return res.json() as Promise<MemberSummaryData>;
-    },
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
-  });
+  const { data, isFetching } = useOtokogiMemberSummary<MemberSummaryData>(from, to);
 
   const metrics = buildMetrics(data?.hasJankenData ?? false);
   const members = data?.members ?? [];

@@ -2,7 +2,6 @@
 
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,26 +16,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-
-type Member = {
-  id: string;
-  name: string;
-  fullName: string;
-  initial: string;
-  colorBg: string;
-  colorText: string;
-};
-
-type CalendarEvent = {
-  id: string;
-  title: string;
-  date: string;
-};
+import { useMembers } from '@/hooks/use-members';
+import { useEvents } from '@/hooks/use-events';
+import { useCreateOtokogi } from '@/hooks/use-otokogi';
 
 function OtokogiNewForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const queryClient = useQueryClient();
   const [eventDate, setEventDate] = useState(new Date().toISOString().slice(0, 10));
   const [eventName, setEventName] = useState('');
   const [eventId, setEventId] = useState(searchParams.get('eventId') ?? '');
@@ -47,23 +33,8 @@ function OtokogiNewForm() {
   const [memo, setMemo] = useState('');
   const [participantIds, setParticipantIds] = useState<string[]>([]);
 
-  const { data: members = [] } = useQuery({
-    queryKey: ['members'],
-    queryFn: async () => {
-      const res = await fetch('/api/members');
-      if (!res.ok) throw new Error('メンバーの取得に失敗しました');
-      return res.json() as Promise<Member[]>;
-    },
-  });
-
-  const { data: events = [] } = useQuery({
-    queryKey: ['events'],
-    queryFn: async () => {
-      const res = await fetch('/api/events');
-      if (!res.ok) throw new Error('イベントの取得に失敗しました');
-      return res.json() as Promise<CalendarEvent[]>;
-    },
-  });
+  const { data: members = [] } = useMembers();
+  const { data: events = [] } = useEvents();
 
   const toggleParticipant = (id: string) => {
     setParticipantIds((prev) =>
@@ -74,31 +45,8 @@ function OtokogiNewForm() {
   const amountNum = Number(amount.replace(/,/g, '')) || 0;
   const perPerson = participantIds.length > 0 ? Math.round(amountNum / participantIds.length) : 0;
 
-  const createMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch('/api/otokogi', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          eventDate,
-          eventName,
-          payerId,
-          amount: amountNum,
-          place: place || null,
-          hasAlbum,
-          memo: memo || null,
-          eventId: (eventId && eventId !== 'none') ? eventId : null,
-          participantIds,
-        }),
-      });
-      if (!res.ok) throw new Error('登録に失敗しました');
-      return res.json();
-    },
+  const createMutation = useCreateOtokogi({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['otokogi'] });
-      queryClient.invalidateQueries({ queryKey: ['otokogi-ranking'] });
-      queryClient.invalidateQueries({ queryKey: ['otokogi-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['calendar'] });
       const from = searchParams.get('from');
       router.push(from ?? '/otokogi');
     },
@@ -109,7 +57,17 @@ function OtokogiNewForm() {
 
   const handleSubmit = () => {
     if (!eventDate || !eventName || !payerId || !amount || participantIds.length === 0) return;
-    createMutation.mutate();
+    createMutation.mutate({
+      eventDate,
+      eventName,
+      payerId,
+      amount: amountNum,
+      place: place || null,
+      hasAlbum,
+      memo: memo || null,
+      eventId: (eventId && eventId !== 'none') ? eventId : null,
+      participantIds,
+    });
   };
 
   return (

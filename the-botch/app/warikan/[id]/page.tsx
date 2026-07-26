@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { calculateSettlements, calculateMemberBalances } from '@/lib/warikan-calc';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +16,18 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { MaskedAccountNumber } from '@/components/masked-account-number';
+import {
+  useAddWarikanExpense,
+  useCalculateWarikanSettlements,
+  useDeleteWarikan,
+  useDeleteWarikanExpense,
+  useRevertWarikanToEntering,
+  useUpdateWarikanExpense,
+  useWarikanDetail,
+  useWarikanExpenses,
+  useWarikanSettlementAction,
+  useWarikanSettlements,
+} from '@/hooks/use-warikan';
 
 type BankAccount = {
   bankName: string;
@@ -110,7 +121,6 @@ function formatShortDate(date: string | null) {
 export default function WarikanDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const queryClient = useQueryClient();
   const id = params.id as string;
 
   // 明細追加フォーム
@@ -126,71 +136,21 @@ export default function WarikanDetailPage() {
   const [editAmount, setEditAmount] = useState('');
   const [editDebtorIds, setEditDebtorIds] = useState<Set<string>>(new Set());
 
-  // イベントサマリー取得（ヘッダー + 参加者）
-  const { data: event, isLoading: loading } = useQuery({
-    queryKey: ['warikan-detail', id],
-    queryFn: async () => {
-      const res = await fetch(`/api/warikan/${id}`, { cache: 'no-store' });
-      if (!res.ok) throw new Error('割り勘イベントの取得に失敗しました');
-      return res.json() as Promise<WarikanDetail>;
-    },
-    staleTime: 60 * 1000,
-  });
-
-  // 経費一覧（即時fetch）
-  const { data: expenses = [] } = useQuery({
-    queryKey: ['warikan-expenses', id],
-    queryFn: async () => {
-      const res = await fetch(`/api/warikan/${id}/expenses`);
-      if (!res.ok) throw new Error('経費一覧の取得に失敗しました');
-      return res.json() as Promise<Expense[]>;
-    },
-    staleTime: 60 * 1000,
-  });
-
-  // 精算一覧（PAYING/CLOSEDの場合のみfetch）
-  const { data: settlements = [] } = useQuery({
-    queryKey: ['warikan-settlements', id],
-    queryFn: async () => {
-      const res = await fetch(`/api/warikan/${id}/settlements`);
-      if (!res.ok) throw new Error('精算一覧の取得に失敗しました');
-      return res.json() as Promise<Settlement[]>;
-    },
-    staleTime: 60 * 1000,
-    enabled: !!event && event.status !== 'ENTERING',
-  });
-
-  const invalidateAll = () => {
-    queryClient.invalidateQueries({ queryKey: ['warikan-detail', id] });
-    queryClient.invalidateQueries({ queryKey: ['warikan-expenses', id] });
-    queryClient.invalidateQueries({ queryKey: ['warikan-settlements', id] });
-  };
+  const { data: event, isLoading: loading } = useWarikanDetail<WarikanDetail>(id);
+  const { data: expenses = [] } = useWarikanExpenses<Expense[]>(id);
+  const { data: settlements = [] } = useWarikanSettlements<Settlement[]>(
+    id,
+    !!event && event.status !== 'ENTERING'
+  );
 
   // 明細追加
-  const addExpenseMutation = useMutation({
-    mutationFn: async () => {
-      const allSelected = event && expenseDebtorIds.size === event.participants.length;
-      const debtorIds = allSelected ? undefined : [...expenseDebtorIds];
-      const res = await fetch(`/api/warikan/${id}/expenses`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          payerId: expensePayerId,
-          description: expenseDescription,
-          amount: Number(expenseAmount),
-          ...(debtorIds && { debtorIds }),
-        }),
-      });
-      if (!res.ok) throw new Error('追加に失敗しました');
-      return res.json();
-    },
+  const addExpenseMutation = useAddWarikanExpense(id, {
     onSuccess: () => {
       setExpensePayerId('');
       setExpenseDescription('');
       setExpenseAmount('');
       setExpenseDebtorIds(new Set());
       setShowExpenseForm(false);
-      invalidateAll();
     },
     onError: () => {
       alert('追加に失敗しました');
@@ -199,7 +159,14 @@ export default function WarikanDetailPage() {
 
   const handleAddExpense = () => {
     if (!expensePayerId || !expenseDescription || !expenseAmount) return;
-    addExpenseMutation.mutate();
+    const allSelected = event && expenseDebtorIds.size === event.participants.length;
+    const debtorIds = allSelected ? undefined : [...expenseDebtorIds];
+    addExpenseMutation.mutate({
+      payerId: expensePayerId,
+      description: expenseDescription,
+      amount: Number(expenseAmount),
+      ...(debtorIds && { debtorIds }),
+    });
   };
 
   const startEditExpense = (expense: Expense) => {
@@ -220,32 +187,11 @@ export default function WarikanDetailPage() {
   };
 
   // 明細更新
-  const updateExpenseMutation = useMutation({
-    mutationFn: async () => {
-      const amountNum = Number(editAmount);
-      const allSelected = event && editDebtorIds.size === event.participants.length;
-      const debtorIds = allSelected ? undefined : [...editDebtorIds];
-      const res = await fetch(`/api/warikan/${id}/expenses/${editingExpenseId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          payerId: editPayerId,
-          description: editDescription,
-          amount: amountNum,
-          ...(debtorIds && { debtorIds }),
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error ?? '更新に失敗しました');
-      }
-      return res.json();
-    },
+  const updateExpenseMutation = useUpdateWarikanExpense(id, {
     onSuccess: () => {
       setEditingExpenseId(null);
-      invalidateAll();
     },
-    onError: (error: Error) => {
+    onError: (error) => {
       alert(error.message);
     },
   });
@@ -258,25 +204,23 @@ export default function WarikanDetailPage() {
       alert('金額は1以上の整数を入力してください');
       return;
     }
-    updateExpenseMutation.mutate();
+    if (!editingExpenseId) return;
+    const allSelected = event && editDebtorIds.size === event.participants.length;
+    const debtorIds = allSelected ? undefined : [...editDebtorIds];
+    updateExpenseMutation.mutate({
+      expenseId: editingExpenseId,
+      input: {
+        payerId: editPayerId,
+        description: editDescription,
+        amount: amountNum,
+        ...(debtorIds && { debtorIds }),
+      },
+    });
   };
 
   // 明細削除
-  const deleteExpenseMutation = useMutation({
-    mutationFn: async (expenseId: string) => {
-      const res = await fetch(`/api/warikan/${id}/expenses/${expenseId}`, {
-        method: 'DELETE',
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error ?? '削除に失敗しました');
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      invalidateAll();
-    },
-    onError: (error: Error) => {
+  const deleteExpenseMutation = useDeleteWarikanExpense(id, {
+    onError: (error) => {
       alert(error.message);
     },
   });
@@ -288,22 +232,8 @@ export default function WarikanDetailPage() {
   };
 
   // 精算確定（ENTERING → PAYING）
-  const calculateSettlementsMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/warikan/${id}/settlements`, {
-        method: 'POST',
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || '精算計算に失敗しました');
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['warikan'] });
-      invalidateAll();
-    },
-    onError: (error: Error) => {
+  const calculateSettlementsMutation = useCalculateWarikanSettlements(id, {
+    onError: (error) => {
       alert(error.message);
     },
   });
@@ -314,22 +244,8 @@ export default function WarikanDetailPage() {
   };
 
   // 明細修正に戻る（PAYING → ENTERING）
-  const revertToEnteringMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/warikan/${id}/revert-to-entering`, {
-        method: 'POST',
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error ?? '明細修正に戻す処理に失敗しました');
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['warikan'] });
-      invalidateAll();
-    },
-    onError: (error: Error) => {
+  const revertToEnteringMutation = useRevertWarikanToEntering(id, {
+    onError: (error) => {
       alert(error.message);
     },
   });
@@ -345,23 +261,8 @@ export default function WarikanDetailPage() {
   };
 
   // 精算アクション（送金済み/受領確認）
-  const settlementActionMutation = useMutation({
-    mutationFn: async ({ settlementId, action }: { settlementId: string; action: 'pay' | 'receive' }) => {
-      const res = await fetch(`/api/warikan/${id}/settlements/${settlementId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error ?? '操作に失敗しました');
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      invalidateAll();
-    },
-    onError: (error: Error) => {
+  const settlementActionMutation = useWarikanSettlementAction(id, {
+    onError: (error) => {
       alert(error.message);
     },
   });
@@ -380,21 +281,11 @@ export default function WarikanDetailPage() {
   };
 
   // イベント削除
-  const deleteEventMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/warikan/${id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error ?? '削除に失敗しました');
-      }
-      return res.json();
-    },
+  const deleteEventMutation = useDeleteWarikan(id, {
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['warikan'] });
-      queryClient.invalidateQueries({ queryKey: ['calendar'] });
       router.push('/warikan');
     },
-    onError: (error: Error) => {
+    onError: (error) => {
       alert(error.message);
     },
   });
