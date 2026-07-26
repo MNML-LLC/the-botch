@@ -1,18 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { handleApiError } from '@/lib/api-utils'
 import { invalidateStatsCache } from '@/lib/stats-cache'
 import { MEMBER_SELECT } from '@/lib/prisma-selects'
-import {
-  readJsonBody,
-  validationErrorResponse,
-  idString,
-  limitedString,
-  dateString,
-  positiveInt,
-  memberIdArray,
-} from '@/lib/api-validation'
+import { readJsonBody } from '@/lib/api-validation'
+import { createOtokogiSchema } from '@/lib/schemas/otokogi'
 
 // GET /api/otokogi — 男気イベント一覧（フィルタ: year, payer、カーソルベースページネーション）
 export async function GET(request: NextRequest) {
@@ -63,21 +55,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// リクエストボディ検証スキーマ（文字列長は DB カラム定義に対応）
-const createOtokogiSchema = z.object({
-  eventDate: dateString('eventDate'),
-  eventName: limitedString('eventName', 100).min(1, { error: 'eventName は必須です' }),
-  payerId: idString('payerId'),
-  amount: positiveInt('amount'),
-  place: limitedString('place', 100).nullable().optional(),
-  hasAlbum: z.boolean({ error: 'hasAlbum は真偽値で指定してください' }).optional(),
-  memo: limitedString('memo', 1000).nullable().optional(),
-  eventId: idString('eventId').nullable().optional(),
-  participantIds: memberIdArray('participantIds').min(1, {
-    error: 'participantIds（参加者配列）は必須です',
-  }),
-})
-
 // POST /api/otokogi — 男気イベント作成
 export async function POST(request: NextRequest) {
   try {
@@ -85,7 +62,12 @@ export async function POST(request: NextRequest) {
     if (!parsed.ok) return parsed.response
 
     const result = createOtokogiSchema.safeParse(parsed.body)
-    if (!result.success) return validationErrorResponse(result.error)
+    if (!result.success) {
+      return NextResponse.json(
+        { error: 'Validation error', details: result.error.issues },
+        { status: 400 },
+      )
+    }
 
     const { eventDate, eventName, payerId, amount, place, hasAlbum, memo, eventId, participantIds } = result.data
 

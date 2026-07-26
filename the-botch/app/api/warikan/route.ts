@@ -1,18 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { handleApiError } from '@/lib/api-utils'
 import { WarikanStatus } from '@/lib/generated/prisma/client'
 import { computeDisplayDate } from '@/lib/date-utils'
 import { MEMBER_SELECT } from '@/lib/prisma-selects'
-import {
-  readJsonBody,
-  validationErrorResponse,
-  idString,
-  limitedString,
-  dateString,
-  memberIdArray,
-} from '@/lib/api-validation'
+import { readJsonBody } from '@/lib/api-validation'
+import { createWarikanSchema } from '@/lib/schemas/warikan'
 
 // GET /api/warikan — 割り勘イベント一覧（フィルタ: status, year、カーソルベースページネーション）
 export async function GET(request: NextRequest) {
@@ -67,20 +60,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// リクエストボディ検証スキーマ（文字列長は DB カラム定義に対応）
-const createWarikanSchema = z.object({
-  eventName: limitedString('eventName', 200).min(1, { error: 'eventName は必須です' }),
-  managerId: idString('managerId').nullable().optional(),
-  detailDeadline: dateString('detailDeadline').nullable().optional(),
-  paymentDeadline: dateString('paymentDeadline').nullable().optional(),
-  memo: limitedString('memo', 1000).nullable().optional(),
-  walicaUrl: limitedString('walicaUrl', 255).nullable().optional(),
-  eventId: idString('eventId').nullable().optional(),
-  participantIds: memberIdArray('participantIds').min(1, {
-    error: 'participantIds（参加者配列）は必須です',
-  }),
-})
-
 // POST /api/warikan — 割り勘イベント作成
 export async function POST(request: NextRequest) {
   try {
@@ -88,7 +67,12 @@ export async function POST(request: NextRequest) {
     if (!parsed.ok) return parsed.response
 
     const result = createWarikanSchema.safeParse(parsed.body)
-    if (!result.success) return validationErrorResponse(result.error)
+    if (!result.success) {
+      return NextResponse.json(
+        { error: 'Validation error', details: result.error.issues },
+        { status: 400 },
+      )
+    }
 
     const { eventName, managerId, detailDeadline, paymentDeadline, memo, walicaUrl, eventId, participantIds } = result.data
 

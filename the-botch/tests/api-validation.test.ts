@@ -15,6 +15,22 @@ import { POST as createWarikan } from '@/app/api/warikan/route'
 import { POST as createMember } from '@/app/api/members/route'
 import { PUT as putBankAccount } from '@/app/api/members/[id]/bank-account/route'
 
+/** Zod スキーマ経由の 400 レスポンス（Validation error 形式） */
+type ZodValidationResponse = {
+  error: string
+  details: Array<{ message: string; path: (string | number)[] }>
+}
+
+/** details の中に指定文字列を含むメッセージがあることを検証 */
+function expectDetailsMessageContains(
+  data: ZodValidationResponse,
+  expected: string,
+): void {
+  expect(data.error).toBe('Validation error')
+  expect(Array.isArray(data.details)).toBe(true)
+  expect(data.details.some((issue) => issue.message.includes(expected))).toBe(true)
+}
+
 /** 生ボディ文字列から NextRequest を生成する（サイズ制限テスト用） */
 function createRawRequest(rawBody: string): NextRequest {
   return new NextRequest('http://localhost:3000/api/test', {
@@ -92,9 +108,9 @@ describe('participantIds — 最大件数バリデーション', () => {
         body: { ...basePayload, participantIds },
       })
     )
-    const { status, data } = await parseResponse<{ error: string }>(res)
+    const { status, data } = await parseResponse<ZodValidationResponse>(res)
     expect(status).toBe(400)
-    expect(data.error).toContain(`最大${MAX_PARTICIPANTS}件`)
+    expectDetailsMessageContains(data, `最大${MAX_PARTICIPANTS}件`)
   })
 
   test(`POST /api/warikan — participantIds ${MAX_PARTICIPANTS + 1}件 → 400`, async () => {
@@ -105,9 +121,9 @@ describe('participantIds — 最大件数バリデーション', () => {
         body: { eventName: 'テスト割り勘', participantIds },
       })
     )
-    const { status, data } = await parseResponse<{ error: string }>(res)
+    const { status, data } = await parseResponse<ZodValidationResponse>(res)
     expect(status).toBe(400)
-    expect(data.error).toContain(`最大${MAX_PARTICIPANTS}件`)
+    expectDetailsMessageContains(data, `最大${MAX_PARTICIPANTS}件`)
   })
 
   test('POST /api/otokogi — participantIds 空配列 → 400', async () => {
@@ -117,7 +133,7 @@ describe('participantIds — 最大件数バリデーション', () => {
         body: { ...basePayload, participantIds: [] },
       })
     )
-    const { status } = await parseResponse<{ error: string }>(res)
+    const { status } = await parseResponse<ZodValidationResponse>(res)
     expect(status).toBe(400)
   })
 })
@@ -136,9 +152,9 @@ describe('文字列フィールド — 最大長バリデーション', () => {
         },
       })
     )
-    const { status, data } = await parseResponse<{ error: string }>(res)
+    const { status, data } = await parseResponse<ZodValidationResponse>(res)
     expect(status).toBe(400)
-    expect(data.error).toContain('100文字')
+    expectDetailsMessageContains(data, '100文字')
   })
 
   test('POST /api/warikan — eventName 201文字 → 400', async () => {
@@ -151,9 +167,9 @@ describe('文字列フィールド — 最大長バリデーション', () => {
         },
       })
     )
-    const { status, data } = await parseResponse<{ error: string }>(res)
+    const { status, data } = await parseResponse<ZodValidationResponse>(res)
     expect(status).toBe(400)
-    expect(data.error).toContain('200文字')
+    expectDetailsMessageContains(data, '200文字')
   })
 
   test('POST /api/members — name 101文字 → 400', async () => {
@@ -163,9 +179,9 @@ describe('文字列フィールド — 最大長バリデーション', () => {
         body: { name: 'あ'.repeat(101), fullName: 'テスト', initial: 'T' },
       })
     )
-    const { status, data } = await parseResponse<{ error: string }>(res)
+    const { status, data } = await parseResponse<ZodValidationResponse>(res)
     expect(status).toBe(400)
-    expect(data.error).toContain('100文字')
+    expectDetailsMessageContains(data, '100文字')
   })
 
   test('PUT /api/members/[id]/bank-account — 銀行名51文字 → 400', async () => {
