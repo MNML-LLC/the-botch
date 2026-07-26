@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { maskAccountNumber } from '@/lib/utils';
+import { toast } from '@/hooks/use-toast';
 
 type BankAccountData = {
   bankName: string;
@@ -139,10 +140,12 @@ export default function MemberEditPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['members'] });
       queryClient.invalidateQueries({ queryKey: ['member-detail', id] });
+      toast({ title: 'メンバー情報を更新しました' });
       router.push('/members');
     },
     onError: (error: Error) => {
-      alert(error.message);
+      console.error(error);
+      toast({ variant: 'destructive', title: '更新に失敗しました', description: error.message });
     },
   });
 
@@ -169,10 +172,11 @@ export default function MemberEditPage() {
     onSuccess: () => {
       setHasBankAccount(true);
       queryClient.invalidateQueries({ queryKey: ['member-bank-account', id] });
-      alert('口座情報を保存しました');
+      toast({ title: '口座情報を保存しました' });
     },
     onError: (error: Error) => {
-      alert(error.message);
+      console.error(error);
+      toast({ variant: 'destructive', title: '口座情報の保存に失敗しました', description: error.message });
     },
   });
 
@@ -197,10 +201,11 @@ export default function MemberEditPage() {
       setHasBankAccount(false);
       setIsAccountRevealed(false);
       queryClient.invalidateQueries({ queryKey: ['member-bank-account', id] });
-      alert('口座情報を削除しました');
+      toast({ title: '口座情報を削除しました' });
     },
     onError: (error: Error) => {
-      alert(error.message);
+      console.error(error);
+      toast({ variant: 'destructive', title: '口座情報の削除に失敗しました', description: error.message });
     },
   });
 
@@ -216,11 +221,11 @@ export default function MemberEditPage() {
 
   const handleSaveBankAccount = () => {
     if (!bankName || !branchName || !accountNumber || !accountHolder) {
-      alert('口座情報を全て入力してください');
+      toast({ variant: 'destructive', title: '口座情報を全て入力してください' });
       return;
     }
     if (!/^\d{1,7}$/.test(accountNumber)) {
-      alert('口座番号は7桁以下の数字で入力してください');
+      toast({ variant: 'destructive', title: '口座番号は7桁以下の数字で入力してください' });
       return;
     }
     saveBankMutation.mutate();
@@ -236,8 +241,9 @@ export default function MemberEditPage() {
       await navigator.clipboard.writeText(accountNumber);
       setAccountCopied(true);
       setTimeout(() => setAccountCopied(false), 2000);
-    } catch {
-      alert('コピーに失敗しました');
+    } catch (error) {
+      console.error(error);
+      toast({ variant: 'destructive', title: 'コピーに失敗しました' });
     }
   };
 

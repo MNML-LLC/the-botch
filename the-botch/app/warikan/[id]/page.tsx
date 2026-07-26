@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select';
 import { MaskedAccountNumber } from '@/components/masked-account-number';
 import { WARIKAN_STATUS_LABELS } from '@/lib/constants';
+import { toast } from '@/hooks/use-toast';
 
 type BankAccount = {
   bankName: string;
@@ -192,9 +193,11 @@ export default function WarikanDetailPage() {
       setExpenseDebtorIds(new Set());
       setShowExpenseForm(false);
       invalidateAll();
+      toast({ title: '明細を追加しました' });
     },
-    onError: () => {
-      alert('追加に失敗しました');
+    onError: (error: Error) => {
+      console.error(error);
+      toast({ variant: 'destructive', title: '追加に失敗しました', description: error.message });
     },
   });
 
@@ -245,9 +248,11 @@ export default function WarikanDetailPage() {
     onSuccess: () => {
       setEditingExpenseId(null);
       invalidateAll();
+      toast({ title: '明細を更新しました' });
     },
     onError: (error: Error) => {
-      alert(error.message);
+      console.error(error);
+      toast({ variant: 'destructive', title: '更新に失敗しました', description: error.message });
     },
   });
 
@@ -256,7 +261,7 @@ export default function WarikanDetailPage() {
     if (isMutating) return;
     const amountNum = Number(editAmount);
     if (!Number.isInteger(amountNum) || amountNum <= 0) {
-      alert('金額は1以上の整数を入力してください');
+      toast({ variant: 'destructive', title: '金額は1以上の整数を入力してください' });
       return;
     }
     updateExpenseMutation.mutate();
@@ -276,9 +281,11 @@ export default function WarikanDetailPage() {
     },
     onSuccess: () => {
       invalidateAll();
+      toast({ title: '明細を削除しました' });
     },
     onError: (error: Error) => {
-      alert(error.message);
+      console.error(error);
+      toast({ variant: 'destructive', title: '削除に失敗しました', description: error.message });
     },
   });
 
@@ -303,9 +310,11 @@ export default function WarikanDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warikan'] });
       invalidateAll();
+      toast({ title: '精算を確定しました' });
     },
     onError: (error: Error) => {
-      alert(error.message);
+      console.error(error);
+      toast({ variant: 'destructive', title: '精算計算に失敗しました', description: error.message });
     },
   });
 
@@ -329,9 +338,11 @@ export default function WarikanDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warikan'] });
       invalidateAll();
+      toast({ title: '明細修正モードに戻しました' });
     },
     onError: (error: Error) => {
-      alert(error.message);
+      console.error(error);
+      toast({ variant: 'destructive', title: '明細修正に戻す処理に失敗しました', description: error.message });
     },
   });
 
@@ -359,11 +370,13 @@ export default function WarikanDetailPage() {
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       invalidateAll();
+      toast({ title: variables.action === 'pay' ? '送金済みにしました' : '受領を確認しました' });
     },
     onError: (error: Error) => {
-      alert(error.message);
+      console.error(error);
+      toast({ variant: 'destructive', title: '操作に失敗しました', description: error.message });
     },
   });
 
@@ -393,10 +406,12 @@ export default function WarikanDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warikan'] });
       queryClient.invalidateQueries({ queryKey: ['calendar'] });
+      toast({ title: '割り勘イベントを削除しました' });
       router.push('/warikan');
     },
     onError: (error: Error) => {
-      alert(error.message);
+      console.error(error);
+      toast({ variant: 'destructive', title: '削除に失敗しました', description: error.message });
     },
   });
 
