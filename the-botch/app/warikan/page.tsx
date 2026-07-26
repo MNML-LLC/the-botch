@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { WARIKAN_STATUS_LABELS } from '@/lib/constants';
 import { useState } from 'react';
 
 type Member = {
@@ -48,23 +49,21 @@ type WarikanResponse = {
 function statusBadge(status: string) {
   switch (status) {
     case 'ENTERING':
-      return <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">明細入力中</span>;
+      return <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">{WARIKAN_STATUS_LABELS.ENTERING}</span>;
     case 'PAYING':
-      return <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">支払待ち</span>;
+      return <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">{WARIKAN_STATUS_LABELS.PAYING}</span>;
     case 'CLOSED':
-      return <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">クローズ</span>;
+      return <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">{WARIKAN_STATUS_LABELS.CLOSED}</span>;
     default:
       return null;
   }
 }
 
 function statusLabel(status: string) {
-  switch (status) {
-    case 'ENTERING': return '明細入力中';
-    case 'PAYING': return '支払待ち';
-    case 'CLOSED': return 'クローズ';
-    default: return status;
+  if (status in WARIKAN_STATUS_LABELS) {
+    return WARIKAN_STATUS_LABELS[status as keyof typeof WARIKAN_STATUS_LABELS];
   }
+  return status;
 }
 
 export default function WarikanListPage() {
@@ -125,9 +124,9 @@ export default function WarikanListPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">全てのステータス</SelectItem>
-            <SelectItem value="ENTERING">明細入力中</SelectItem>
-            <SelectItem value="PAYING">支払待ち</SelectItem>
-            <SelectItem value="CLOSED">クローズ</SelectItem>
+            <SelectItem value="ENTERING">{WARIKAN_STATUS_LABELS.ENTERING}</SelectItem>
+            <SelectItem value="PAYING">{WARIKAN_STATUS_LABELS.PAYING}</SelectItem>
+            <SelectItem value="CLOSED">{WARIKAN_STATUS_LABELS.CLOSED}</SelectItem>
           </SelectContent>
         </Select>
 

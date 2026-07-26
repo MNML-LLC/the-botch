@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { handleApiError } from '@/lib/api-utils'
+import { WARIKAN_STATUS_LABELS } from '@/lib/constants'
 import { computeDisplayDate } from '@/lib/date-utils'
 import { MEMBER_SELECT, MEMBER_SELECT_FULL } from '@/lib/prisma-selects'
 import {
@@ -110,7 +111,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
     // CLOSED状態では編集不可
     if (currentEvent.status === 'CLOSED') {
       return NextResponse.json(
-        { error: 'クローズ済みのイベントは編集できません' },
+        { error: `${WARIKAN_STATUS_LABELS.CLOSED}済みのイベントは編集できません` },
         { status: 400 }
       )
     }
@@ -119,7 +120,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
     if (participantIds) {
       if (currentEvent.status !== 'ENTERING') {
         return NextResponse.json(
-          { error: '明細入力中のイベントのみ参加者を変更できます' },
+          { error: `${WARIKAN_STATUS_LABELS.ENTERING}のイベントのみ参加者を変更できます` },
           { status: 400 }
         )
       }

@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { EVENT_TYPE_LABELS } from '@/lib/constants';
 
 type Member = {
   id: string;
@@ -62,12 +63,10 @@ function eventTypeColor(type: string) {
 }
 
 function eventTypeLabel(type: string) {
-  switch (type) {
-    case 'TRIP': return '旅行';
-    case 'HANGOUT': return '飲み会';
-    case 'ACTIVITY': return 'アクティビティ';
-    default: return 'その他';
+  if (type in EVENT_TYPE_LABELS) {
+    return EVENT_TYPE_LABELS[type as keyof typeof EVENT_TYPE_LABELS];
   }
+  return EVENT_TYPE_LABELS.OTHER;
 }
 
 export default function CalendarPage() {
@@ -184,9 +183,9 @@ export default function CalendarPage() {
       <div className="flex flex-wrap gap-x-3 gap-y-1 mb-3">
         <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-full bg-amber-500" /><span className="text-[10px] text-gray-500">男気</span></div>
         <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-full bg-sky-500" /><span className="text-[10px] text-gray-500">割り勘</span></div>
-        <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-full bg-green-500" /><span className="text-[10px] text-gray-500">飲み会</span></div>
-        <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-full bg-blue-500" /><span className="text-[10px] text-gray-500">旅行</span></div>
-        <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-full bg-purple-500" /><span className="text-[10px] text-gray-500">アクティビティ</span></div>
+        <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-full bg-green-500" /><span className="text-[10px] text-gray-500">{EVENT_TYPE_LABELS.HANGOUT}</span></div>
+        <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-full bg-blue-500" /><span className="text-[10px] text-gray-500">{EVENT_TYPE_LABELS.TRIP}</span></div>
+        <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-full bg-purple-500" /><span className="text-[10px] text-gray-500">{EVENT_TYPE_LABELS.ACTIVITY}</span></div>
       </div>
 
       {/* カレンダーグリッド */}

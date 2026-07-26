@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { ChevronLeft, Plus, X } from 'lucide-react';
+import { EVENT_TYPE_LABELS, WARIKAN_STATUS_LABELS } from '@/lib/constants';
 
 type Member = {
   id: string;
@@ -55,12 +56,10 @@ type EventDetail = {
 type Tab = 'warikan' | 'otokogi';
 
 function eventTypeLabel(type: string) {
-  switch (type) {
-    case 'TRIP': return '旅行';
-    case 'HANGOUT': return '飲み会';
-    case 'ACTIVITY': return 'アクティビティ';
-    default: return 'その他';
+  if (type in EVENT_TYPE_LABELS) {
+    return EVENT_TYPE_LABELS[type as keyof typeof EVENT_TYPE_LABELS];
   }
+  return EVENT_TYPE_LABELS.OTHER;
 }
 
 function eventTypeBadgeColor(type: string) {
@@ -75,11 +74,11 @@ function eventTypeBadgeColor(type: string) {
 function warikanStatusBadge(status: string) {
   switch (status) {
     case 'ENTERING':
-      return <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">明細入力中</span>;
+      return <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">{WARIKAN_STATUS_LABELS.ENTERING}</span>;
     case 'PAYING':
-      return <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">支払待ち</span>;
+      return <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">{WARIKAN_STATUS_LABELS.PAYING}</span>;
     case 'CLOSED':
-      return <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">クローズ</span>;
+      return <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">{WARIKAN_STATUS_LABELS.CLOSED}</span>;
     default:
       return null;
   }
