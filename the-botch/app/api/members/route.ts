@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { handleApiError } from '@/lib/api-utils'
-import { readJsonBody } from '@/lib/api-validation'
+import { readJsonBody, validationErrorResponse } from '@/lib/api-validation'
 import { createMemberSchema } from '@/lib/schemas/members'
 
 // GET /api/members — メンバー一覧
@@ -29,10 +29,7 @@ export async function POST(request: NextRequest) {
 
     const result = createMemberSchema.safeParse(parsed.body)
     if (!result.success) {
-      return NextResponse.json(
-        { error: 'Validation error', details: result.error.issues },
-        { status: 400 },
-      )
+      return validationErrorResponse(result.error)
     }
 
     const { name, fullName, initial, colorBg, colorText, paypayId } = result.data

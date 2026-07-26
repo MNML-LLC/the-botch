@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { handleApiError } from '@/lib/api-utils'
 import { invalidateStatsCache } from '@/lib/stats-cache'
 import { MEMBER_SELECT } from '@/lib/prisma-selects'
-import { readJsonBody } from '@/lib/api-validation'
+import { readJsonBody, validationErrorResponse } from '@/lib/api-validation'
 import { createOtokogiSchema } from '@/lib/schemas/otokogi'
 
 // GET /api/otokogi — 男気イベント一覧（フィルタ: year, payer、カーソルベースページネーション）
@@ -63,10 +63,7 @@ export async function POST(request: NextRequest) {
 
     const result = createOtokogiSchema.safeParse(parsed.body)
     if (!result.success) {
-      return NextResponse.json(
-        { error: 'Validation error', details: result.error.issues },
-        { status: 400 },
-      )
+      return validationErrorResponse(result.error)
     }
 
     const { eventDate, eventName, payerId, amount, place, hasAlbum, memo, eventId, participantIds } = result.data

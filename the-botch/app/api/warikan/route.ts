@@ -4,7 +4,7 @@ import { handleApiError } from '@/lib/api-utils'
 import { WarikanStatus } from '@/lib/generated/prisma/client'
 import { computeDisplayDate } from '@/lib/date-utils'
 import { MEMBER_SELECT } from '@/lib/prisma-selects'
-import { readJsonBody } from '@/lib/api-validation'
+import { readJsonBody, validationErrorResponse } from '@/lib/api-validation'
 import { createWarikanSchema } from '@/lib/schemas/warikan'
 
 // GET /api/warikan — 割り勘イベント一覧（フィルタ: status, year、カーソルベースページネーション）
@@ -68,10 +68,7 @@ export async function POST(request: NextRequest) {
 
     const result = createWarikanSchema.safeParse(parsed.body)
     if (!result.success) {
-      return NextResponse.json(
-        { error: 'Validation error', details: result.error.issues },
-        { status: 400 },
-      )
+      return validationErrorResponse(result.error)
     }
 
     const { eventName, managerId, detailDeadline, paymentDeadline, memo, walicaUrl, eventId, participantIds } = result.data
