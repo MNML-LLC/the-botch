@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
+import { toast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -95,8 +96,10 @@ export default function WalicaImportPage() {
       setMemberMapping(mapping);
     },
     onError: (error: Error) => {
+      console.error(error);
       setError(error.message);
       setPreview(null);
+      toast({ variant: 'destructive', title: 'データの取得に失敗しました', description: error.message });
     },
   });
 
@@ -139,10 +142,13 @@ export default function WalicaImportPage() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['warikan'] });
       queryClient.invalidateQueries({ queryKey: ['calendar'] });
+      toast({ title: 'Walicaからインポートしました' });
       router.push(`/warikan/${data.event.id}`);
     },
     onError: (error: Error) => {
+      console.error(error);
       setError(error.message);
+      toast({ variant: 'destructive', title: 'インポートに失敗しました', description: error.message });
     },
   });
 

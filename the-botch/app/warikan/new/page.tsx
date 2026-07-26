@@ -4,6 +4,7 @@ import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
+import { toast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -88,11 +89,13 @@ function WarikanNewForm() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['warikan'] });
       queryClient.invalidateQueries({ queryKey: ['calendar'] });
+      toast({ title: '割り勘イベントを作成しました' });
       const from = searchParams.get('from');
       router.push(from ?? '/warikan');
     },
-    onError: () => {
-      alert('作成に失敗しました');
+    onError: (error: Error) => {
+      console.error(error);
+      toast({ variant: 'destructive', title: '作成に失敗しました', description: error.message });
     },
   });
 

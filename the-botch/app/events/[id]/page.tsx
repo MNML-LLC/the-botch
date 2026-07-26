@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { ChevronLeft, Plus, X } from 'lucide-react';
 import { EVENT_TYPE_LABELS, WARIKAN_STATUS_LABELS } from '@/lib/constants';
+import { toast } from '@/hooks/use-toast';
 
 type Member = {
   id: string;
@@ -232,8 +233,12 @@ export default function EventDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['event', id] });
       queryClient.invalidateQueries({ queryKey: ['calendar'] });
+      toast({ title: '男気の紐付けを解除しました' });
     },
-    onError: () => alert('紐付け解除に失敗しました'),
+    onError: (error: Error) => {
+      console.error(error);
+      toast({ variant: 'destructive', title: '紐付け解除に失敗しました', description: error.message });
+    },
   });
 
   const unlinkWarikanMutation = useMutation({
@@ -244,8 +249,12 @@ export default function EventDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['event', id] });
       queryClient.invalidateQueries({ queryKey: ['calendar'] });
+      toast({ title: '割り勘の紐付けを解除しました' });
     },
-    onError: () => alert('紐付け解除に失敗しました'),
+    onError: (error: Error) => {
+      console.error(error);
+      toast({ variant: 'destructive', title: '紐付け解除に失敗しました', description: error.message });
+    },
   });
 
   if (isLoading) {

@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
+import { toast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -85,10 +86,12 @@ export default function NewEventPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['calendar'] });
+      toast({ title: '予定を登録しました' });
       router.push('/calendar');
     },
     onError: (error: Error) => {
-      alert(error.message);
+      console.error(error);
+      toast({ variant: 'destructive', title: '登録に失敗しました', description: error.message });
     },
   });
 
