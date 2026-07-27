@@ -1,32 +1,14 @@
 "use client";
 
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-
-type Member = {
-  id: string;
-  name: string;
-  fullName: string;
-  initial: string;
-  colorBg: string;
-  colorText: string;
-  paypayId: string | null;
-  bankAccount: { id: string } | null;
-  isActive: boolean;
-};
+import { useMembers } from '@/hooks/use-members';
 
 export default function MembersPage() {
-  const { data: members = [], isLoading: loading } = useQuery({
-    queryKey: ['members'],
-    queryFn: async () => {
-      const res = await fetch('/api/members');
-      if (!res.ok) throw new Error('API error');
-      return res.json() as Promise<Member[]>;
-    },
-    staleTime: 5 * 60 * 1000,  // 5分キャッシュ
-    gcTime: 30 * 60 * 1000,    // 30分GC
+  const { data: members = [], isLoading: loading } = useMembers({
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
 
   return (

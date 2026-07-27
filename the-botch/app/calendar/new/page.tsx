@@ -2,7 +2,6 @@
 
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { toast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,9 +17,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useMembers } from '@/hooks/use-members';
+import { useCreateEvent } from '@/hooks/use-events';
 import { EVENT_TYPE_LABELS } from '@/lib/constants';
-
-type Member = { id: string; name: string; fullName: string };
 
 const EVENT_TYPES: { value: keyof typeof EVENT_TYPE_LABELS; label: string }[] = [
   { value: 'HANGOUT', label: EVENT_TYPE_LABELS.HANGOUT },
@@ -31,7 +30,6 @@ const EVENT_TYPES: { value: keyof typeof EVENT_TYPE_LABELS; label: string }[] = 
 
 export default function NewEventPage() {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const membersInitialized = useRef(false);
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
@@ -41,15 +39,7 @@ export default function NewEventPage() {
   const [createdById, setCreatedById] = useState('');
   const [participantIds, setParticipantIds] = useState<string[]>([]);
 
-  const { data: members = [] } = useQuery({
-    queryKey: ['members'],
-    queryFn: async () => {
-      const res = await fetch('/api/members');
-      if (!res.ok) throw new Error('メンバーの取得に失敗しました');
-      return res.json() as Promise<Member[]>;
-    },
-
-  });
+  const { data: members = [] } = useMembers();
 
   // 初回ロード時に全メンバーを参加者として選択
   if (members.length > 0 && !membersInitialized.current) {
@@ -63,33 +53,12 @@ export default function NewEventPage() {
     );
   };
 
-  const createMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch('/api/events', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          date,
-          endDate: endDate || null,
-          description: description || null,
-          eventType,
-          createdById,
-          participantIds,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || '登録に失敗しました');
-      }
-      return res.json();
-    },
+  const createMutation = useCreateEvent({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['calendar'] });
       toast({ title: '予定を登録しました' });
       router.push('/calendar');
     },
-    onError: (error: Error) => {
+    onError: (error) => {
       console.error(error);
       toast({ variant: 'destructive', title: '登録に失敗しました', description: error.message });
     },
@@ -97,7 +66,15 @@ export default function NewEventPage() {
 
   const handleSubmit = () => {
     if (!title || !date || !createdById) return;
-    createMutation.mutate();
+    createMutation.mutate({
+      title,
+      date,
+      endDate: endDate || null,
+      description: description || null,
+      eventType,
+      createdById,
+      participantIds,
+    });
   };
 
   return (

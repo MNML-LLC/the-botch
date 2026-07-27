@@ -1,12 +1,12 @@
 "use client";
 
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid,
 } from 'recharts';
+import { useOtokogiStats } from '@/hooks/use-otokogi';
 
 type PerMember = {
   id: string;
@@ -44,16 +44,7 @@ function deviationLabel(score: number) {
 }
 
 export default function PlaygroundPage() {
-  const { data: stats } = useQuery({
-    queryKey: ['otokogi-stats', 'all'],
-    queryFn: async () => {
-      const res = await fetch('/api/otokogi/stats');
-      if (!res.ok) throw new Error('統計データの取得に失敗しました');
-      return res.json() as Promise<PlaygroundStatsData>;
-    },
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
-  });
+  const { data: stats } = useOtokogiStats<PlaygroundStatsData>('all');
 
   const deviationChartData = stats?.deviationScores
     .slice()

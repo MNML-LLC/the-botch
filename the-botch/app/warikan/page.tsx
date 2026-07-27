@@ -1,7 +1,5 @@
 "use client";
 
-import { useCallback } from 'react';
-import { useInfiniteQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,37 +12,7 @@ import {
 } from '@/components/ui/select';
 import { WARIKAN_STATUS_LABELS } from '@/lib/constants';
 import { useState } from 'react';
-
-type Member = {
-  id: string;
-  name: string;
-  initial: string;
-  colorBg: string;
-  colorText: string;
-};
-
-type ParticipantMember = {
-  id: string;
-  name: string;
-};
-
-type WarikanEvent = {
-  id: string;
-  eventName: string;
-  status: 'ENTERING' | 'PAYING' | 'CLOSED';
-  detailDeadline: string | null;
-  paymentDeadline: string | null;
-  memo: string | null;
-  createdAt: string;
-  manager: Member | null;
-  participants: { member: ParticipantMember }[];
-  _count: { expenses: number; settlements: number };
-};
-
-type WarikanResponse = {
-  data: WarikanEvent[];
-  nextCursor: string | null;
-};
+import { useWarikanList } from '@/hooks/use-warikan';
 
 function statusBadge(status: string) {
   switch (status) {
@@ -70,31 +38,13 @@ export default function WarikanListPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [yearFilter, setYearFilter] = useState('all');
 
-  const fetchWarikanEvents = useCallback(async ({ pageParam }: { pageParam: string | null }) => {
-    const params = new URLSearchParams();
-    if (statusFilter !== 'all') params.set('status', statusFilter);
-    if (yearFilter !== 'all') params.set('year', yearFilter);
-    if (pageParam) params.set('cursor', pageParam);
-
-    const res = await fetch(`/api/warikan?${params.toString()}`);
-    if (!res.ok) throw new Error('割り勘イベントの取得に失敗しました');
-    return res.json() as Promise<WarikanResponse>;
-  }, [statusFilter, yearFilter]);
-
   const {
     data,
     isLoading,
     isFetchingNextPage,
     hasNextPage,
     fetchNextPage,
-  } = useInfiniteQuery({
-    queryKey: ['warikan', statusFilter, yearFilter],
-    queryFn: fetchWarikanEvents,
-    initialPageParam: null as string | null,
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
-    staleTime: 5 * 60 * 1000,  // 5分キャッシュ
-    gcTime: 30 * 60 * 1000,    // 30分GC
-  });
+  } = useWarikanList(statusFilter, yearFilter);
 
   const events = data?.pages.flatMap((page) => page.data) ?? [];
 

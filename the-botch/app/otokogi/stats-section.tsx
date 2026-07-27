@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Select,
@@ -15,6 +14,7 @@ import MemberSummaryTable from './member-summary-table';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
 } from 'recharts';
+import { useOtokogiStats } from '@/hooks/use-otokogi';
 
 type PerMember = {
   id: string;
@@ -65,18 +65,7 @@ export default function StatsSection() {
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 4 }, (_, i) => currentYear - i);
 
-  const { data: stats } = useQuery({
-    queryKey: ['otokogi-stats', yearFilter],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (yearFilter !== 'all') params.set('year', yearFilter);
-      const res = await fetch(`/api/otokogi/stats?${params.toString()}`);
-      if (!res.ok) throw new Error('統計データの取得に失敗しました');
-      return res.json() as Promise<StatsData>;
-    },
-    staleTime: 5 * 60 * 1000,  // 5分キャッシュ（統計は頻繁に変わらない）
-    gcTime: 30 * 60 * 1000,    // 30分GC
-  });
+  const { data: stats } = useOtokogiStats<StatsData>(yearFilter);
 
   return (
     <div className="space-y-4">

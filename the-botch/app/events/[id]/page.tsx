@@ -2,10 +2,14 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { ChevronLeft, Plus, X } from 'lucide-react';
+import {
+  useEventDetail,
+  useUnlinkEventOtokogi,
+  useUnlinkEventWarikan,
+} from '@/hooks/use-events';
 import { EVENT_TYPE_LABELS, WARIKAN_STATUS_LABELS } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
 
@@ -39,19 +43,6 @@ type WarikanItem = {
   manager: Member | null;
   participants: { member: Member }[];
   _count: { expenses: number };
-};
-
-type EventDetail = {
-  id: string;
-  title: string;
-  date: string;
-  endDate: string | null;
-  description: string | null;
-  eventType: string;
-  createdBy: Member;
-  participants: { member: Member }[];
-  otokogiEvents: OtokogiItem[];
-  warikanEvents: WarikanItem[];
 };
 
 type Tab = 'warikan' | 'otokogi';
@@ -209,49 +200,26 @@ function WarikanCard({
 export default function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>('warikan');
   const [fabOpen, setFabOpen] = useState(false);
 
-  const { data: event, isLoading, error } = useQuery<EventDetail>({
-    queryKey: ['event', id],
-    queryFn: async () => {
-      const res = await fetch(`/api/events/${id}`);
-      if (res.status === 404) throw new Error('not_found');
-      if (!res.ok) throw new Error('取得に失敗しました');
-      return res.json();
-    },
-    staleTime: 60 * 1000,
-    gcTime: 30 * 60 * 1000,
-  });
+  const { data: event, isLoading, error } = useEventDetail(id);
 
-  const unlinkOtokogiMutation = useMutation({
-    mutationFn: async (otokogiId: string) => {
-      const res = await fetch(`/api/events/${id}/otokogi/${otokogiId}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('紐付け解除に失敗しました');
-    },
+  const unlinkOtokogiMutation = useUnlinkEventOtokogi(id, {
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['event', id] });
-      queryClient.invalidateQueries({ queryKey: ['calendar'] });
       toast({ title: '男気の紐付けを解除しました' });
     },
-    onError: (error: Error) => {
+    onError: (error) => {
       console.error(error);
       toast({ variant: 'destructive', title: '紐付け解除に失敗しました', description: error.message });
     },
   });
 
-  const unlinkWarikanMutation = useMutation({
-    mutationFn: async (warikanId: string) => {
-      const res = await fetch(`/api/events/${id}/warikan/${warikanId}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('紐付け解除に失敗しました');
-    },
+  const unlinkWarikanMutation = useUnlinkEventWarikan(id, {
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['event', id] });
-      queryClient.invalidateQueries({ queryKey: ['calendar'] });
       toast({ title: '割り勘の紐付けを解除しました' });
     },
-    onError: (error: Error) => {
+    onError: (error) => {
       console.error(error);
       toast({ variant: 'destructive', title: '紐付け解除に失敗しました', description: error.message });
     },

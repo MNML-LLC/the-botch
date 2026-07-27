@@ -1,55 +1,22 @@
 "use client";
 
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  useCalendar,
+  type CalendarEvent,
+  type CalendarOtokogiEvent,
+  type CalendarWarikanEvent,
+} from '@/hooks/use-calendar';
 import { EVENT_TYPE_LABELS } from '@/lib/constants';
-
-type Member = {
-  id: string;
-  name: string;
-  initial: string;
-  colorBg: string;
-  colorText: string;
-};
-
-type CalendarEvent = {
-  id: string;
-  title: string;
-  date: string;
-  endDate: string | null;
-  description: string | null;
-  eventType: string;
-  createdBy: Member;
-  participants: { member: Member }[];
-};
-
-type OtokogiEvent = {
-  id: string;
-  eventDate: string;
-  eventName: string;
-  amount: number;
-  memo: string | null;
-  payer: Member;
-};
-
-type WarikanEvent = {
-  id: string;
-  eventName: string;
-  status: string;
-  memo: string | null;
-  createdAt: string;
-  displayDate: string | null;
-  manager: Member | null;
-};
 
 type DayData = {
   date: number;
   events: CalendarEvent[];
-  otokogi: OtokogiEvent[];
-  warikan: WarikanEvent[];
+  otokogi: CalendarOtokogiEvent[];
+  warikan: CalendarWarikanEvent[];
 };
 
 // イベントタイプの色
@@ -76,20 +43,7 @@ export default function CalendarPage() {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;
 
-  const { data: calendarData } = useQuery({
-    queryKey: ['calendar', year, month],
-    queryFn: async () => {
-      const res = await fetch(`/api/calendar?year=${year}&month=${month}`);
-      if (!res.ok) throw new Error('カレンダーデータの取得に失敗しました');
-      return res.json() as Promise<{
-        events: CalendarEvent[];
-        otokogiEvents: OtokogiEvent[];
-        warikanEvents: WarikanEvent[];
-      }>;
-    },
-    staleTime: 10 * 60 * 1000, // 10分（月切替時の再フェッチ抑制）
-    gcTime: 30 * 60 * 1000,    // 30分GC（前後月をキャッシュ保持）
-  });
+  const { data: calendarData } = useCalendar(year, month);
 
   // 月の日数と開始曜日
   const daysInMonth = new Date(year, month, 0).getDate();
