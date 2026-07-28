@@ -36,4 +36,26 @@ export function maskAccountNumber(accountNumber: string): string {
   return '*'.repeat(accountNumber.length - 4) + accountNumber.slice(-4)
 }
 
-// DBマイグレーション後は不要なLocalStorage関連の関数を削除
+/**
+ * 金額入力の表示用フォーマット。数値文字列（カンマなし）を3桁区切りに整形する。
+ * 空文字は空のまま、数値化できないものはそのまま返す。
+ */
+export function formatAmount(value: string): string {
+  if (value === '') return ''
+  const num = Number(value)
+  if (!Number.isFinite(num)) return value
+  return num.toLocaleString('ja-JP')
+}
+
+/**
+ * 金額入力の生値抽出。表示用文字列（カンマ・全角数字を含みうる）から整数文字列を取り出す。
+ * 全角数字は半角化し、非数字は除去。先頭ゼロは1桁だけ残す。
+ */
+export function parseAmount(value: string): string {
+  const halfWidth = value.replace(/[０-９]/g, (c) =>
+    String.fromCharCode(c.charCodeAt(0) - 0xfee0)
+  )
+  const digitsOnly = halfWidth.replace(/[^0-9]/g, '')
+  if (digitsOnly === '') return ''
+  return digitsOnly.replace(/^0+(?=\d)/, '')
+}

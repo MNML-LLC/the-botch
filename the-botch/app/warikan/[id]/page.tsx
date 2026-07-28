@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { AmountInput } from '@/components/amount-input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -440,14 +441,11 @@ export default function WarikanDetailPage() {
                               ))}
                             </SelectContent>
                           </Select>
-                          <Input
-                            type="number"
-                            min={1}
-                            step={1}
+                          <AmountInput
                             className="w-28 text-right font-mono"
                             placeholder="金額"
                             value={editAmount}
-                            onChange={(e) => setEditAmount(e.target.value)}
+                            onChange={setEditAmount}
                           />
                         </div>
                         <Input
@@ -582,14 +580,11 @@ export default function WarikanDetailPage() {
                           ))}
                         </SelectContent>
                       </Select>
-                      <Input
-                        type="number"
-                        min={1}
-                        step={1}
+                      <AmountInput
                         className="w-28 text-right font-mono"
                         placeholder="金額"
                         value={expenseAmount}
-                        onChange={(e) => setExpenseAmount(e.target.value)}
+                        onChange={setExpenseAmount}
                       />
                     </div>
                     <Input
