@@ -18,6 +18,17 @@ import {
 } from '@/components/ui/select';
 import { MaskedAccountNumber } from '@/components/masked-account-number';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {
   useAddWarikanExpense,
   useCalculateWarikanSettlements,
   useDeleteWarikan,
@@ -751,13 +762,58 @@ export default function WarikanDetailPage() {
 
         {/* フェーズ遷移ボタン */}
         {isEntering && (
-          <Button
-            className="w-full bg-amber-500 hover:bg-amber-600 text-white font-medium"
-            onClick={handleCalculateSettlements}
-            disabled={isMutating || !canConfirmSettlement}
-          >
-            精算を確定する
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                className="w-full bg-amber-500 hover:bg-amber-600 text-white font-medium"
+                disabled={isMutating || !canConfirmSettlement}
+              >
+                精算を確定する
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>精算を確定しますか？</AlertDialogTitle>
+                <AlertDialogDescription>
+                  「支払待ち」に移行します。移行後も「明細を修正する」から戻せますが、送金済みの精算があるとリセットされます。
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="rounded-md border bg-gray-50 p-3">
+                <p className="text-xs font-medium text-gray-500 mb-2">精算サマリー</p>
+                {previewSettlements.length === 0 ? (
+                  <p className="text-sm text-gray-500">精算不要です（全員均等に立替済み）</p>
+                ) : (
+                  <ol className="space-y-1.5">
+                    {previewSettlements.map((s, i) => {
+                      const fromMember = memberMap.get(s.fromMemberId);
+                      const toMember = memberMap.get(s.toMemberId);
+                      return (
+                        <li key={i} className="flex items-center gap-2 text-sm">
+                          <span className="text-gray-400 text-xs font-mono w-5 shrink-0">
+                            {String.fromCharCode(0x2460 + i)}
+                          </span>
+                          <span className="font-medium text-slate-800">{fromMember?.name ?? s.fromMemberId}</span>
+                          <span className="text-gray-400">&rarr;</span>
+                          <span className="font-medium text-slate-800">{toMember?.name ?? s.toMemberId}</span>
+                          <span className="ml-auto font-bold text-slate-800">¥{s.amount.toLocaleString()}</span>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                )}
+              </div>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={isMutating}>キャンセル</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-amber-500 hover:bg-amber-600 text-white"
+                  disabled={isMutating}
+                  onClick={handleCalculateSettlements}
+                >
+                  確定
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         )}
 
         {isPaying && (
