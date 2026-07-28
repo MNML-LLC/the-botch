@@ -65,13 +65,13 @@ export async function GET(request: NextRequest) {
 
 // リクエストボディ検証スキーマ（title は DB の VarChar(200) に対応）
 const createEventSchema = z.object({
-  title: limitedString('title', 200).min(1, { error: 'タイトル、日付、作成者は必須です' }),
-  date: dateString('date'),
-  endDate: dateString('endDate').nullable().optional(),
-  description: limitedString('description', 1000).nullable().optional(),
-  eventType: z.enum(EventType, { error: 'eventType が不正です' }).optional(),
-  createdById: idString('createdById'),
-  participantIds: memberIdArray('participantIds').optional(),
+  title: limitedString('タイトル', 200).min(1, { error: 'タイトルは必須項目です' }),
+  date: dateString('開始日'),
+  endDate: dateString('終了日').nullable().optional(),
+  description: limitedString('説明', 1000).nullable().optional(),
+  eventType: z.enum(EventType, { error: 'イベント種別が正しくありません' }).optional(),
+  createdById: idString('作成者'),
+  participantIds: memberIdArray('参加メンバー').optional(),
 })
 
 // POST /api/events — イベント作成

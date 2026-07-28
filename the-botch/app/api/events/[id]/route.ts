@@ -14,12 +14,12 @@ import {
 
 // リクエストボディ検証スキーマ（部分更新のため全フィールド optional）
 const updateEventSchema = z.object({
-  title: limitedString('title', 200).optional(),
-  date: dateString('date').optional(),
-  endDate: dateString('endDate').nullable().optional(),
-  description: limitedString('description', 1000).nullable().optional(),
-  eventType: z.enum(EventType, { error: 'eventType が不正です' }).optional(),
-  participantIds: memberIdArray('participantIds').optional(),
+  title: limitedString('タイトル', 200).optional(),
+  date: dateString('開始日').optional(),
+  endDate: dateString('終了日').nullable().optional(),
+  description: limitedString('説明', 1000).nullable().optional(),
+  eventType: z.enum(EventType, { error: 'イベント種別が正しくありません' }).optional(),
+  participantIds: memberIdArray('参加メンバー').optional(),
 })
 
 // GET /api/events/:id — イベント詳細
