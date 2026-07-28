@@ -58,8 +58,8 @@ export async function GET(_request: NextRequest, { params }: Params) {
   }
 }
 
-// PUT /api/otokogi/[id] — 男気イベント更新
-export async function PUT(request: NextRequest, { params }: Params) {
+// PATCH /api/otokogi/[id] — 男気イベント部分更新
+export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const { id } = await params
     const parsed = await readJsonBody(request)

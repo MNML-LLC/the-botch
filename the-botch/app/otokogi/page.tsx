@@ -128,7 +128,12 @@ export default function OtokogiPage() {
                         </div>
                       </div>
                     </div>
-                    <p className="font-bold text-slate-800 shrink-0 text-sm">¥{event.amount.toLocaleString()}</p>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <p className="font-bold text-slate-800 text-sm">¥{event.amount.toLocaleString()}</p>
+                      <Button variant="outline" size="sm" asChild className="h-6 px-2 text-xs">
+                        <Link href={`/otokogi/${event.id}/edit`}>編集</Link>
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}
