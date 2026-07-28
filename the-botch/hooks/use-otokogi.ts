@@ -61,6 +61,36 @@ export type OtokogiCreateInput = {
   participantIds: string[];
 };
 
+export type OtokogiUpdateInput = Partial<{
+  eventDate: string;
+  eventName: string;
+  payerId: string;
+  amount: number;
+  place: string | null;
+  hasAlbum: boolean;
+  memo: string | null;
+  participantIds: string[];
+}>;
+
+export type OtokogiEventDetail = OtokogiEvent & {
+  payerId: string;
+  eventId: string | null;
+};
+
+export function useOtokogiEvent(id: string | undefined) {
+  return useQuery({
+    queryKey: ['otokogi-event', id],
+    queryFn: async () => {
+      const res = await fetch(`/api/otokogi/${id}`);
+      if (!res.ok) throw new Error('男気イベントの取得に失敗しました');
+      return res.json() as Promise<OtokogiEventDetail>;
+    },
+    enabled: !!id,
+    staleTime: 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+}
+
 export function useOtokogiEvents(yearFilter: string) {
   const fetchOtokogiEvents = useCallback(
     async ({ pageParam }: { pageParam: string | null }) => {
@@ -180,6 +210,36 @@ export function useCreateOtokogi(
     ...options,
     onSuccess: (data, variables, onMutateResult, context) => {
       queryClient.invalidateQueries({ queryKey: ['otokogi'] });
+      queryClient.invalidateQueries({ queryKey: ['otokogi-ranking'] });
+      queryClient.invalidateQueries({ queryKey: ['otokogi-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar'] });
+      options?.onSuccess?.(data, variables, onMutateResult, context);
+    },
+  });
+}
+
+export function useUpdateOtokogi(
+  id: string,
+  options?: UseMutationOptions<unknown, Error, OtokogiUpdateInput>
+) {
+  const queryClient = useQueryClient();
+  return useMutation<unknown, Error, OtokogiUpdateInput>({
+    mutationFn: async (input) => {
+      const res = await fetch(`/api/otokogi/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error ?? '更新に失敗しました');
+      }
+      return res.json();
+    },
+    ...options,
+    onSuccess: (data, variables, onMutateResult, context) => {
+      queryClient.invalidateQueries({ queryKey: ['otokogi'] });
+      queryClient.invalidateQueries({ queryKey: ['otokogi-event', id] });
       queryClient.invalidateQueries({ queryKey: ['otokogi-ranking'] });
       queryClient.invalidateQueries({ queryKey: ['otokogi-stats'] });
       queryClient.invalidateQueries({ queryKey: ['calendar'] });
