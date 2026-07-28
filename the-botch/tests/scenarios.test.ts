@@ -41,7 +41,7 @@ import {
   POST as createExpense,
 } from '@/app/api/warikan/[id]/expenses/route'
 import {
-  PUT as updateExpense,
+  PATCH as updateExpense,
   DELETE as deleteExpense,
 } from '@/app/api/warikan/[id]/expenses/[expenseId]/route'
 import {
@@ -997,7 +997,7 @@ describe('シナリオ5: ENTERING状態での明細変更→自動再計算 (Iss
     // 金額を9000→6000に更新
     const res = await updateExpense(
       createRequest(`/api/warikan/${warikanId}/expenses/${expenseId}`, {
-        method: 'PUT',
+        method: 'PATCH',
         body: { amount: 6000 },
       }),
       makeParams({ id: warikanId, expenseId })
