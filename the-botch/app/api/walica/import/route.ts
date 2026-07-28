@@ -35,19 +35,19 @@ type WalicaPaybackTransaction = {
 
 // リクエストボディ検証スキーマ（walicaUrl は DB の VarChar(255) に対応）
 const importSchema = z.object({
-  walicaUrl: limitedString('walicaUrl', 255).min(1, { error: 'walicaUrl と memberMapping は必須です' }),
+  walicaUrl: limitedString('Walica URL', 255).min(1, { error: 'Walica URL は必須項目です' }),
   memberMapping: z
     .array(
       z.object({
-        walicaId: limitedString('walicaId', 50),
-        walicaName: limitedString('walicaName', 100),
-        appMemberId: idString('appMemberId'),
+        walicaId: limitedString('Walica メンバー ID', 50),
+        walicaName: limitedString('Walica メンバー名', 100),
+        appMemberId: idString('紐づけメンバー'),
       }),
-      { error: 'memberMapping の形式が正しくありません' }
+      { error: 'メンバー対応表の形式が正しくありません' }
     )
-    .min(1, { error: 'walicaUrl と memberMapping は必須です' })
-    .max(MAX_PARTICIPANTS, { error: `memberMapping は最大${MAX_PARTICIPANTS}件までです` }),
-  warikanEventId: idString('warikanEventId').optional(), // 既存イベントに紐付ける場合
+    .min(1, { error: 'メンバー対応表は必須項目です' })
+    .max(MAX_PARTICIPANTS, { error: `メンバー対応表は最大${MAX_PARTICIPANTS}件までです` }),
+  warikanEventId: idString('割り勘イベント').optional(), // 既存イベントに紐付ける場合
 })
 
 // POST /api/walica/import

@@ -9,7 +9,7 @@ type Params = { params: Promise<{ id: string; settlementId: string }> }
 // リクエストボディ検証スキーマ
 const updateSettlementSchema = z.object({
   action: z.enum(['pay', 'receive'], {
-    error: "action は 'pay' または 'receive' を指定してください",
+    error: '操作種別が正しくありません（送金 or 受領のみ）',
   }),
 })
 

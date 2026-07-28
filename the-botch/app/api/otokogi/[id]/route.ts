@@ -17,15 +17,15 @@ type Params = { params: Promise<{ id: string }> }
 
 // リクエストボディ検証スキーマ（部分更新のため全フィールド optional）
 const updateOtokogiSchema = z.object({
-  eventDate: dateString('eventDate').optional(),
-  eventName: limitedString('eventName', 100).min(1, { error: 'eventName は必須です' }).optional(),
-  payerId: idString('payerId').optional(),
-  amount: positiveInt('amount').optional(),
-  place: limitedString('place', 100).nullable().optional(),
-  hasAlbum: z.boolean({ error: 'hasAlbum は真偽値で指定してください' }).optional(),
-  memo: limitedString('memo', 1000).nullable().optional(),
-  participantIds: memberIdArray('participantIds')
-    .min(1, { error: 'participantIds（参加者配列）は必須です' })
+  eventDate: dateString('イベント日').optional(),
+  eventName: limitedString('イベント名', 100).min(1, { error: 'イベント名は必須項目です' }).optional(),
+  payerId: idString('支払い担当').optional(),
+  amount: positiveInt('金額').optional(),
+  place: limitedString('場所', 100).nullable().optional(),
+  hasAlbum: z.boolean({ error: 'アルバム有無は true/false で指定してください' }).optional(),
+  memo: limitedString('メモ', 1000).nullable().optional(),
+  participantIds: memberIdArray('参加メンバー')
+    .min(1, { error: '参加メンバーを1人以上選択してください' })
     .optional(),
 })
 

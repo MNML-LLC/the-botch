@@ -12,16 +12,16 @@ import {
 
 /** POST /api/otokogi — 男気イベント作成のボディ */
 export const createOtokogiSchema = z.object({
-  eventDate: dateString('eventDate'),
-  eventName: limitedString('eventName', 100).min(1, { error: 'eventName は必須です' }),
-  payerId: idString('payerId'),
-  amount: positiveInt('amount'),
-  place: limitedString('place', 100).nullable().optional(),
-  hasAlbum: z.boolean({ error: 'hasAlbum は真偽値で指定してください' }).optional(),
-  memo: limitedString('memo', 1000).nullable().optional(),
-  eventId: idString('eventId').nullable().optional(),
-  participantIds: memberIdArray('participantIds').min(1, {
-    error: 'participantIds（参加者配列）は必須です',
+  eventDate: dateString('イベント日'),
+  eventName: limitedString('イベント名', 100).min(1, { error: 'イベント名は必須項目です' }),
+  payerId: idString('支払い担当'),
+  amount: positiveInt('金額'),
+  place: limitedString('場所', 100).nullable().optional(),
+  hasAlbum: z.boolean({ error: 'アルバム有無は true/false で指定してください' }).optional(),
+  memo: limitedString('メモ', 1000).nullable().optional(),
+  eventId: idString('カレンダーイベント').nullable().optional(),
+  participantIds: memberIdArray('参加メンバー').min(1, {
+    error: '参加メンバーを1人以上選択してください',
   }),
 })
 

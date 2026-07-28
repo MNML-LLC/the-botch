@@ -18,11 +18,11 @@ type Params = { params: Promise<{ id: string }> }
 
 // リクエストボディ検証スキーマ（description は DB の VarChar(200) に対応）
 const createExpenseSchema = z.object({
-  payerId: idString('payerId'),
-  description: limitedString('description', 200).min(1, { error: 'description は必須です' }),
-  amount: positiveInt('amount'),
+  payerId: idString('立替者'),
+  description: limitedString('明細名', 200).min(1, { error: '明細名は必須項目です' }),
+  amount: positiveInt('金額'),
   // 対象者。省略・空配列時は全参加者
-  debtorIds: memberIdArray('debtorIds').optional(),
+  debtorIds: memberIdArray('対象者').optional(),
 })
 
 // GET /api/warikan/[id]/expenses — 割り勘立替明細一覧

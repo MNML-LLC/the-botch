@@ -85,36 +85,39 @@ export function validationErrorResponse(error: z.ZodError): NextResponse {
   return NextResponse.json({ error: message }, { status: 400 })
 }
 
+// ラベルはユーザー向けの日本語表記（例: 'イベント名', '金額'）を前提とする。
+// 入力必須・形式不正・上限超過などのメッセージはすべて日本語で組み立てる。
+
 /** ID 文字列（UUID 想定） */
 export const idString = (label: string) =>
   z
-    .string({ error: `${label} は文字列で指定してください` })
-    .min(1, { error: `${label} は必須です` })
-    .max(36, { error: `${label} の形式が正しくありません` })
+    .string({ error: `${label}は文字列で入力してください` })
+    .min(1, { error: `${label}は必須項目です` })
+    .max(36, { error: `${label}の形式が正しくありません` })
 
 /** 上限文字数付き文字列 */
 export const limitedString = (label: string, max: number) =>
   z
-    .string({ error: `${label} は文字列で指定してください` })
-    .max(max, { error: `${label} は${max}文字以内で入力してください` })
+    .string({ error: `${label}は文字列で入力してください` })
+    .max(max, { error: `${label}は${max}文字以内で入力してください` })
 
 /** 日付文字列（new Date() でパース可能な形式を想定） */
 export const dateString = (label: string) =>
   z
-    .string({ error: `${label} は文字列で指定してください` })
-    .min(1, { error: `${label} は必須です` })
-    .max(40, { error: `${label} の形式が正しくありません` })
+    .string({ error: `${label}は文字列で入力してください` })
+    .min(1, { error: `${label}は必須項目です` })
+    .max(40, { error: `${label}の形式が正しくありません` })
 
 /** 1以上の整数（金額等）。Int カラムの範囲を超えないよう上限も設ける */
 export const positiveInt = (label: string) =>
   z
-    .number({ error: `${label} は1以上の整数を指定してください` })
-    .int({ error: `${label} は1以上の整数を指定してください` })
-    .positive({ error: `${label} は1以上の整数を指定してください` })
-    .max(1_000_000_000, { error: `${label} が大きすぎます` })
+    .number({ error: `${label}は1以上の整数を入力してください` })
+    .int({ error: `${label}は1以上の整数を入力してください` })
+    .positive({ error: `${label}は1以上の整数を入力してください` })
+    .max(1_000_000_000, { error: `${label}が大きすぎます` })
 
 /** メンバー ID 配列（最大 MAX_PARTICIPANTS 件） */
 export const memberIdArray = (label: string) =>
   z
-    .array(idString(label), { error: `${label}（配列）の形式が正しくありません` })
-    .max(MAX_PARTICIPANTS, { error: `${label} は最大${MAX_PARTICIPANTS}件までです` })
+    .array(idString(label), { error: `${label}の形式が正しくありません` })
+    .max(MAX_PARTICIPANTS, { error: `${label}は最大${MAX_PARTICIPANTS}件までです` })

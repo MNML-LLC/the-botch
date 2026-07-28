@@ -17,11 +17,11 @@ type Params = { params: Promise<{ id: string; expenseId: string }> }
 
 // リクエストボディ検証スキーマ（部分更新のため全フィールド optional）
 const updateExpenseSchema = z.object({
-  payerId: idString('payerId').optional(),
-  description: limitedString('description', 200).min(1, { error: 'description は必須です' }).optional(),
-  amount: positiveInt('amount').optional(),
-  debtorIds: memberIdArray('debtorIds')
-    .min(1, { error: '対象者を1人以上指定してください' })
+  payerId: idString('立替者').optional(),
+  description: limitedString('明細名', 200).min(1, { error: '明細名は必須項目です' }).optional(),
+  amount: positiveInt('金額').optional(),
+  debtorIds: memberIdArray('対象者')
+    .min(1, { error: '対象者を1人以上選択してください' })
     .optional(),
 })
 
