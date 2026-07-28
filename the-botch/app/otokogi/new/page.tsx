@@ -7,6 +7,7 @@ import { toast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { AmountInput } from '@/components/amount-input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
@@ -43,7 +44,7 @@ function OtokogiNewForm() {
     );
   };
 
-  const amountNum = Number(amount.replace(/,/g, '')) || 0;
+  const amountNum = Number(amount) || 0;
   const perPerson = participantIds.length > 0 ? Math.round(amountNum / participantIds.length) : 0;
 
   const createMutation = useCreateOtokogi({
@@ -164,14 +165,11 @@ function OtokogiNewForm() {
             <Label>支払額</Label>
             <div className="relative mt-1">
               <span className="absolute left-3 top-2 text-gray-500">&yen;</span>
-              <Input
-                type="number"
-                min={1}
-                step={1}
+              <AmountInput
                 className="pl-7 text-right font-mono"
                 placeholder="0"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={setAmount}
               />
             </div>
           </div>
