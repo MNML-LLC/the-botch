@@ -33,7 +33,7 @@ import {
 } from '@/app/api/warikan/route'
 import {
   GET as getWarikanById,
-  PUT as updateWarikan,
+  PATCH as updateWarikan,
   DELETE as deleteWarikan,
 } from '@/app/api/warikan/[id]/route'
 import {
@@ -531,7 +531,7 @@ describe('シナリオ4: カレンダー・イベント', () => {
     // eventIdを紐付け
     const updateRes = await updateWarikan(
       createRequest(`/api/warikan/${warikan.id}`, {
-        method: 'PUT',
+        method: 'PATCH',
         body: { eventId },
       }),
       makeParams({ id: warikan.id })
@@ -1122,7 +1122,7 @@ describe('シナリオ6: PAYING状態での参加者変更禁止 (Issue #174)', 
   test('PAYING状態で参加者変更が400エラーで拒否される', async () => {
     const res = await updateWarikan(
       createRequest(`/api/warikan/${warikanId}`, {
-        method: 'PUT',
+        method: 'PATCH',
         body: {
           participantIds: testMembers.slice(0, 2).map((m) => m.id),
         },

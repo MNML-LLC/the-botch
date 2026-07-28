@@ -75,8 +75,8 @@ export async function GET(_request: NextRequest, { params }: Params) {
   }
 }
 
-// PUT /api/warikan/[id] — 割り勘イベント更新
-export async function PUT(request: NextRequest, { params }: Params) {
+// PATCH /api/warikan/[id] — 割り勘イベント部分更新
+export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const { id } = await params
     const parsed = await readJsonBody(request)

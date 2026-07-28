@@ -50,6 +50,17 @@ export type WarikanCreateInput = {
   participantIds: string[];
 };
 
+export type WarikanUpdateInput = Partial<{
+  eventName: string;
+  managerId: string | null;
+  detailDeadline: string | null;
+  paymentDeadline: string | null;
+  memo: string | null;
+  walicaUrl: string | null;
+  eventId: string | null;
+  participantIds: string[];
+}>;
+
 type ExpenseInput = {
   payerId: string;
   description: string;
@@ -151,6 +162,34 @@ function invalidateWarikanDetail(
   queryClient.invalidateQueries({ queryKey: ['warikan-detail', id] });
   queryClient.invalidateQueries({ queryKey: ['warikan-expenses', id] });
   queryClient.invalidateQueries({ queryKey: ['warikan-settlements', id] });
+}
+
+export function useUpdateWarikan(
+  id: string,
+  options?: UseMutationOptions<unknown, Error, WarikanUpdateInput>
+) {
+  const queryClient = useQueryClient();
+  return useMutation<unknown, Error, WarikanUpdateInput>({
+    mutationFn: async (input) => {
+      const res = await fetch(`/api/warikan/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error ?? '更新に失敗しました');
+      }
+      return res.json();
+    },
+    ...options,
+    onSuccess: (data, variables, onMutateResult, context) => {
+      queryClient.invalidateQueries({ queryKey: ['warikan'] });
+      invalidateWarikanDetail(queryClient, id);
+      queryClient.invalidateQueries({ queryKey: ['calendar'] });
+      options?.onSuccess?.(data, variables, onMutateResult, context);
+    },
+  });
 }
 
 export function useAddWarikanExpense(
