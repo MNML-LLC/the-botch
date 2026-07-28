@@ -374,14 +374,24 @@ export default function WarikanDetailPage() {
           <Link href="/warikan" className="text-gray-500 hover:text-gray-700">← 戻る</Link>
           <h2 className="text-xl font-bold text-slate-800">精算詳細</h2>
         </div>
-        <button
-          type="button"
-          className="text-xs text-red-500 hover:text-red-700 hover:underline"
-          onClick={handleDeleteEvent}
-          disabled={isMutating}
-        >
-          削除
-        </button>
+        <div className="flex items-center gap-3">
+          {!isClosed && (
+            <Link
+              href={`/warikan/${id}/edit`}
+              className="text-xs text-blue-500 hover:text-blue-700 hover:underline"
+            >
+              基本情報を編集
+            </Link>
+          )}
+          <button
+            type="button"
+            className="text-xs text-red-500 hover:text-red-700 hover:underline"
+            onClick={handleDeleteEvent}
+            disabled={isMutating}
+          >
+            削除
+          </button>
+        </div>
       </div>
 
       <div className="space-y-4">
