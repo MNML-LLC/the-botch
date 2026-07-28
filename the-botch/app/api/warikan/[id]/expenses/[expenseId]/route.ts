@@ -25,8 +25,8 @@ const updateExpenseSchema = z.object({
     .optional(),
 })
 
-// PUT /api/warikan/[id]/expenses/[expenseId] — 立替明細更新
-export async function PUT(request: NextRequest, { params }: Params) {
+// PATCH /api/warikan/[id]/expenses/[expenseId] — 立替明細更新
+export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const { id, expenseId } = await params
     const parsed = await readJsonBody(request)

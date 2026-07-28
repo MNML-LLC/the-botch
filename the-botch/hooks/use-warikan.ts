@@ -192,7 +192,7 @@ export function useUpdateWarikanExpense(
   >({
     mutationFn: async ({ expenseId, input }) => {
       const res = await fetch(`/api/warikan/${id}/expenses/${expenseId}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
       });
