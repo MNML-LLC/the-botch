@@ -81,6 +81,9 @@ export default function WarikanListPage() {
         <h2 className="text-xl font-bold text-slate-800">割り勘管理</h2>
         <div className="flex gap-2">
           <Button variant="outline" asChild>
+            <Link href="/warikan/summary">累積収支</Link>
+          </Button>
+          <Button variant="outline" asChild>
             <Link href="/warikan/import">Walica取込</Link>
           </Button>
           <Button asChild className="bg-slate-800 hover:bg-slate-700">
