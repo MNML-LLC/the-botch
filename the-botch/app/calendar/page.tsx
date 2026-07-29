@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   useCalendar,
@@ -11,6 +12,30 @@ import {
   type CalendarWarikanEvent,
 } from '@/hooks/use-calendar';
 import { EVENT_TYPE_LABELS } from '@/lib/constants';
+
+function CalendarGridSkeleton({
+  daysInMonth,
+  firstDayOfWeek,
+}: {
+  daysInMonth: number;
+  firstDayOfWeek: number;
+}) {
+  return (
+    <div className="grid grid-cols-7">
+      {Array.from({ length: firstDayOfWeek }).map((_, i) => (
+        <div key={`empty-${i}`} className="min-h-14 border-b border-r last:border-r-0 bg-gray-50" />
+      ))}
+      {Array.from({ length: daysInMonth }).map((_, i) => (
+        <div key={i} className="min-h-14 p-0.5 border-b border-r">
+          <Skeleton className="w-5 h-5 rounded-full mb-0.5" />
+          <div className="flex flex-wrap gap-0.5 px-0.5">
+            <Skeleton className="w-1.5 h-1.5 rounded-full" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 type DayData = {
   date: number;
@@ -43,7 +68,7 @@ export default function CalendarPage() {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;
 
-  const { data: calendarData } = useCalendar(year, month);
+  const { data: calendarData, isLoading } = useCalendar(year, month);
 
   // 月の日数と開始曜日
   const daysInMonth = new Date(year, month, 0).getDate();
@@ -156,6 +181,9 @@ export default function CalendarPage() {
         </div>
 
         {/* 日付セル */}
+        {isLoading ? (
+          <CalendarGridSkeleton daysInMonth={daysInMonth} firstDayOfWeek={firstDayOfWeek} />
+        ) : (
         <div className="grid grid-cols-7">
           {/* 空セル（月初の前） */}
           {Array.from({ length: firstDayOfWeek }).map((_, i) => (
@@ -202,6 +230,7 @@ export default function CalendarPage() {
             );
           })}
         </div>
+        )}
       </div>
 
       {/* 選択した日の詳細 */}

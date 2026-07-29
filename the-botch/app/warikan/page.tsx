@@ -10,9 +10,39 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { WARIKAN_STATUS_LABELS } from '@/lib/constants';
 import { useState } from 'react';
 import { useWarikanList } from '@/hooks/use-warikan';
+
+function WarikanListSkeleton() {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <Card key={i}>
+          <CardContent className="pt-4">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1.5 flex-1">
+                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="h-3 w-1/3" />
+              </div>
+              <Skeleton className="h-5 w-16 rounded-full shrink-0" />
+            </div>
+            <div className="flex items-center gap-4 mt-2">
+              <Skeleton className="h-3 w-14" />
+              <Skeleton className="h-3 w-16" />
+            </div>
+            <div className="flex flex-wrap gap-1 mt-2">
+              <Skeleton className="h-5 w-12 rounded-full" />
+              <Skeleton className="h-5 w-16 rounded-full" />
+              <Skeleton className="h-5 w-14 rounded-full" />
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
 
 function statusBadge(status: string) {
   switch (status) {
@@ -95,7 +125,7 @@ export default function WarikanListPage() {
 
       {/* リスト */}
       {isLoading ? (
-        <p className="text-sm text-gray-500">読み込み中...</p>
+        <WarikanListSkeleton />
       ) : events.length === 0 ? (
         <p className="text-sm text-gray-500">該当する割り勘イベントがありません</p>
       ) : (
