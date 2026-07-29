@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { MaskedAccountNumber } from '@/components/masked-account-number';
+import { WarikanStatusBadge } from '@/components/ui/warikan-status-badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,7 +42,6 @@ import {
   useWarikanSettlementAction,
   useWarikanSettlements,
 } from '@/hooks/use-warikan';
-import { WARIKAN_STATUS_LABELS } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
 
 type BankAccount = {
@@ -109,19 +109,6 @@ type WarikanDetail = {
   participants: { member: Member }[];
   _count: { expenses: number; settlements: number };
 };
-
-function statusBadge(status: string) {
-  switch (status) {
-    case 'ENTERING':
-      return <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">{WARIKAN_STATUS_LABELS.ENTERING}</span>;
-    case 'PAYING':
-      return <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">{WARIKAN_STATUS_LABELS.PAYING}</span>;
-    case 'CLOSED':
-      return <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">{WARIKAN_STATUS_LABELS.CLOSED}</span>;
-    default:
-      return null;
-  }
-}
 
 function accountTypeLabel(type: string): string {
   return type === 'CHECKING' ? '当座' : '普通';
@@ -421,7 +408,7 @@ export default function WarikanDetailPage() {
                 <p className="text-xs sm:text-sm text-gray-500 mt-1">管理: {event.manager?.name ?? '未設定'}</p>
               </div>
               {/* ステータスは読み取り専用バッジ */}
-              {statusBadge(event.status)}
+              <WarikanStatusBadge status={event.status} />
             </div>
             <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
               <div><span className="text-gray-400">明細追加期日:</span> {formatShortDate(event.detailDeadline)}</div>

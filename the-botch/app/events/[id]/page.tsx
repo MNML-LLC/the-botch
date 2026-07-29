@@ -10,7 +10,8 @@ import {
   useUnlinkEventOtokogi,
   useUnlinkEventWarikan,
 } from '@/hooks/use-events';
-import { EVENT_TYPE_LABELS, WARIKAN_STATUS_LABELS } from '@/lib/constants';
+import { EVENT_TYPE_LABELS } from '@/lib/constants';
+import { WarikanStatusBadge } from '@/components/ui/warikan-status-badge';
 import { toast } from '@/hooks/use-toast';
 
 type Member = {
@@ -60,19 +61,6 @@ function eventTypeBadgeColor(type: string) {
     case 'HANGOUT': return 'bg-green-100 text-green-700';
     case 'ACTIVITY': return 'bg-purple-100 text-purple-700';
     default: return 'bg-gray-100 text-gray-600';
-  }
-}
-
-function warikanStatusBadge(status: string) {
-  switch (status) {
-    case 'ENTERING':
-      return <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">{WARIKAN_STATUS_LABELS.ENTERING}</span>;
-    case 'PAYING':
-      return <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">{WARIKAN_STATUS_LABELS.PAYING}</span>;
-    case 'CLOSED':
-      return <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">{WARIKAN_STATUS_LABELS.CLOSED}</span>;
-    default:
-      return null;
   }
 }
 
@@ -164,7 +152,7 @@ function WarikanCard({
             <Link href={`/warikan/${item.id}`} className="font-medium text-slate-800 hover:underline truncate">
               {item.eventName}
             </Link>
-            {warikanStatusBadge(item.status)}
+            <WarikanStatusBadge status={item.status} />
           </div>
           <p className="text-xs text-gray-500 mt-0.5">
             管理: {item.manager?.name ?? '未設定'} / 明細 {item._count.expenses}件
