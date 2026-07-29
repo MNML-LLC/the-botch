@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ParticipantSelector } from '@/components/participant-selector';
 import { useMembers } from '@/hooks/use-members';
 import { useEvents } from '@/hooks/use-events';
 import { useCreateOtokogi } from '@/hooks/use-otokogi';
@@ -185,50 +186,14 @@ function OtokogiNewForm() {
           <hr className="border-gray-200" />
 
           {/* 参加者 */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <Label className="mb-0">参加者（奢った人含む全員）</Label>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={selectAllParticipants}
-                  disabled={members.length === 0 || participantIds.length === members.length}
-                >
-                  全員選択
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={clearAllParticipants}
-                  disabled={participantIds.length === 0}
-                >
-                  全員解除
-                </Button>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-2 mt-2">
-              {members.map((m) => {
-                const checked = participantIds.includes(m.id);
-                return (
-                  <label
-                    key={m.id}
-                    className={`flex items-center gap-2 rounded-lg px-3 py-2 border cursor-pointer ${
-                      checked ? 'bg-blue-50 border-blue-200' : 'bg-gray-50'
-                    }`}
-                  >
-                    <Checkbox
-                      checked={checked}
-                      onCheckedChange={() => toggleParticipant(m.id)}
-                    />
-                    <span className={`text-sm ${checked ? '' : 'text-gray-400'}`}>{m.name}</span>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
+          <ParticipantSelector
+            label="参加者（奢った人含む全員）"
+            members={members}
+            selectedIds={participantIds}
+            onToggle={toggleParticipant}
+            onSelectAll={selectAllParticipants}
+            onClearAll={clearAllParticipants}
+          />
 
           {/* 期待値表示 */}
           {amountNum > 0 && participantIds.length > 0 && (
