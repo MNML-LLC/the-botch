@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import {
   useAddWarikanExpense,
+  useBulkCompleteWarikanSettlements,
   useCalculateWarikanSettlements,
   useDeleteWarikan,
   useDeleteWarikanExpense,
@@ -290,6 +291,22 @@ export default function WarikanDetailPage() {
     revertToEnteringMutation.mutate();
   };
 
+  // 精算一括完了（PAYING → CLOSED）
+  const bulkCompleteMutation = useBulkCompleteWarikanSettlements(id, {
+    onSuccess: () => {
+      toast({ title: '全ての精算を完了しました' });
+    },
+    onError: (error) => {
+      console.error(error);
+      toast({ variant: 'destructive', title: '一括完了に失敗しました', description: error.message });
+    },
+  });
+
+  const handleBulkComplete = () => {
+    if (isMutating) return;
+    bulkCompleteMutation.mutate();
+  };
+
   // 精算アクション（送金済み/受領確認）
   const settlementActionMutation = useWarikanSettlementAction(id, {
     onSuccess: (_data, variables) => {
@@ -332,7 +349,7 @@ export default function WarikanDetailPage() {
     deleteEventMutation.mutate();
   };
 
-  const isMutating = addExpenseMutation.isPending || updateExpenseMutation.isPending || deleteExpenseMutation.isPending || calculateSettlementsMutation.isPending || settlementActionMutation.isPending || revertToEnteringMutation.isPending || deleteEventMutation.isPending;
+  const isMutating = addExpenseMutation.isPending || updateExpenseMutation.isPending || deleteExpenseMutation.isPending || calculateSettlementsMutation.isPending || settlementActionMutation.isPending || revertToEnteringMutation.isPending || deleteEventMutation.isPending || bulkCompleteMutation.isPending;
 
   // useMemo は早期 return より前に呼ぶ必要がある（Rules of Hooks）
   const participantIds = useMemo(
@@ -827,14 +844,46 @@ export default function WarikanDetailPage() {
         )}
 
         {isPaying && (
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={handleRevertToEntering}
-            disabled={isMutating}
-          >
-            明細を修正する
-          </Button>
+          <div className="space-y-2">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={handleRevertToEntering}
+              disabled={isMutating}
+            >
+              明細を修正する
+            </Button>
+            {settlements.length > 0 && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    className="w-full bg-green-600 hover:bg-green-700 text-white font-medium"
+                    disabled={isMutating}
+                  >
+                    全て完了にする
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>全ての精算を完了しますか？</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      全 {settlements.length} 件の精算を「送金済み」「受領済み」に一括更新し、イベントを「クローズ」に遷移します。この操作は取り消せません。
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isMutating}>キャンセル</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                      disabled={isMutating}
+                      onClick={handleBulkComplete}
+                    >
+                      全て完了にする
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
         )}
 
         {/* 送金フロー（PAYING/CLOSEDのみ表示） */}

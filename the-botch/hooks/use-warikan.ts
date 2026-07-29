@@ -323,6 +323,31 @@ export function useRevertWarikanToEntering(
   });
 }
 
+export function useBulkCompleteWarikanSettlements(
+  id: string,
+  options?: UseMutationOptions<unknown, Error, void>
+) {
+  const queryClient = useQueryClient();
+  return useMutation<unknown, Error, void>({
+    mutationFn: async () => {
+      const res = await fetch(`/api/warikan/${id}/settlements/bulk-complete`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error ?? '一括完了に失敗しました');
+      }
+      return res.json();
+    },
+    ...options,
+    onSuccess: (data, variables, onMutateResult, context) => {
+      queryClient.invalidateQueries({ queryKey: ['warikan'] });
+      invalidateWarikanDetail(queryClient, id);
+      options?.onSuccess?.(data, variables, onMutateResult, context);
+    },
+  });
+}
+
 export function useWarikanSettlementAction(
   id: string,
   options?: UseMutationOptions<
