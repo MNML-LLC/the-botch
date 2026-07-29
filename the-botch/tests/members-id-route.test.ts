@@ -22,6 +22,9 @@ vi.mock('@/lib/prisma', () => ({
     warikanExpense: {
       aggregate: vi.fn(),
     },
+    warikanEvent: {
+      count: vi.fn(),
+    },
   },
 }))
 
@@ -34,6 +37,7 @@ const mockedFindUnique = prisma.member.findUnique as unknown as MockFn
 const mockedUpdate = prisma.member.update as unknown as MockFn
 const mockedOtokogiAggregate = prisma.otokogiEvent.aggregate as unknown as MockFn
 const mockedWarikanExpenseAggregate = prisma.warikanExpense.aggregate as unknown as MockFn
+const mockedWarikanCount = prisma.warikanEvent.count as unknown as MockFn
 
 const emptyAgg = { _sum: { amount: null }, _count: 0 }
 
@@ -43,6 +47,8 @@ let consoleErrorSpy: ReturnType<typeof vi.spyOn>
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // デフォルトでは進行中イベントなし（0 件）とする。個別テストで上書きする
+  mockedWarikanCount.mockResolvedValue(0)
   consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 })
 
@@ -367,6 +373,87 @@ describe('PUT /api/members/[id]', () => {
     expect(status).toBe(500)
     expect(data.error).toBe('メンバーの更新に失敗しました')
   })
+
+  test('isActive:false かつ進行中割り勘イベント参加あり → 409 と件数メッセージ、update は呼ばれない', async () => {
+    mockedWarikanCount.mockResolvedValue(3)
+
+    const res = await PUT(
+      createRequest(`/api/members/${MEMBER_ID}`, {
+        method: 'PUT',
+        body: { isActive: false },
+      }),
+      makeParams({ id: MEMBER_ID })
+    )
+    const { status, data } = await parseResponse<{ error: string; inProgressCount: number }>(res)
+
+    expect(status).toBe(409)
+    expect(data.error).toBe('3件の進行中イベントに参加中です')
+    expect(data.inProgressCount).toBe(3)
+    expect(mockedUpdate).not.toHaveBeenCalled()
+
+    // 進行中イベントのカウントは対象メンバー・ENTERING/PAYING で行われる
+    const countArgs = mockedWarikanCount.mock.calls[0][0] as {
+      where: {
+        status: { in: string[] }
+        participants: { some: { memberId: string } }
+      }
+    }
+    expect(countArgs.where.status.in).toEqual(expect.arrayContaining(['ENTERING', 'PAYING']))
+    expect(countArgs.where.status.in).toHaveLength(2)
+    expect(countArgs.where.participants.some.memberId).toBe(MEMBER_ID)
+  })
+
+  test('isActive:false かつ進行中イベント 0 件 → 200 で非アクティブ化される', async () => {
+    mockedWarikanCount.mockResolvedValue(0)
+    mockedUpdate.mockResolvedValue({ id: MEMBER_ID, isActive: false })
+
+    const res = await PUT(
+      createRequest(`/api/members/${MEMBER_ID}`, {
+        method: 'PUT',
+        body: { isActive: false },
+      }),
+      makeParams({ id: MEMBER_ID })
+    )
+    const { status } = await parseResponse(res)
+
+    expect(status).toBe(200)
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    const args = mockedUpdate.mock.calls[0][0] as { data: { isActive: boolean } }
+    expect(args.data.isActive).toBe(false)
+  })
+
+  test('isActive:true への更新は進行中イベントをチェックせず update を呼ぶ', async () => {
+    mockedUpdate.mockResolvedValue({ id: MEMBER_ID, isActive: true })
+
+    const res = await PUT(
+      createRequest(`/api/members/${MEMBER_ID}`, {
+        method: 'PUT',
+        body: { isActive: true },
+      }),
+      makeParams({ id: MEMBER_ID })
+    )
+    const { status } = await parseResponse(res)
+
+    expect(status).toBe(200)
+    expect(mockedWarikanCount).not.toHaveBeenCalled()
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+  })
+
+  test('isActive を含まない部分更新は進行中イベントをチェックしない', async () => {
+    mockedUpdate.mockResolvedValue({ id: MEMBER_ID })
+
+    const res = await PUT(
+      createRequest(`/api/members/${MEMBER_ID}`, {
+        method: 'PUT',
+        body: { name: '新名' },
+      }),
+      makeParams({ id: MEMBER_ID })
+    )
+    const { status } = await parseResponse(res)
+
+    expect(status).toBe(200)
+    expect(mockedWarikanCount).not.toHaveBeenCalled()
+  })
 })
 
 // ============================================================
@@ -414,5 +501,20 @@ describe('DELETE /api/members/[id]', () => {
 
     expect(status).toBe(500)
     expect(data.error).toBe('メンバーの削除に失敗しました')
+  })
+
+  test('進行中割り勘イベント参加あり → 409 と件数メッセージ、update は呼ばれない', async () => {
+    mockedWarikanCount.mockResolvedValue(2)
+
+    const res = await DELETE(
+      createRequest(`/api/members/${MEMBER_ID}`, { method: 'DELETE' }),
+      makeParams({ id: MEMBER_ID })
+    )
+    const { status, data } = await parseResponse<{ error: string; inProgressCount: number }>(res)
+
+    expect(status).toBe(409)
+    expect(data.error).toBe('2件の進行中イベントに参加中です')
+    expect(data.inProgressCount).toBe(2)
+    expect(mockedUpdate).not.toHaveBeenCalled()
   })
 })

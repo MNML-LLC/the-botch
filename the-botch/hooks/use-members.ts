@@ -89,6 +89,22 @@ export type MemberUpdateInput = MemberCreateInput & {
   isActive: boolean;
 };
 
+/**
+ * メンバー更新 API のエラー。ステータスコードとサーバーが返した追加情報を保持する。
+ * 特に 409（進行中割り勘イベントに参加中）を UI が識別するために使用する。
+ */
+export class MemberUpdateError extends Error {
+  readonly status: number;
+  readonly inProgressCount?: number;
+
+  constructor(message: string, status: number, inProgressCount?: number) {
+    super(message);
+    this.name = 'MemberUpdateError';
+    this.status = status;
+    this.inProgressCount = inProgressCount;
+  }
+}
+
 export type MembersQueryOptions = {
   staleTime?: number;
   gcTime?: number;
@@ -167,8 +183,14 @@ export function useUpdateMember(
         body: JSON.stringify(input),
       });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || '更新に失敗しました');
+        const data: { error?: string; inProgressCount?: number } = await res
+          .json()
+          .catch(() => ({}));
+        throw new MemberUpdateError(
+          data.error || '更新に失敗しました',
+          res.status,
+          typeof data.inProgressCount === 'number' ? data.inProgressCount : undefined
+        );
       }
       return res.json();
     },
