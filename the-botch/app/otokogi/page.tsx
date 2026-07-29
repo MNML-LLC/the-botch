@@ -12,6 +12,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Swords, Trophy } from 'lucide-react';
 import { useOtokogiEvents, useOtokogiRanking } from '@/hooks/use-otokogi';
 
 function OtokogiHistorySkeleton() {
@@ -144,7 +146,12 @@ export default function OtokogiPage() {
           {eventsLoading ? (
             <OtokogiHistorySkeleton />
           ) : events.length === 0 ? (
-            <p className="text-sm text-gray-500">該当するイベントがありません</p>
+            <EmptyState
+              icon={Swords}
+              title="該当する男気イベントがありません"
+              description={yearFilter === 'all' ? '最初の勝負を記録してみましょう' : '別の年度を選ぶか、新しく記録してください'}
+              action={{ label: '+ 記録する', href: '/otokogi/new' }}
+            />
           ) : (
             <div className="space-y-2">
               {events.map((event) => (
@@ -213,7 +220,12 @@ export default function OtokogiPage() {
             {loading ? (
               <OtokogiRankingSkeleton />
             ) : rankingData.length === 0 ? (
-              <p className="text-sm text-gray-500">データがありません</p>
+              <EmptyState
+                icon={Trophy}
+                title="ランキングデータがありません"
+                description="男気イベントを記録するとランキングが表示されます"
+                action={{ label: '+ 記録する', href: '/otokogi/new' }}
+              />
             ) : (
               <div className="space-y-3">
                 {rankingData.map((member) => (

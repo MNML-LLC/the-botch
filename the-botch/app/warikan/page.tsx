@@ -11,6 +11,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Wallet } from 'lucide-react';
 import { WARIKAN_STATUS_LABELS } from '@/lib/constants';
 import { useState } from 'react';
 import { useWarikanList } from '@/hooks/use-warikan';
@@ -127,7 +129,12 @@ export default function WarikanListPage() {
       {isLoading ? (
         <WarikanListSkeleton />
       ) : events.length === 0 ? (
-        <p className="text-sm text-gray-500">該当する割り勘イベントがありません</p>
+        <EmptyState
+          icon={Wallet}
+          title="該当する割り勘イベントがありません"
+          description={statusFilter === 'all' && yearFilter === 'all' ? '新しい割り勘イベントを作成してみましょう' : 'フィルタを変更するか、新規作成してください'}
+          action={{ label: '+ 新規作成', href: '/warikan/new' }}
+        />
       ) : (
         <div className="space-y-3">
           {events.map((event) => (
