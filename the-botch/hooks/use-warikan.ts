@@ -70,6 +70,43 @@ type ExpenseInput = {
 
 type SettlementAction = 'pay' | 'receive';
 
+export type WarikanMemberSummaryMember = {
+  id: string;
+  name: string;
+  initial: string;
+  colorBg: string;
+  colorText: string;
+};
+
+export type WarikanMemberSummaryBalance = {
+  fromMemberId: string;
+  toMemberId: string;
+  amount: number;
+};
+
+export type WarikanMemberSummaryResponse = {
+  members: WarikanMemberSummaryMember[];
+  balances: WarikanMemberSummaryBalance[];
+  eventCount: number;
+  totalAmount: number;
+  availableYears: number[];
+};
+
+export function useWarikanMemberSummary(yearFilter: string) {
+  return useQuery<WarikanMemberSummaryResponse, Error>({
+    queryKey: ['warikan-member-summary', yearFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (yearFilter !== 'all') params.set('year', yearFilter);
+      const res = await fetch(`/api/warikan/member-summary?${params.toString()}`);
+      if (!res.ok) throw new Error('累積サマリーの取得に失敗しました');
+      return res.json() as Promise<WarikanMemberSummaryResponse>;
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+}
+
 export function useWarikanList(statusFilter: string, yearFilter: string) {
   const fetchWarikanEvents = useCallback(
     async ({ pageParam }: { pageParam: string | null }) => {
