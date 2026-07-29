@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
+import { WarikanStatusBadge } from '@/components/ui/warikan-status-badge';
 import { Wallet } from 'lucide-react';
 import { WARIKAN_STATUS_LABELS } from '@/lib/constants';
 import { useState } from 'react';
@@ -45,19 +46,6 @@ function WarikanListSkeleton() {
       ))}
     </div>
   );
-}
-
-function statusBadge(status: string) {
-  switch (status) {
-    case 'ENTERING':
-      return <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">{WARIKAN_STATUS_LABELS.ENTERING}</span>;
-    case 'PAYING':
-      return <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">{WARIKAN_STATUS_LABELS.PAYING}</span>;
-    case 'CLOSED':
-      return <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">{WARIKAN_STATUS_LABELS.CLOSED}</span>;
-    default:
-      return null;
-  }
 }
 
 function statusLabel(status: string) {
@@ -154,7 +142,7 @@ export default function WarikanListPage() {
                         <p className="text-sm text-gray-500 mt-1 line-clamp-2 whitespace-pre-wrap">{event.memo}</p>
                       )}
                     </div>
-                    {statusBadge(event.status)}
+                    <WarikanStatusBadge status={event.status} />
                   </div>
                   <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
                     <span>{event.participants.length}人参加</span>
