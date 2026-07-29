@@ -23,6 +23,9 @@ const contentSecurityPolicy = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  experimental: {
+    scrollRestoration: true,
+  },
   async headers() {
     return [
       {

@@ -16,6 +16,7 @@ import { Wallet } from 'lucide-react';
 import { WARIKAN_STATUS_LABELS } from '@/lib/constants';
 import { useState } from 'react';
 import { useWarikanList } from '@/hooks/use-warikan';
+import { useScrollRestoration } from '@/hooks/use-scroll-restoration';
 
 function WarikanListSkeleton() {
   return (
@@ -79,6 +80,8 @@ export default function WarikanListPage() {
   } = useWarikanList(statusFilter, yearFilter);
 
   const events = data?.pages.flatMap((page) => page.data) ?? [];
+
+  useScrollRestoration(!isLoading);
 
   // 年度リスト生成
   const currentYear = new Date().getFullYear();

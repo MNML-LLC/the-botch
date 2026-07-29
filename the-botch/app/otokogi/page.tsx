@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Swords, Trophy } from 'lucide-react';
 import { useOtokogiEvents, useOtokogiRanking } from '@/hooks/use-otokogi';
+import { useScrollRestoration } from '@/hooks/use-scroll-restoration';
 
 function OtokogiHistorySkeleton() {
   return (
@@ -86,6 +87,8 @@ export default function OtokogiPage() {
   const rankingData = rankingResponse?.ranking ?? [];
 
   const loading = activeTab === 'history' ? eventsLoading : rankingLoading;
+
+  useScrollRestoration(!eventsLoading);
 
   const formatDate = (date: string) => {
     const d = new Date(date);
