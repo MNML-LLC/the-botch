@@ -11,6 +11,7 @@ import { AmountInput } from '@/components/amount-input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
+import { ParticipantSelector } from '@/components/participant-selector';
 import { useMembers } from '@/hooks/use-members';
 import {
   useOtokogiEvent,
@@ -144,28 +145,12 @@ function EditForm({ id, event, members }: { id: string; event: OtokogiEventDetai
 
         <hr className="border-gray-200" />
 
-        <div>
-          <Label className="mb-2">参加者（奢った人含む全員）</Label>
-          <div className="grid grid-cols-3 gap-2 mt-2">
-            {members.map((m) => {
-              const checked = participantIds.includes(m.id);
-              return (
-                <label
-                  key={m.id}
-                  className={`flex items-center gap-2 rounded-lg px-3 py-2 border cursor-pointer ${
-                    checked ? 'bg-blue-50 border-blue-200' : 'bg-gray-50'
-                  }`}
-                >
-                  <Checkbox
-                    checked={checked}
-                    onCheckedChange={() => toggleParticipant(m.id)}
-                  />
-                  <span className={`text-sm ${checked ? '' : 'text-gray-400'}`}>{m.name}</span>
-                </label>
-              );
-            })}
-          </div>
-        </div>
+        <ParticipantSelector
+          label="参加者（奢った人含む全員）"
+          members={members}
+          selectedIds={participantIds}
+          onToggle={toggleParticipant}
+        />
 
         {amountNum > 0 && participantIds.length > 0 && (
           <div className="bg-amber-50 rounded-lg border border-amber-200 p-4">
