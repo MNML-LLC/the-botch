@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { handleApiError } from '@/lib/api-utils'
 import { readJsonBody, validationErrorResponse, limitedString } from '@/lib/api-validation'
+import { MEMBER_SELECT } from '@/lib/prisma-selects'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -17,12 +18,45 @@ const updateMemberSchema = z.object({
   isActive: z.boolean({ error: '有効/無効は true/false で指定してください' }).optional(),
 })
 
-// GET /api/members/[id] — メンバー詳細
+// GET /api/members/[id] — メンバー詳細（参加イベント一覧・累計統計を含む）
 export async function GET(_request: NextRequest, { params }: Params) {
   try {
     const { id } = await params
     const member = await prisma.member.findUnique({
       where: { id },
+      include: {
+        otokogiParticipations: {
+          select: {
+            otokogiEvent: {
+              select: {
+                id: true,
+                eventDate: true,
+                eventName: true,
+                amount: true,
+                place: true,
+                payer: { select: MEMBER_SELECT },
+              },
+            },
+          },
+          orderBy: { otokogiEvent: { eventDate: 'desc' } },
+        },
+        warikanParticipations: {
+          select: {
+            warikanEvent: {
+              select: {
+                id: true,
+                eventName: true,
+                status: true,
+                detailDeadline: true,
+                paymentDeadline: true,
+                displayDate: true,
+                createdAt: true,
+              },
+            },
+          },
+          orderBy: { warikanEvent: { createdAt: 'desc' } },
+        },
+      },
     })
 
     if (!member) {
@@ -32,7 +66,35 @@ export async function GET(_request: NextRequest, { params }: Params) {
       )
     }
 
-    return NextResponse.json(member, {
+    // 累計支払額の集計（男気: payer として支払った額、割り勘: 立替明細の合計額）
+    const [otokogiPaidAgg, warikanPaidAgg] = await Promise.all([
+      prisma.otokogiEvent.aggregate({
+        where: { payerId: id },
+        _sum: { amount: true },
+        _count: true,
+      }),
+      prisma.warikanExpense.aggregate({
+        where: { payerId: id },
+        _sum: { amount: true },
+        _count: true,
+      }),
+    ])
+
+    const otokogiPaidTotal = otokogiPaidAgg._sum.amount ?? 0
+    const warikanPaidTotal = warikanPaidAgg._sum.amount ?? 0
+
+    return NextResponse.json({
+      ...member,
+      stats: {
+        otokogiParticipationCount: member.otokogiParticipations.length,
+        warikanParticipationCount: member.warikanParticipations.length,
+        otokogiPaidCount: otokogiPaidAgg._count,
+        otokogiPaidTotal,
+        warikanPaidCount: warikanPaidAgg._count,
+        warikanPaidTotal,
+        totalPaid: otokogiPaidTotal + warikanPaidTotal,
+      },
+    }, {
       headers: { 'Cache-Control': 'private, max-age=600' },
     })
   } catch (error) {
