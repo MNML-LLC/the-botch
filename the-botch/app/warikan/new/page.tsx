@@ -41,6 +41,14 @@ function WarikanNewForm() {
     );
   };
 
+  const selectAllParticipants = () => {
+    setParticipantIds(members.map((m) => m.id));
+  };
+
+  const clearAllParticipants = () => {
+    setParticipantIds([]);
+  };
+
   const createMutation = useCreateWarikan({
     onSuccess: () => {
       toast({ title: '割り勘イベントを作成しました' });
@@ -142,7 +150,29 @@ function WarikanNewForm() {
           </div>
 
           <div>
-            <Label className="mb-2">参加メンバー</Label>
+            <div className="flex items-center justify-between mb-2">
+              <Label className="mb-0">参加メンバー</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={selectAllParticipants}
+                  disabled={members.length === 0 || participantIds.length === members.length}
+                >
+                  全員選択
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={clearAllParticipants}
+                  disabled={participantIds.length === 0}
+                >
+                  全員解除
+                </Button>
+              </div>
+            </div>
             <div className="grid grid-cols-3 gap-2 mt-2">
               {members.map((m) => {
                 const checked = participantIds.includes(m.id);

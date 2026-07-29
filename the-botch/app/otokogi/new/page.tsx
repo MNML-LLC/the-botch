@@ -44,6 +44,14 @@ function OtokogiNewForm() {
     );
   };
 
+  const selectAllParticipants = () => {
+    setParticipantIds(members.map((m) => m.id));
+  };
+
+  const clearAllParticipants = () => {
+    setParticipantIds([]);
+  };
+
   const amountNum = Number(amount) || 0;
   const perPerson = participantIds.length > 0 ? Math.round(amountNum / participantIds.length) : 0;
 
@@ -178,7 +186,29 @@ function OtokogiNewForm() {
 
           {/* 参加者 */}
           <div>
-            <Label className="mb-2">参加者（奢った人含む全員）</Label>
+            <div className="flex items-center justify-between mb-2">
+              <Label className="mb-0">参加者（奢った人含む全員）</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={selectAllParticipants}
+                  disabled={members.length === 0 || participantIds.length === members.length}
+                >
+                  全員選択
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={clearAllParticipants}
+                  disabled={participantIds.length === 0}
+                >
+                  全員解除
+                </Button>
+              </div>
+            </div>
             <div className="grid grid-cols-3 gap-2 mt-2">
               {members.map((m) => {
                 const checked = participantIds.includes(m.id);
