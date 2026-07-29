@@ -11,7 +11,55 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useOtokogiEvents, useOtokogiRanking } from '@/hooks/use-otokogi';
+
+function OtokogiHistorySkeleton() {
+  return (
+    <div className="space-y-2">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="bg-white rounded-lg p-3 border shadow-sm">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-start gap-3 min-w-0 flex-1">
+              <Skeleton className="w-10 h-10 rounded-full shrink-0" />
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="h-3 w-1/2" />
+                <div className="flex gap-1 pt-0.5">
+                  <Skeleton className="w-5 h-5 rounded-full" />
+                  <Skeleton className="w-5 h-5 rounded-full" />
+                  <Skeleton className="w-5 h-5 rounded-full" />
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col items-end gap-1 shrink-0">
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-6 w-10" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function OtokogiRankingSkeleton() {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-2 sm:gap-3">
+          <Skeleton className="w-7 h-7 sm:w-8 sm:h-8 rounded-full shrink-0" />
+          <Skeleton className="w-7 h-7 sm:w-8 sm:h-8 rounded-full shrink-0" />
+          <div className="flex-1 min-w-0 space-y-1">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-3 w-10" />
+          </div>
+          <Skeleton className="h-4 w-20 shrink-0" />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 type Tab = 'history' | 'ranking';
 
@@ -94,7 +142,7 @@ export default function OtokogiPage() {
       {activeTab === 'history' && (
         <div>
           {eventsLoading ? (
-            <p className="text-sm text-gray-500">読み込み中...</p>
+            <OtokogiHistorySkeleton />
           ) : events.length === 0 ? (
             <p className="text-sm text-gray-500">該当するイベントがありません</p>
           ) : (
@@ -163,7 +211,7 @@ export default function OtokogiPage() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <p className="text-sm text-gray-500">読み込み中...</p>
+              <OtokogiRankingSkeleton />
             ) : rankingData.length === 0 ? (
               <p className="text-sm text-gray-500">データがありません</p>
             ) : (
