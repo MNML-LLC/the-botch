@@ -27,7 +27,43 @@ export type BankAccountData = {
   accountHolder: string;
 };
 
+export type MemberProfileOtokogiEvent = {
+  id: string;
+  eventDate: string;
+  eventName: string;
+  amount: number;
+  place: string | null;
+  payer: {
+    id: string;
+    name: string;
+    initial: string;
+    colorBg: string;
+    colorText: string;
+  };
+};
+
+export type MemberProfileWarikanEvent = {
+  id: string;
+  eventName: string;
+  status: 'ENTERING' | 'PAYING' | 'CLOSED';
+  detailDeadline: string | null;
+  paymentDeadline: string | null;
+  displayDate: string | null;
+  createdAt: string;
+};
+
+export type MemberProfileStats = {
+  otokogiParticipationCount: number;
+  warikanParticipationCount: number;
+  otokogiPaidCount: number;
+  otokogiPaidTotal: number;
+  warikanPaidCount: number;
+  warikanPaidTotal: number;
+  totalPaid: number;
+};
+
 export type MemberDetail = {
+  id: string;
   name: string;
   fullName: string;
   initial: string;
@@ -35,6 +71,9 @@ export type MemberDetail = {
   colorText: string;
   paypayId: string | null;
   isActive: boolean;
+  otokogiParticipations: { otokogiEvent: MemberProfileOtokogiEvent }[];
+  warikanParticipations: { warikanEvent: MemberProfileWarikanEvent }[];
+  stats: MemberProfileStats;
 };
 
 export type MemberCreateInput = {

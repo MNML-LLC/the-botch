@@ -16,6 +16,12 @@ vi.mock('@/lib/prisma', () => ({
       findUnique: vi.fn(),
       update: vi.fn(),
     },
+    otokogiEvent: {
+      aggregate: vi.fn(),
+    },
+    warikanExpense: {
+      aggregate: vi.fn(),
+    },
   },
 }))
 
@@ -26,6 +32,10 @@ import { GET, PUT, DELETE } from '@/app/api/members/[id]/route'
 type MockFn = ReturnType<typeof vi.fn>
 const mockedFindUnique = prisma.member.findUnique as unknown as MockFn
 const mockedUpdate = prisma.member.update as unknown as MockFn
+const mockedOtokogiAggregate = prisma.otokogiEvent.aggregate as unknown as MockFn
+const mockedWarikanExpenseAggregate = prisma.warikanExpense.aggregate as unknown as MockFn
+
+const emptyAgg = { _sum: { amount: null }, _count: 0 }
 
 const MEMBER_ID = '00000000-0000-0000-0000-000000000001'
 
@@ -44,28 +54,125 @@ afterEach(() => {
 // GET /api/members/[id]
 // ============================================================
 describe('GET /api/members/[id]', () => {
-  test('存在するメンバー → 200 と Cache-Control:private,max-age=600', async () => {
+  test('存在するメンバー → 200 と参加履歴・統計を含む、Cache-Control:private,max-age=600', async () => {
     const fakeMember = {
       id: MEMBER_ID,
       name: 'あ',
       fullName: 'あさん',
       isActive: true,
+      otokogiParticipations: [
+        {
+          otokogiEvent: {
+            id: 'ot-1',
+            eventDate: new Date('2026-01-15'),
+            eventName: '新年会',
+            amount: 12000,
+            place: '渋谷',
+            payer: {
+              id: MEMBER_ID,
+              name: 'あ',
+              initial: 'A',
+              colorBg: 'bg-red-100',
+              colorText: 'text-red-700',
+            },
+          },
+        },
+      ],
+      warikanParticipations: [
+        {
+          warikanEvent: {
+            id: 'wk-1',
+            eventName: '合宿',
+            status: 'CLOSED',
+            detailDeadline: null,
+            paymentDeadline: null,
+            displayDate: new Date('2026-02-01'),
+            createdAt: new Date('2026-02-05'),
+          },
+        },
+      ],
     }
     mockedFindUnique.mockResolvedValue(fakeMember)
+    mockedOtokogiAggregate.mockResolvedValue({ _sum: { amount: 30000 }, _count: 2 })
+    mockedWarikanExpenseAggregate.mockResolvedValue({ _sum: { amount: 5000 }, _count: 1 })
 
     const res = await GET(
       createRequest(`/api/members/${MEMBER_ID}`),
       makeParams({ id: MEMBER_ID })
     )
-    const { status, data } = await parseResponse<typeof fakeMember>(res)
+    const { status, data } = await parseResponse<{
+      id: string
+      stats: {
+        otokogiParticipationCount: number
+        warikanParticipationCount: number
+        otokogiPaidCount: number
+        otokogiPaidTotal: number
+        warikanPaidCount: number
+        warikanPaidTotal: number
+        totalPaid: number
+      }
+      otokogiParticipations: unknown[]
+      warikanParticipations: unknown[]
+    }>(res)
 
     expect(status).toBe(200)
     expect(data.id).toBe(MEMBER_ID)
     expect(res.headers.get('Cache-Control')).toBe('private, max-age=600')
-    expect(mockedFindUnique).toHaveBeenCalledWith({ where: { id: MEMBER_ID } })
+    expect(data.stats).toEqual({
+      otokogiParticipationCount: 1,
+      warikanParticipationCount: 1,
+      otokogiPaidCount: 2,
+      otokogiPaidTotal: 30000,
+      warikanPaidCount: 1,
+      warikanPaidTotal: 5000,
+      totalPaid: 35000,
+    })
+    expect(data.otokogiParticipations).toHaveLength(1)
+    expect(data.warikanParticipations).toHaveLength(1)
+
+    const findUniqueArgs = mockedFindUnique.mock.calls[0][0] as { where: { id: string } }
+    expect(findUniqueArgs.where).toEqual({ id: MEMBER_ID })
+    expect(mockedOtokogiAggregate).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { payerId: MEMBER_ID } })
+    )
+    expect(mockedWarikanExpenseAggregate).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { payerId: MEMBER_ID } })
+    )
   })
 
-  test('存在しないメンバー → 404', async () => {
+  test('参加履歴なし・支払い実績なし → 統計は 0 埋め', async () => {
+    mockedFindUnique.mockResolvedValue({
+      id: MEMBER_ID,
+      name: 'あ',
+      otokogiParticipations: [],
+      warikanParticipations: [],
+    })
+    mockedOtokogiAggregate.mockResolvedValue(emptyAgg)
+    mockedWarikanExpenseAggregate.mockResolvedValue(emptyAgg)
+
+    const res = await GET(
+      createRequest(`/api/members/${MEMBER_ID}`),
+      makeParams({ id: MEMBER_ID })
+    )
+    const { status, data } = await parseResponse<{
+      stats: {
+        otokogiParticipationCount: number
+        warikanParticipationCount: number
+        otokogiPaidTotal: number
+        warikanPaidTotal: number
+        totalPaid: number
+      }
+    }>(res)
+
+    expect(status).toBe(200)
+    expect(data.stats.otokogiParticipationCount).toBe(0)
+    expect(data.stats.warikanParticipationCount).toBe(0)
+    expect(data.stats.otokogiPaidTotal).toBe(0)
+    expect(data.stats.warikanPaidTotal).toBe(0)
+    expect(data.stats.totalPaid).toBe(0)
+  })
+
+  test('存在しないメンバー → 404（aggregate は呼ばれない）', async () => {
     mockedFindUnique.mockResolvedValue(null)
 
     const res = await GET(
@@ -76,6 +183,8 @@ describe('GET /api/members/[id]', () => {
 
     expect(status).toBe(404)
     expect(data.error).toBe('メンバーが見つかりません')
+    expect(mockedOtokogiAggregate).not.toHaveBeenCalled()
+    expect(mockedWarikanExpenseAggregate).not.toHaveBeenCalled()
   })
 
   test('Prisma が例外を投げる → 500 + fallbackMessage', async () => {
