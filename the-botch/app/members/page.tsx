@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Users } from 'lucide-react';
 import { useMembers } from '@/hooks/use-members';
 
 function MembersListSkeleton() {
@@ -47,7 +49,12 @@ export default function MembersPage() {
       {loading ? (
         <MembersListSkeleton />
       ) : members.length === 0 ? (
-        <p className="text-sm text-gray-500">メンバーがいません</p>
+        <EmptyState
+          icon={Users}
+          title="メンバーがいません"
+          description="最初のメンバーを追加してみましょう"
+          action={{ label: '+ 追加', href: '/members/new' }}
+        />
       ) : (
         <div className="space-y-3">
           {members.map((member) => (
