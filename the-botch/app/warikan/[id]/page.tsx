@@ -392,6 +392,13 @@ export default function WarikanDetailPage() {
           <h2 className="text-xl font-bold text-slate-800">精算詳細</h2>
         </div>
         <div className="flex items-center gap-3">
+          <a
+            href={`/api/warikan/${id}/export`}
+            className="text-xs text-slate-600 hover:text-slate-900 hover:underline"
+            download
+          >
+            CSV ダウンロード
+          </a>
           {!isClosed && (
             <Link
               href={`/warikan/${id}/edit`}
