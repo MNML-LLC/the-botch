@@ -1,11 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
+import { WarikanStatus } from '@/lib/generated/prisma/client'
 import { handleApiError } from '@/lib/api-utils'
 import { readJsonBody, validationErrorResponse, limitedString } from '@/lib/api-validation'
 import { MEMBER_SELECT } from '@/lib/prisma-selects'
 
 type Params = { params: Promise<{ id: string }> }
+
+/**
+ * 非アクティブ化前チェック: 進行中（ENTERING / PAYING）の割り勘イベントに
+ * 参加しているメンバーは非アクティブ化を拒否する。精算フローが破綻するのを防ぐため。
+ * 進行中件数を返す（0 なら非アクティブ化可）。
+ */
+async function countInProgressWarikanEvents(memberId: string): Promise<number> {
+  return prisma.warikanEvent.count({
+    where: {
+      status: { in: [WarikanStatus.ENTERING, WarikanStatus.PAYING] },
+      participants: { some: { memberId } },
+    },
+  })
+}
+
+function inProgressConflictResponse(count: number): NextResponse {
+  return NextResponse.json(
+    {
+      error: `${count}件の進行中イベントに参加中です`,
+      inProgressCount: count,
+    },
+    { status: 409 }
+  )
+}
 
 // リクエストボディ検証スキーマ（部分更新のため全フィールド optional）
 const updateMemberSchema = z.object({
@@ -114,6 +139,14 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
     const { name, fullName, initial, colorBg, colorText, paypayId, isActive } = result.data
 
+    // 非アクティブ化しようとしている場合は、進行中の割り勘イベント参加をチェック
+    if (isActive === false) {
+      const inProgressCount = await countInProgressWarikanEvents(id)
+      if (inProgressCount > 0) {
+        return inProgressConflictResponse(inProgressCount)
+      }
+    }
+
     const member = await prisma.member.update({
       where: { id },
       data: {
@@ -141,6 +174,13 @@ export async function PUT(request: NextRequest, { params }: Params) {
 export async function DELETE(_request: NextRequest, { params }: Params) {
   try {
     const { id } = await params
+
+    // 論理削除で isActive:false に変わるため、非アクティブ化と同じ依存チェックを行う
+    const inProgressCount = await countInProgressWarikanEvents(id)
+    if (inProgressCount > 0) {
+      return inProgressConflictResponse(inProgressCount)
+    }
+
     const member = await prisma.member.update({
       where: { id },
       data: { isActive: false },

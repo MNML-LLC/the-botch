@@ -14,8 +14,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { maskAccountNumber } from '@/lib/utils';
 import {
+  MemberUpdateError,
   useDeleteMemberBankAccount,
   useMemberBankAccount,
   useMemberDetail,
@@ -57,6 +67,12 @@ export default function MemberEditPage() {
   const [isAccountRevealed, setIsAccountRevealed] = useState(false);
   const [accountCopied, setAccountCopied] = useState(false);
 
+  // 進行中の割り勘イベントに参加中で非アクティブ化を拒否された時のダイアログ表示
+  const [inProgressDialog, setInProgressDialog] = useState<{
+    open: boolean;
+    message: string;
+  }>({ open: false, message: '' });
+
   const { data: member, isPending: memberLoading } = useMemberDetail(id);
   const { data: bankAccount, isError: bankError } = useMemberBankAccount(id);
 
@@ -92,6 +108,13 @@ export default function MemberEditPage() {
     },
     onError: (error) => {
       console.error(error);
+      // 409: 進行中の割り勘イベントに参加中のため非アクティブ化不可 → AlertDialog で明示
+      if (error instanceof MemberUpdateError && error.status === 409) {
+        setInProgressDialog({ open: true, message: error.message });
+        // トグルを元に戻す（サーバー側は変更していないため）
+        setIsActive(true);
+        return;
+      }
       toast({ variant: 'destructive', title: '更新に失敗しました', description: error.message });
     },
   });
@@ -453,6 +476,32 @@ export default function MemberEditPage() {
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog
+        open={inProgressDialog.open}
+        onOpenChange={(open) =>
+          setInProgressDialog((prev) => ({ ...prev, open }))
+        }
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>非アクティブ化できません</AlertDialogTitle>
+            <AlertDialogDescription>
+              {inProgressDialog.message}
+              。全ての割り勘イベントがクローズされてから再度お試しください。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction
+              onClick={() =>
+                setInProgressDialog((prev) => ({ ...prev, open: false }))
+              }
+            >
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
