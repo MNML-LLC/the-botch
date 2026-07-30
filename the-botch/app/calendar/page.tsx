@@ -11,7 +11,10 @@ import {
   type CalendarOtokogiEvent,
   type CalendarWarikanEvent,
 } from '@/hooks/use-calendar';
-import { EVENT_TYPE_LABELS } from '@/lib/constants';
+import { EVENT_TYPE_LABELS, eventTypeStyle } from '@/lib/constants';
+
+// カレンダーセル内に表示するイベント数の上限（超過分は "+N" 表示）
+const MAX_VISIBLE_EVENTS = 2;
 
 function CalendarGridSkeleton({
   daysInMonth,
@@ -43,16 +46,6 @@ type DayData = {
   otokogi: CalendarOtokogiEvent[];
   warikan: CalendarWarikanEvent[];
 };
-
-// イベントタイプの色
-function eventTypeColor(type: string) {
-  switch (type) {
-    case 'TRIP': return 'bg-blue-500';
-    case 'HANGOUT': return 'bg-green-500';
-    case 'ACTIVITY': return 'bg-purple-500';
-    default: return 'bg-gray-500';
-  }
-}
 
 function eventTypeLabel(type: string) {
   if (type in EVENT_TYPE_LABELS) {
@@ -160,11 +153,12 @@ export default function CalendarPage() {
 
       {/* 凡例 */}
       <div className="flex flex-wrap gap-x-3 gap-y-1 mb-3">
-        <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-full bg-amber-500" /><span className="text-[10px] text-gray-500">男気</span></div>
-        <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-full bg-sky-500" /><span className="text-[10px] text-gray-500">割り勘</span></div>
-        <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-full bg-green-500" /><span className="text-[10px] text-gray-500">{EVENT_TYPE_LABELS.HANGOUT}</span></div>
-        <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-full bg-blue-500" /><span className="text-[10px] text-gray-500">{EVENT_TYPE_LABELS.TRIP}</span></div>
-        <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-full bg-purple-500" /><span className="text-[10px] text-gray-500">{EVENT_TYPE_LABELS.ACTIVITY}</span></div>
+        <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-full bg-amber-500 dark:bg-amber-400" /><span className="text-[10px] text-gray-500">男気</span></div>
+        <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-full bg-sky-500 dark:bg-sky-400" /><span className="text-[10px] text-gray-500">割り勘</span></div>
+        <div className="flex items-center gap-1"><div className={`w-2.5 h-2.5 rounded-full ${eventTypeStyle('HANGOUT').solid}`} /><span className="text-[10px] text-gray-500">{EVENT_TYPE_LABELS.HANGOUT}</span></div>
+        <div className="flex items-center gap-1"><div className={`w-2.5 h-2.5 rounded-full ${eventTypeStyle('TRIP').solid}`} /><span className="text-[10px] text-gray-500">{EVENT_TYPE_LABELS.TRIP}</span></div>
+        <div className="flex items-center gap-1"><div className={`w-2.5 h-2.5 rounded-full ${eventTypeStyle('ACTIVITY').solid}`} /><span className="text-[10px] text-gray-500">{EVENT_TYPE_LABELS.ACTIVITY}</span></div>
+        <div className="flex items-center gap-1"><div className={`w-2.5 h-2.5 rounded-full ${eventTypeStyle('OTHER').solid}`} /><span className="text-[10px] text-gray-500">{EVENT_TYPE_LABELS.OTHER}</span></div>
       </div>
 
       {/* カレンダーグリッド */}
@@ -214,17 +208,32 @@ export default function CalendarPage() {
                 }`}>
                   {day}
                 </div>
-                {/* ドットインジケーター */}
-                <div className="flex flex-wrap gap-0.5 px-0.5">
-                  {dayData.otokogi.map((o) => (
-                    <div key={o.id} className="w-1.5 h-1.5 rounded-full bg-amber-500" title={`男気: ${o.eventName}`} />
+                {/* イベント表示: カレンダーイベントは背景色付きチップ、男気/割り勘はドット */}
+                <div className="flex flex-col gap-0.5 px-0.5">
+                  {dayData.events.slice(0, MAX_VISIBLE_EVENTS).map((e) => (
+                    <div
+                      key={e.id}
+                      className={`text-[9px] leading-tight px-1 py-0.5 rounded-sm truncate text-left ${eventTypeStyle(e.eventType).chip}`}
+                      title={`${eventTypeLabel(e.eventType)}: ${e.title}`}
+                    >
+                      {e.title}
+                    </div>
                   ))}
-                  {dayData.warikan.map((w) => (
-                    <div key={w.id} className="w-1.5 h-1.5 rounded-full bg-sky-500" title={`割り勘: ${w.eventName}`} />
-                  ))}
-                  {dayData.events.map((e) => (
-                    <div key={e.id} className={`w-1.5 h-1.5 rounded-full ${eventTypeColor(e.eventType)}`} title={e.title} />
-                  ))}
+                  {dayData.events.length > MAX_VISIBLE_EVENTS && (
+                    <span className="text-[9px] text-gray-500 px-1 leading-tight">
+                      +{dayData.events.length - MAX_VISIBLE_EVENTS}
+                    </span>
+                  )}
+                  {(dayData.otokogi.length > 0 || dayData.warikan.length > 0) && (
+                    <div className="flex flex-wrap gap-0.5">
+                      {dayData.otokogi.map((o) => (
+                        <div key={o.id} className="w-1.5 h-1.5 rounded-full bg-amber-500 dark:bg-amber-400" title={`男気: ${o.eventName}`} />
+                      ))}
+                      {dayData.warikan.map((w) => (
+                        <div key={w.id} className="w-1.5 h-1.5 rounded-full bg-sky-500 dark:bg-sky-400" title={`割り勘: ${w.eventName}`} />
+                      ))}
+                    </div>
+                  )}
                 </div>
               </button>
             );
@@ -244,12 +253,16 @@ export default function CalendarPage() {
           {selectedDay.events.map((e) => (
             <div key={e.id} className="bg-white rounded-lg p-3 border shadow-sm">
               <div className="flex items-start gap-2">
-                <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${eventTypeColor(e.eventType)}`} />
+                <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${eventTypeStyle(e.eventType).solid}`} />
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-slate-800 text-sm">{e.title}</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-medium text-slate-800 text-sm">{e.title}</p>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${eventTypeStyle(e.eventType).badge}`}>
+                      {eventTypeLabel(e.eventType)}
+                    </span>
+                  </div>
                   <p className="text-xs text-gray-500">
-                    {eventTypeLabel(e.eventType)}
-                    {e.endDate && e.endDate !== e.date && ` (〜${new Date(e.endDate).getMonth() + 1}/${new Date(e.endDate).getDate()})`}
+                    {e.endDate && e.endDate !== e.date && `〜${new Date(e.endDate).getMonth() + 1}/${new Date(e.endDate).getDate()}`}
                   </p>
                   {e.description && (
                     <p className="text-sm text-gray-500 mt-1 whitespace-pre-wrap">{e.description}</p>
@@ -270,7 +283,7 @@ export default function CalendarPage() {
           {selectedDay.otokogi.map((o) => (
             <div key={o.id} className="bg-white rounded-lg p-3 border shadow-sm">
               <div className="flex items-start gap-2">
-                <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-amber-500" />
+                <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-amber-500 dark:bg-amber-400" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-medium text-slate-800 text-sm truncate">{o.eventName}</p>
@@ -290,7 +303,7 @@ export default function CalendarPage() {
             <Link key={w.id} href={`/warikan/${w.id}`} className="block">
               <div className="bg-white rounded-lg p-3 border shadow-sm hover:border-amber-300 transition">
                 <div className="flex items-start gap-2">
-                  <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-sky-500" />
+                  <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-sky-500 dark:bg-sky-400" />
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-slate-800 text-sm truncate">{w.eventName}</p>
                     <p className="text-xs text-gray-500">割り勘 — {w.manager?.name ?? '未設定'}</p>
