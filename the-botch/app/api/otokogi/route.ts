@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
     })
 
     // 統計キャッシュ無効化（イベント追加で統計が変わる）
-    invalidateStatsCache()
+    await invalidateStatsCache()
 
     return NextResponse.json(event, { status: 201 })
   } catch (error) {
