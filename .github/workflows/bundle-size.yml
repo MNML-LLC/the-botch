@@ -1,0 +1,81 @@
+name: Bundle Size
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  bundle-size:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: the-botch
+    env:
+      DATABASE_URL: postgresql://user:pass@localhost:5432/dummy
+      BUNDLE_WARN_PCT: '20'
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: the-botch/package-lock.json
+
+      - name: Stash bundle scripts for base run
+        run: |
+          mkdir -p /tmp/bundle-scripts
+          cp scripts/bundle-size.mjs scripts/bundle-size-diff.mjs /tmp/bundle-scripts/
+
+      - name: Install (PR)
+        run: npm ci
+
+      - name: Build (PR)
+        run: npm run build
+
+      - name: Measure (PR)
+        run: node scripts/bundle-size.mjs > /tmp/pr-bundle.json
+
+      - name: Restore base baseline from cache
+        id: baseline-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/base-bundle.json
+          key: bundle-baseline-${{ github.event.pull_request.base.sha }}
+
+      - name: Checkout base
+        if: steps.baseline-cache.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          clean: true
+
+      - name: Install (base)
+        if: steps.baseline-cache.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Build (base)
+        if: steps.baseline-cache.outputs.cache-hit != 'true'
+        run: npm run build
+
+      - name: Measure (base)
+        if: steps.baseline-cache.outputs.cache-hit != 'true'
+        run: node /tmp/bundle-scripts/bundle-size.mjs > /tmp/base-bundle.json
+
+      - name: Compare
+        run: |
+          node /tmp/bundle-scripts/bundle-size-diff.mjs /tmp/base-bundle.json /tmp/pr-bundle.json > /tmp/report.md
+          cat /tmp/report.md
+
+      - name: Post PR comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: bundle-size
+          path: /tmp/report.md
