@@ -105,7 +105,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     })
 
     // 統計キャッシュ無効化（イベント更新で統計が変わる）
-    invalidateStatsCache()
+    await invalidateStatsCache()
 
     return NextResponse.json(event)
   } catch (error) {
@@ -126,7 +126,7 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     })
 
     // 統計キャッシュ無効化（イベント削除で統計が変わる）
-    invalidateStatsCache()
+    await invalidateStatsCache()
 
     return NextResponse.json({ success: true })
   } catch (error) {

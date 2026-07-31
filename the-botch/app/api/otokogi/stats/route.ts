@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
       ? `f:${from ?? ''}_t:${to ?? ''}_m:${[...memberIdList].sort().join(',')}`
       : (year ?? 'all')
 
-    const cached = getCachedStats(cacheKey)
+    const cached = await getCachedStats(cacheKey)
     if (cached) {
       return NextResponse.json(cached)
     }
@@ -455,7 +455,7 @@ export async function GET(request: NextRequest) {
       totalOtokogiAmount,
     }
 
-    setCachedStats(cacheKey, result)
+    await setCachedStats(cacheKey, result)
 
     return NextResponse.json(result)
   } catch (error) {
