@@ -21,10 +21,11 @@ vi.mock('@/lib/prisma', () => ({
 }))
 
 // 統計キャッシュ無効化の呼び出し検証用にモック
+// 本体は Promise を返す非同期関数なのでモックも Promise を返すようにする
 vi.mock('@/lib/stats-cache', () => ({
-  invalidateStatsCache: vi.fn(),
-  getCachedStats: vi.fn(),
-  setCachedStats: vi.fn(),
+  invalidateStatsCache: vi.fn().mockResolvedValue(undefined),
+  getCachedStats: vi.fn().mockResolvedValue(null),
+  setCachedStats: vi.fn().mockResolvedValue(undefined),
 }))
 
 // モック定義後にインポート
