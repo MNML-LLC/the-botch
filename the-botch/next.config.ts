@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
+import bundleAnalyzer from "@next/bundle-analyzer";
 
 const isDev = process.env.NODE_ENV === "development";
+
+const withBundleAnalyzer = bundleAnalyzer({
+  enabled: process.env.ANALYZE === "true",
+});
 
 // 段階的導入: Report-Only で違反がないことを確認済みのため Enforce に切り替え
 // (Issue #77)。問題が発生した場合は true に戻すと Report-Only に復帰できる
@@ -43,4 +48,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withBundleAnalyzer(nextConfig);

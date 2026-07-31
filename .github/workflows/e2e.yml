@@ -12,28 +12,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # secrets コンテキストは job-level の `if:` 条件では参照できない（GitHub Actions の
+  # 仕様）。そのため gate ジョブで secret の存在をチェックし、outputs 経由で
+  # 後続の e2e ジョブに伝える方式を採る。
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      has-secret: ${{ steps.check.outputs.has-secret }}
+    steps:
+      - id: check
+        env:
+          E2E_DATABASE_URL: ${{ secrets.E2E_DATABASE_URL }}
+        run: |
+          if [ -n "$E2E_DATABASE_URL" ]; then
+            echo "has-secret=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-secret=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::secrets.E2E_DATABASE_URL is not set — skipping E2E job. Add a Neon Test Branch connection string to enable E2E."
+          fi
+
   e2e:
+    needs: [gate]
+    # E2E_DATABASE_URL (Neon Test Branch) が未設定の場合はジョブをスキップする。
+    # 本番 DATABASE_URL へのフォールバックは行わない（E2E が create/delete を大量に
+    # 実行するため、本番データを破壊するリスクを避ける）。
+    if: needs.gate.outputs.has-secret == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
       run:
         working-directory: the-botch
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: the_botch_e2e
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
     env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/the_botch_e2e
+      DATABASE_URL: ${{ secrets.E2E_DATABASE_URL }}
       E2E_BASE_URL: http://localhost:3000
       CI: 'true'
     steps:
@@ -72,8 +82,8 @@ jobs:
       - name: Apply Prisma migrations to test DB
         run: npx prisma migrate deploy
 
-      - name: Seed test DB
-        run: npx tsx prisma/seed.ts
+      - name: Seed test database
+        run: npx prisma db seed
 
       - name: Build Next.js
         run: npm run build
