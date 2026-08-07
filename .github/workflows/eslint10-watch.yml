@@ -1,0 +1,176 @@
+name: ESLint 10 Watch
+
+on:
+  schedule:
+    # 毎週月曜 09:00 JST (00:00 UTC)
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Prepare isolated probe workspace
+        id: prepare
+        run: |
+          set -eux
+          PROBE_DIR="$(mktemp -d)"
+          echo "probe_dir=${PROBE_DIR}" >> "$GITHUB_OUTPUT"
+
+          # 最小の Next.js プロジェクト scaffold (lint 実行だけを試す)
+          mkdir -p "${PROBE_DIR}/app"
+
+          cat > "${PROBE_DIR}/package.json" <<'JSON'
+          {
+            "name": "eslint10-probe",
+            "version": "0.0.0",
+            "private": true,
+            "scripts": {
+              "lint": "eslint . --max-warnings 0"
+            }
+          }
+          JSON
+
+          cat > "${PROBE_DIR}/eslint.config.mjs" <<'MJS'
+          import { FlatCompat } from "@eslint/eslintrc";
+
+          const compat = new FlatCompat({
+            baseDirectory: import.meta.dirname,
+          });
+
+          export default [
+            ...compat.extends("next/core-web-vitals", "next/typescript"),
+          ];
+          MJS
+
+          cat > "${PROBE_DIR}/app/page.tsx" <<'TSX'
+          export default function Page() {
+            return <main>probe</main>;
+          }
+          TSX
+
+          cat > "${PROBE_DIR}/tsconfig.json" <<'JSON'
+          {
+            "compilerOptions": {
+              "target": "ES2022",
+              "module": "esnext",
+              "moduleResolution": "bundler",
+              "jsx": "preserve",
+              "strict": true,
+              "esModuleInterop": true,
+              "skipLibCheck": true,
+              "resolveJsonModule": true,
+              "isolatedModules": true,
+              "noEmit": true
+            },
+            "include": ["app/**/*.ts", "app/**/*.tsx"]
+          }
+          JSON
+
+      - name: Install eslint@^10 + eslint-config-next@latest
+        id: install
+        continue-on-error: true
+        working-directory: ${{ steps.prepare.outputs.probe_dir }}
+        run: |
+          set -eux
+          npm install --no-audit --no-fund \
+            eslint@^10 \
+            eslint-config-next@latest \
+            @eslint/eslintrc@latest \
+            typescript@latest
+
+      - name: Run lint probe
+        id: probe
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        working-directory: ${{ steps.prepare.outputs.probe_dir }}
+        run: |
+          set -eux
+          npx --no-install eslint --version
+          npm run lint
+
+      - name: Report result
+        run: |
+          echo "install=${{ steps.install.outcome }}"
+          echo "probe=${{ steps.probe.outcome }}"
+
+      - name: Notify Issue #114 on success
+        if: steps.install.outcome == 'success' && steps.probe.outcome == 'success'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issueNumber = 114;
+            const label = 'eslint10-ready';
+
+            const { owner, repo } = context.repo;
+
+            // ラベル作成（存在しない場合）
+            try {
+              await github.rest.issues.getLabel({ owner, repo, name: label });
+            } catch (e) {
+              if (e.status === 404) {
+                await github.rest.issues.createLabel({
+                  owner,
+                  repo,
+                  name: label,
+                  color: '0e8a16',
+                  description: 'eslint@^10 + eslint-config-next の probe が成功した',
+                });
+              } else {
+                throw e;
+              }
+            }
+
+            // 既にラベルが付いていれば通知を重複させない（冪等）
+            const issue = await github.rest.issues.get({
+              owner,
+              repo,
+              issue_number: issueNumber,
+            });
+            const alreadyLabeled = issue.data.labels.some((l) =>
+              (typeof l === 'string' ? l : l.name) === label,
+            );
+            if (alreadyLabeled) {
+              core.info('Label already present; skipping comment.');
+              return;
+            }
+
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number: issueNumber,
+              labels: [label],
+            });
+
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: issueNumber,
+              body: [
+                '## eslint10-watch: probe 成功 🎉',
+                '',
+                '週次 probe で `eslint@^10 + eslint-config-next@latest` の最小 lint が通りました。',
+                'フェーズ2（本体 bump）に着手できます。',
+                '',
+                `- 実行: ${runUrl}`,
+                '- `eslint10-ready` ラベルを付与しました',
+                '',
+                '次のステップ (フェーズ2):',
+                '1. `the-botch/package.json` の `eslint` を `^10` に、`eslint-config-next` を対応版に bump',
+                '2. `npm run lint` がローカルで成功することを確認',
+                '3. `.github/dependabot.yml` の `eslint` メジャー ignore ブロックを削除',
+                '4. CI Lint が SUCCESS であることを確認して close',
+              ].join('\n'),
+            });
