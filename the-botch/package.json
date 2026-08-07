@@ -16,7 +16,7 @@
     "test:e2e:mobile": "playwright test --project=mobile"
   },
   "dependencies": {
-    "@hookform/resolvers": "^5.4.0",
+    "@hookform/resolvers": "^5.7.1",
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
     "@radix-ui/react-alert-dialog": "^1.1.23",
