@@ -1,0 +1,113 @@
+name: ESLint 10 compatibility watch
+
+# Issue #114 フェーズ1: eslint@^10 + eslint-config-next@latest が実際に動くようになったら通知する。
+# 週次 cron（毎週月曜 09:00 JST = 00:00 UTC）で隔離環境に最新版を入れて最小 lint を試行し、
+# 成功した場合のみ Issue #114 にコメントを付け、eslint10-ready ラベルを付与する。
+# 失敗しても CI は赤くしない（continue-on-error）。
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ISSUE_NUMBER: '114'
+      READY_LABEL: 'eslint10-ready'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Prepare probe workspace
+        run: |
+          set -euxo pipefail
+          mkdir -p "$RUNNER_TEMP/eslint10-probe"
+          cd "$RUNNER_TEMP/eslint10-probe"
+          cat > package.json <<'JSON'
+          {
+            "name": "eslint10-probe",
+            "version": "0.0.0",
+            "private": true,
+            "type": "module"
+          }
+          JSON
+          cat > eslint.config.mjs <<'JS'
+          import next from 'eslint-config-next';
+
+          export default [
+            ...(Array.isArray(next) ? next : [next]),
+          ];
+          JS
+          mkdir -p src
+          cat > src/sample.tsx <<'TSX'
+          export default function Sample() {
+            return <div>hello</div>;
+          }
+          TSX
+
+      - name: Install eslint@^10 + eslint-config-next@latest
+        id: install
+        continue-on-error: true
+        working-directory: ${{ runner.temp }}/eslint10-probe
+        run: |
+          set -euxo pipefail
+          npm install --no-audit --no-fund \
+            eslint@^10 \
+            eslint-config-next@latest \
+            typescript@^5 \
+            react@^19 \
+            react-dom@^19
+
+      - name: Run probe lint
+        id: probe
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        working-directory: ${{ runner.temp }}/eslint10-probe
+        run: npx --no-install eslint src
+
+      - name: Report probe result
+        run: |
+          echo "install outcome: ${{ steps.install.outcome }}"
+          echo "probe outcome:   ${{ steps.probe.outcome }}"
+
+      - name: Notify Issue #114 (only on success)
+        if: steps.install.outcome == 'success' && steps.probe.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euxo pipefail
+          gh label create "$READY_LABEL" \
+            --repo "$GITHUB_REPOSITORY" \
+            --color 0e8a16 \
+            --description "eslint@^10 probe が成功。フェーズ2着手可能。" \
+            2>/dev/null || true
+          gh issue edit "$ISSUE_NUMBER" \
+            --repo "$GITHUB_REPOSITORY" \
+            --add-label "$READY_LABEL"
+          gh issue comment "$ISSUE_NUMBER" \
+            --repo "$GITHUB_REPOSITORY" \
+            --body "$(cat <<'MSG'
+          ## eslint10-watch: probe SUCCESS
+
+          隔離環境で `eslint@^10 + eslint-config-next@latest` の最小 lint が成功しました。フェーズ2（本体アップグレード）に着手できます。
+
+          - Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          - Trigger: `${{ github.event_name }}`
+
+          ### 次アクション
+          1. `the-botch/package.json` の `eslint` を `^10` に、`eslint-config-next` を対応版に bump
+          2. `npm run lint` がローカル / CI で成功することを確認
+          3. `.github/dependabot.yml` の `eslint` メジャー更新 `ignore` ブロックを削除
+          4. 本 Issue をクローズ
+          MSG
+          )"
