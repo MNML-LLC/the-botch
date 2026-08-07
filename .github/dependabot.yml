@@ -11,6 +11,15 @@ updates:
     open-pull-requests-limit: 3
     commit-message:
       prefix: "chore"
+    groups:
+      prisma-all:
+        patterns:
+          - "prisma"
+          - "@prisma/client"
+          - "@prisma/adapter-pg"
+      radix-ui:
+        patterns:
+          - "@radix-ui/*"
     ignore:
       - dependency-name: typescript
         update-types: [version-update:semver-major]
