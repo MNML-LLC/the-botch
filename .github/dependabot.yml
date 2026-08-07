@@ -20,6 +20,10 @@ updates:
       radix-ui:
         patterns:
           - "@radix-ui/*"
+      form-libs:
+        patterns:
+          - "react-hook-form"
+          - "@hookform/*"
     ignore:
       - dependency-name: typescript
         update-types: [version-update:semver-major]
