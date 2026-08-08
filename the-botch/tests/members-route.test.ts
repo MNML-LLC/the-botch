@@ -50,7 +50,7 @@ describe('GET /api/members', () => {
     ]
     mockedFindMany.mockResolvedValue(fakeMembers)
 
-    const res = await GET()
+    const res = await GET(createRequest('/api/members'))
     const { status, data } = await parseResponse<typeof fakeMembers>(res)
 
     expect(status).toBe(200)
@@ -68,7 +68,7 @@ describe('GET /api/members', () => {
   test('Cache-Control ヘッダーが private, max-age=300 で返る', async () => {
     mockedFindMany.mockResolvedValue([])
 
-    const res = await GET()
+    const res = await GET(createRequest('/api/members'))
 
     expect(res.headers.get('Cache-Control')).toBe('private, max-age=300')
   })
@@ -76,7 +76,7 @@ describe('GET /api/members', () => {
   test('メンバーが 0 件でも 200 と空配列を返す', async () => {
     mockedFindMany.mockResolvedValue([])
 
-    const res = await GET()
+    const res = await GET(createRequest('/api/members'))
     const { status, data } = await parseResponse<unknown[]>(res)
 
     expect(status).toBe(200)
@@ -86,7 +86,7 @@ describe('GET /api/members', () => {
   test('Prisma が例外を投げる → 500 + fallbackMessage', async () => {
     mockedFindMany.mockRejectedValue(new Error('DB error'))
 
-    const res = await GET()
+    const res = await GET(createRequest('/api/members'))
     const { status, data } = await parseResponse<{ error: string }>(res)
 
     expect(status).toBe(500)
