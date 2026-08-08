@@ -31,6 +31,15 @@ function formatShortDate(date: Date | string | null) {
 }
 
 async function fetchDashboardData() {
+  // ビルド時 (next build の静的 prerender) は DB を叩かない。
+  // 実行時に revalidate=300 で再取得される。
+  // 背景: CI では Postgres サービスコンテナが起動しているが Build ステップの
+  // DATABASE_URL は dummy 認証情報を指すため、Prisma が接続試行でハングする
+  // (Next.js 16.3.0 の並列 prerender と組み合わさると顕著。Issue #220)
+  if (process.env.NEXT_PHASE === 'phase-production-build') {
+    return null;
+  }
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
