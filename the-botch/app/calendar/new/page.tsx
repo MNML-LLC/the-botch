@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from '@/hooks/use-toast';
@@ -30,26 +30,23 @@ const EVENT_TYPES: { value: keyof typeof EVENT_TYPE_LABELS; label: string }[] = 
 
 export default function NewEventPage() {
   const router = useRouter();
-  const membersInitialized = useRef(false);
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [description, setDescription] = useState('');
   const [eventType, setEventType] = useState('HANGOUT');
   const [createdById, setCreatedById] = useState('');
-  const [participantIds, setParticipantIds] = useState<string[]>([]);
+  // null は未編集（デフォルトで全メンバー選択）、配列はユーザーが編集した状態
+  const [participantOverride, setParticipantOverride] = useState<string[] | null>(null);
 
   const { data: members = [] } = useMembers();
 
-  // 初回ロード時に全メンバーを参加者として選択
-  if (members.length > 0 && !membersInitialized.current) {
-    setParticipantIds(members.map((m) => m.id));
-    membersInitialized.current = true;
-  }
+  const participantIds = participantOverride ?? members.map((m) => m.id);
 
   const toggleParticipant = (id: string) => {
-    setParticipantIds((prev) =>
-      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
+    const current = participantOverride ?? members.map((m) => m.id);
+    setParticipantOverride(
+      current.includes(id) ? current.filter((p) => p !== id) : [...current, id]
     );
   };
 

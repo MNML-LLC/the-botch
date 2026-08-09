@@ -5,7 +5,7 @@ import { readJsonBody, validationErrorResponse } from '@/lib/api-validation'
 import { createMemberSchema } from '@/lib/schemas/members'
 
 // GET /api/members — メンバー一覧
-export async function GET(_request: NextRequest) {
+export async function GET() {
   try {
     const members = await prisma.member.findMany({
       where: { isActive: true },

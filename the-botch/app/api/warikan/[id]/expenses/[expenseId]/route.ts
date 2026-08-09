@@ -83,7 +83,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     // debtorIdsが指定された場合はトランザクションで更新
     if (debtorIds !== undefined) {
       const expense = await prisma.$transaction(async (tx) => {
-        const updated = await tx.warikanExpense.update({
+        await tx.warikanExpense.update({
           where: { id: expenseId },
           data: {
             ...(payerId !== undefined && { payerId }),

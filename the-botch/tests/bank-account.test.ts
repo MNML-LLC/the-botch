@@ -28,7 +28,7 @@ let testMemberId: string // テスト専用メンバー
 // テスト前にメンバーを準備
 beforeAll(async () => {
   // 既存メンバーを取得
-  const res = await getMembersAll(createRequest('/api/members'))
+  const res = await getMembersAll()
   const { data: members } = await parseResponse<{ id: string; name: string }[]>(res)
 
   if (members.length > 0) {
