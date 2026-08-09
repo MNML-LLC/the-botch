@@ -345,8 +345,6 @@ test.describe('3. 割り勘完全フロー', () => {
 // 4. 男気フロー（新規記録 → 一覧反映 → 統計反映）
 // =============================================================================
 test.describe('4. 男気記録フロー', () => {
-  let otokogiId: string
-
   test('男気新規記録 → 一覧に反映', async ({ page }) => {
     await page.goto('/otokogi/new')
     await expect(page.getByText('男気を記録する')).toBeVisible()
@@ -372,8 +370,6 @@ test.describe('4. 男気記録フロー', () => {
     await page.getByPlaceholder('0').fill('10000')
 
     // 参加者を選択（Radix Checkbox）
-    const checkboxes = page.locator('button[role="checkbox"]').filter({ hasNot: page.locator('.sr-only') })
-    const count = await checkboxes.count()
     // 最初の3人（アルバムチェックボックスを除外するため、参加者セクション内のみ）
     const participantSection = page.locator('label').filter({ has: page.locator('button[role="checkbox"]') })
     const pCount = await participantSection.count()
@@ -400,7 +396,6 @@ test.describe('4. 男気記録フロー', () => {
     const events = await res.json()
     const created = events.find((e: { eventName: string }) => e.eventName === 'UAT_テスト男気')
     if (created) {
-      otokogiId = created.id
       createdIds.otokogi.push(created.id)
     }
   })
@@ -688,7 +683,7 @@ test.describe('8. エッジケース', () => {
 // 9. レスポンシブ表示（モバイルプロジェクトで自動実行）
 // =============================================================================
 test.describe('9. レスポンシブ・モバイル表示', () => {
-  test('モバイルハンバーガーメニュー', async ({ page, browserName }) => {
+  test('モバイルハンバーガーメニュー', async ({ page }) => {
     // モバイルプロジェクトでのみ意味あり
     await page.goto('/')
 

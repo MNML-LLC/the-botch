@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
@@ -31,6 +31,8 @@ import {
   useMemberDetail,
   useSaveMemberBankAccount,
   useUpdateMember,
+  type BankAccountData,
+  type MemberDetail,
 } from '@/hooks/use-members';
 import { toast } from '@/hooks/use-toast';
 
@@ -44,26 +46,52 @@ const COLOR_OPTIONS = [
 ];
 
 export default function MemberEditPage() {
-  const router = useRouter();
   const params = useParams();
   const id = params.id as string;
 
-  // フォーム状態
-  const [name, setName] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [initial, setInitial] = useState('');
-  const [colorBg, setColorBg] = useState('bg-gray-100');
-  const [colorText, setColorText] = useState('text-gray-700');
-  const [paypayId, setPaypayId] = useState('');
-  const [isActive, setIsActive] = useState(true);
+  const { data: member, isPending: memberLoading } = useMemberDetail(id);
+  const { data: bankAccount, isPending: bankLoading, isError: bankError } = useMemberBankAccount(id);
 
-  // 口座フォーム状態
-  const [bankName, setBankName] = useState('');
-  const [branchName, setBranchName] = useState('');
-  const [accountType, setAccountType] = useState<'SAVINGS' | 'CHECKING'>('SAVINGS');
-  const [accountNumber, setAccountNumber] = useState('');
-  const [accountHolder, setAccountHolder] = useState('');
-  const [hasBankAccount, setHasBankAccount] = useState(false);
+  if (memberLoading || bankLoading) return <p className="text-sm text-gray-500">読み込み中...</p>;
+  if (!member) return <p className="text-sm text-gray-500">メンバーが見つかりません</p>;
+
+  return (
+    <MemberEditFormView
+      key={id}
+      id={id}
+      member={member}
+      bankAccount={bankAccount ?? null}
+      bankError={bankError}
+    />
+  );
+}
+
+type MemberEditFormViewProps = {
+  id: string;
+  member: MemberDetail;
+  bankAccount: BankAccountData | null;
+  bankError: boolean;
+};
+
+function MemberEditFormView({ id, member, bankAccount, bankError }: MemberEditFormViewProps) {
+  const router = useRouter();
+
+  // フォーム状態（フェッチ済みデータで初期化）
+  const [name, setName] = useState(member.name);
+  const [fullName, setFullName] = useState(member.fullName);
+  const [initial, setInitial] = useState(member.initial);
+  const [colorBg, setColorBg] = useState(member.colorBg);
+  const [colorText, setColorText] = useState(member.colorText);
+  const [paypayId, setPaypayId] = useState(member.paypayId || '');
+  const [isActive, setIsActive] = useState(member.isActive);
+
+  // 口座フォーム状態（フェッチ済みデータで初期化）
+  const [bankName, setBankName] = useState(bankAccount?.bankName ?? '');
+  const [branchName, setBranchName] = useState(bankAccount?.branchName ?? '');
+  const [accountType, setAccountType] = useState<'SAVINGS' | 'CHECKING'>(bankAccount?.accountType ?? 'SAVINGS');
+  const [accountNumber, setAccountNumber] = useState(bankAccount?.accountNumber ?? '');
+  const [accountHolder, setAccountHolder] = useState(bankAccount?.accountHolder ?? '');
+  const [hasBankAccount, setHasBankAccount] = useState(bankAccount !== null);
   const [isAccountRevealed, setIsAccountRevealed] = useState(false);
   const [accountCopied, setAccountCopied] = useState(false);
 
@@ -72,34 +100,6 @@ export default function MemberEditPage() {
     open: boolean;
     message: string;
   }>({ open: false, message: '' });
-
-  const { data: member, isPending: memberLoading } = useMemberDetail(id);
-  const { data: bankAccount, isError: bankError } = useMemberBankAccount(id);
-
-  // メンバー情報をフォームに反映
-  useEffect(() => {
-    if (member) {
-      setName(member.name);
-      setFullName(member.fullName);
-      setInitial(member.initial);
-      setColorBg(member.colorBg);
-      setColorText(member.colorText);
-      setPaypayId(member.paypayId || '');
-      setIsActive(member.isActive);
-    }
-  }, [member]);
-
-  // 口座情報をフォームに反映
-  useEffect(() => {
-    if (bankAccount) {
-      setBankName(bankAccount.bankName);
-      setBranchName(bankAccount.branchName);
-      setAccountType(bankAccount.accountType);
-      setAccountNumber(bankAccount.accountNumber);
-      setAccountHolder(bankAccount.accountHolder);
-      setHasBankAccount(true);
-    }
-  }, [bankAccount]);
 
   const updateMutation = useUpdateMember(id, {
     onSuccess: () => {
@@ -200,8 +200,6 @@ export default function MemberEditPage() {
   };
 
   const isBankMutating = saveBankMutation.isPending || deleteBankMutation.isPending;
-
-  if (memberLoading) return <p className="text-sm text-gray-500">読み込み中...</p>;
 
   return (
     <div>

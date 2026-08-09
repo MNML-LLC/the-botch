@@ -22,10 +22,7 @@ import {
   GET as getOtokogiAll,
   POST as createOtokogi,
 } from '@/app/api/otokogi/route'
-import {
-  GET as getOtokogiById,
-  DELETE as deleteOtokogi,
-} from '@/app/api/otokogi/[id]/route'
+import { GET as getOtokogiById } from '@/app/api/otokogi/[id]/route'
 import { GET as getOtokogiStats } from '@/app/api/otokogi/stats/route'
 import {
   GET as getWarikanAll,
@@ -34,7 +31,6 @@ import {
 import {
   GET as getWarikanById,
   PATCH as updateWarikan,
-  DELETE as deleteWarikan,
 } from '@/app/api/warikan/[id]/route'
 import {
   GET as getExpenses,
@@ -49,10 +45,7 @@ import {
   POST as calculateSettlements,
 } from '@/app/api/warikan/[id]/settlements/route'
 import { PATCH as patchSettlement } from '@/app/api/warikan/[id]/settlements/[settlementId]/route'
-import {
-  GET as getEvents,
-  POST as createEvent,
-} from '@/app/api/events/route'
+import { POST as createEvent } from '@/app/api/events/route'
 import {
   GET as getEventById,
   PUT as updateEvent,
@@ -74,7 +67,7 @@ let testMembers: { id: string; name: string }[] = []
 
 // テスト開始前に既存メンバーを取得（後方互換のため残す）
 async function getExistingMembers() {
-  const res = await getMembersAll(createRequest('/api/members'))
+  const res = await getMembersAll()
   const { data } = await parseResponse<{ id: string; name: string }[]>(res)
   return data
 }
@@ -131,8 +124,6 @@ afterAll(async () => {
 // ============================================================
 describe('シナリオ1: 割り勘フロー（完全ライフサイクル）', () => {
   let warikanId: string
-  let expenseId1: string
-  let expenseId2: string
   let settlementIds: string[]
 
   test('既存メンバーを取得', async () => {
@@ -176,7 +167,6 @@ describe('シナリオ1: 割り勘フロー（完全ライフサイクル）', (
     const { status, data } = await parseResponse<{ id: string; debtors: unknown[] }>(res)
     expect(status).toBe(201)
     expect(data.debtors.length).toBe(4) // 全参加者
-    expenseId1 = data.id
   })
 
   test('立替明細を追加（対象者指定: 2人のみ）', async () => {
@@ -196,7 +186,6 @@ describe('シナリオ1: 割り勘フロー（完全ライフサイクル）', (
     const { status, data } = await parseResponse<{ id: string; debtors: unknown[] }>(res)
     expect(status).toBe(201)
     expect(data.debtors.length).toBe(2) // 指定した2人のみ
-    expenseId2 = data.id
   })
 
   test('立替明細一覧を取得', async () => {
@@ -604,7 +593,7 @@ describe('シナリオ5: メンバーCRUD', () => {
   })
 
   test('メンバー一覧に含まれる', async () => {
-    const res = await getMembersAll(createRequest('/api/members'))
+    const res = await getMembersAll()
     const { status, data } = await parseResponse<{ id: string }[]>(res)
     expect(status).toBe(200)
     expect(data.some((m) => m.id === newMemberId)).toBe(true)
