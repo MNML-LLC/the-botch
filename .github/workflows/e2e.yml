@@ -95,6 +95,13 @@ jobs:
           echo "::error::Next.js server did not start within 60s"
           exit 1
 
+      - name: Warm up ISR cache (dashboard)
+        run: |
+          # During build, NEXT_PHASE guard causes dashboard to cache fallback HTML.
+          # First curl triggers background ISR revalidation; sleep lets it complete.
+          curl -s http://localhost:3000/ > /dev/null
+          sleep 12
+
       - name: Run Playwright tests
         run: npm run test:e2e
 

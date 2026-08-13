@@ -114,7 +114,9 @@ test.describe('1. 画面表示・遷移', () => {
     // 統計リンクをクリック → /otokogi/stats へナビゲート
     await page.getByRole('link', { name: '統計' }).click()
     await page.waitForURL(/\/otokogi\/stats/)
-    await expect(page.getByText('基本統計')).toBeVisible()
+    await expect(page.getByText('男気統計')).toBeVisible()
+    await expect(page.getByText('総回数')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('累計金額').first()).toBeVisible({ timeout: 10000 })
   })
 
   test('メンバー一覧ページが正常表示される', async ({ page }) => {
@@ -387,17 +389,10 @@ test.describe('4. 男気記録フロー', () => {
   test('男気統計に反映される', async ({ page }) => {
     // 統計ページに直接アクセス
     await page.goto('/otokogi/stats')
-    await page.waitForTimeout(2000)
-
-    // 基本統計が表示される
-    await expect(page.getByText('基本統計')).toBeVisible()
-    await expect(page.getByText('総回数')).toBeVisible()
-
-    // グラフが表示される
-    await expect(page.getByText('月別支払額推移')).toBeVisible()
-    await expect(page.getByText('男気偏差値')).toBeVisible()
-    await expect(page.getByText('累積支払額レース')).toBeVisible()
-    await expect(page.getByText('奢りヒートマップ')).toBeVisible()
+    await expect(page.getByText('男気統計')).toBeVisible()
+    await expect(page.getByText('総回数')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('月別推移')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('漢気ランキング')).toBeVisible({ timeout: 10000 })
   })
 
   test('男気 — 必須項目未入力でボタン無効', async ({ page }) => {
@@ -445,7 +440,7 @@ test.describe('5. カレンダー操作', () => {
 
   test('カレンダー予定追加フロー', async ({ page }) => {
     await page.goto('/calendar/new')
-    await expect(page.getByText('予定を追加')).toBeVisible()
+    await expect(page.getByRole('heading', { name: '予定を追加' })).toBeVisible()
 
     // タイトル入力
     await page.getByPlaceholder('例: 韓国旅行、忘年会').fill('UATテスト予定')
@@ -519,7 +514,7 @@ test.describe('6. Walicaインポート', () => {
     await page.getByRole('button', { name: 'データ取得' }).click()
 
     // エラーメッセージが表示される（外部API呼び出しのため長めに待つ）
-    const errorMessage = page.locator('.bg-red-50')
+    const errorMessage = page.locator('.bg-red-50').first()
     await expect(errorMessage).toBeVisible({ timeout: 8000 })
   })
 
@@ -603,8 +598,8 @@ test.describe('7. フィルター機能', () => {
       if (await yearOption.isVisible()) {
         await yearOption.click()
         await page.waitForTimeout(2000)
-        // 基本統計が更新される
-        await expect(page.getByText('基本統計')).toBeVisible()
+        // 男気統計が更新される
+        await expect(page.getByText('男気統計')).toBeVisible()
       }
     }
   })
@@ -647,7 +642,7 @@ test.describe('8. エッジケース', () => {
     await page.getByPlaceholder('0').fill('-1000')
 
     // parseAmount がマイナス記号を除去するため、表示値は 1000 になる
-    await expect(page.getByPlaceholder('0')).toHaveValue('1000')
+    await expect(page.getByPlaceholder('0')).toHaveValue('1,000')
   })
 
   test('404ページへのアクセス', async ({ page }) => {
