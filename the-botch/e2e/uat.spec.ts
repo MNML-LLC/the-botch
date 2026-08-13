@@ -298,25 +298,63 @@ test.describe('3. 割り勘完全フロー', () => {
     await expect(page.getByText('¥3,000').first()).toBeVisible()
   })
 
-  test('割り勘詳細 — 精算計算', async ({ page }) => {
+  test('割り勘詳細 — ENTERING → PAYING（精算を確定するボタン）', async ({ page }) => {
     if (!warikanId) test.skip()
 
     await page.goto(`/warikan/${warikanId}`)
-    await page.waitForTimeout(1000)
+    await expect(page.getByText('精算詳細')).toBeVisible()
 
-    // 精算計算ボタンが表示される（明細がある場合）
-    const calcBtn = page.getByRole('button', { name: '精算を計算する' })
-    if (await calcBtn.isVisible()) {
-      await calcBtn.click()
+    // 遷移前: ENTERING（明細入力中）
+    await expect(page.locator('main').getByText('明細入力中')).toBeVisible()
 
-      // 精算結果が表示される
-      await page.waitForTimeout(2000)
-      await expect(page.getByText('精算結果')).toBeVisible()
-    }
+    // 「精算を確定する」ボタンをクリック → AlertDialog が開く
+    const confirmSettlementBtn = page.getByRole('button', { name: '精算を確定する' })
+    await expect(confirmSettlementBtn).toBeEnabled({ timeout: 5000 })
+    await confirmSettlementBtn.click()
+
+    const confirmDialog = page.getByRole('alertdialog')
+    await expect(confirmDialog).toBeVisible()
+
+    // ダイアログ内の「確定」で PAYING に遷移
+    await confirmDialog.getByRole('button', { name: '確定' }).click()
+
+    // 遷移後: PAYING（支払待ち）バッジが表示される
+    await expect(page.locator('main').getByText('支払待ち').first()).toBeVisible({ timeout: 10000 })
+
+    // API でもステータス遷移を確認
+    const res = await page.request.get(`${BASE_URL}/api/warikan/${warikanId}`)
+    const detail = await res.json()
+    expect(detail.status).toBe('PAYING')
   })
 
-  test.skip('割り勘詳細 — ステータス変更', async () => {
-    // ステータスは読み取り専用バッジに変更されたため、このテストは無効
+  test('割り勘詳細 — PAYING → CLOSED（全て完了にするボタン）', async ({ page }) => {
+    if (!warikanId) test.skip()
+
+    await page.goto(`/warikan/${warikanId}`)
+    await expect(page.getByText('精算詳細')).toBeVisible()
+
+    // 前ステップで PAYING に遷移していない場合はスキップ（依存関係の保険）
+    const isPaying = await page.locator('main').getByText('支払待ち').first().isVisible().catch(() => false)
+    if (!isPaying) test.skip()
+
+    // 「全て完了にする」ボタン（AlertDialogTrigger）をクリック
+    const bulkTrigger = page.getByRole('button', { name: '全て完了にする' }).first()
+    await expect(bulkTrigger).toBeVisible({ timeout: 10000 })
+    await bulkTrigger.click()
+
+    const bulkDialog = page.getByRole('alertdialog')
+    await expect(bulkDialog).toBeVisible()
+
+    // ダイアログ内の「全て完了にする」で CLOSED に遷移
+    await bulkDialog.getByRole('button', { name: '全て完了にする' }).click()
+
+    // 遷移後: CLOSED（クローズ）バッジが表示される
+    await expect(page.locator('main').getByText('クローズ').first()).toBeVisible({ timeout: 10000 })
+
+    // API でもステータス遷移を確認
+    const res = await page.request.get(`${BASE_URL}/api/warikan/${warikanId}`)
+    const detail = await res.json()
+    expect(detail.status).toBe('CLOSED')
   })
 
   test.afterAll(async ({ browser }) => {
