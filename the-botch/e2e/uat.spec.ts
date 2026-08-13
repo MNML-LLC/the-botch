@@ -249,7 +249,7 @@ test.describe('3. 割り勘完全フロー', () => {
 
     // IDを取得
     const res = await page.request.get(`${BASE_URL}/api/warikan`)
-    const events = await res.json()
+    const { data: events } = await res.json()
     const created = events.find((e: { eventName: string }) => e.eventName === 'UAT_テスト割り勘')
     if (created) {
       warikanId = created.id
@@ -393,7 +393,7 @@ test.describe('4. 男気記録フロー', () => {
 
     // IDを取得
     const res = await page.request.get(`${BASE_URL}/api/otokogi`)
-    const events = await res.json()
+    const { data: events } = await res.json()
     const created = events.find((e: { eventName: string }) => e.eventName === 'UAT_テスト男気')
     if (created) {
       createdIds.otokogi.push(created.id)
@@ -729,7 +729,7 @@ test.describe('9. レスポンシブ・モバイル表示', () => {
   test('割り勘詳細の精算結果がモバイルで見切れない', async ({ page }) => {
     // 既存の割り勘で精算済みのものを探す
     const res = await page.request.get(`${BASE_URL}/api/warikan?status=PAYING`)
-    const events = await res.json()
+    const { data: events } = await res.json()
     if (events.length === 0) {
       test.skip()
       return
