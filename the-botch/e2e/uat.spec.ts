@@ -56,8 +56,8 @@ test.describe('1. 画面表示・遷移', () => {
       if (isMobile) {
         // ハンバーガーメニューを開いてリンクをクリック
         await page.locator('header button').filter({ has: page.locator('svg') }).click()
-        await page.waitForTimeout(300)
         const mobileMenu = page.locator('header .bg-slate-700')
+        await expect(mobileMenu).toBeVisible()
         await mobileMenu.getByRole('link', { name }).click()
       } else {
         await page.locator('header nav').getByRole('link', { name }).click()
@@ -79,8 +79,8 @@ test.describe('1. 画面表示・遷移', () => {
     // ダッシュボードに戻る
     if (isMobile) {
       await page.locator('header button').filter({ has: page.locator('svg') }).click()
-      await page.waitForTimeout(300)
       const mobileMenu = page.locator('header .bg-slate-700')
+      await expect(mobileMenu).toBeVisible()
       await mobileMenu.getByRole('link', { name: 'ダッシュボード' }).click()
     } else {
       await page.getByRole('link', { name: 'The botch' }).click()
@@ -225,14 +225,14 @@ test.describe('3. 割り勘完全フロー', () => {
     await page.goto('/warikan/new')
     await expect(page.getByText('新規割り勘')).toBeVisible()
 
-    // メンバーが読み込まれるまで待つ
-    await page.waitForTimeout(2000)
+    // メンバーが読み込まれるまで待つ（チェックボックスが描画されたら準備完了）
+    const checkboxes = page.locator('button[role="checkbox"]')
+    await expect(checkboxes.first()).toBeVisible({ timeout: 10000 })
 
     // イベント名入力
     await page.getByPlaceholder('例: 20260306_テニス').fill('UAT_テスト割り勘')
 
     // 参加メンバーを選択（Radix Checkboxはbutton[role="checkbox"]）
-    const checkboxes = page.locator('button[role="checkbox"]')
     const count = await checkboxes.count()
     for (let i = 0; i < Math.min(3, count); i++) {
       await checkboxes.nth(i).click()
@@ -269,7 +269,6 @@ test.describe('3. 割り勘完全フロー', () => {
 
     // 「+ 立替を追加」をクリック
     await page.getByText('+ 立替を追加').click()
-    await page.waitForTimeout(500)
 
     // 立替フォームが表示される
     const expenseForm = page.locator('.bg-gray-50.rounded-lg.border')
@@ -279,7 +278,6 @@ test.describe('3. 割り勘完全フロー', () => {
     const payerSelect = expenseForm.locator('button[role="combobox"]')
     await payerSelect.click()
     await page.locator('[role="option"]').first().click()
-    await page.waitForTimeout(300)
 
     // 金額入力
     await expenseForm.getByPlaceholder('金額').fill('3000')
@@ -293,8 +291,7 @@ test.describe('3. 割り勘完全フロー', () => {
     await expenseForm.getByRole('button', { name: '追加' }).click()
 
     // 立替明細が表示される
-    await page.waitForTimeout(1000)
-    await expect(page.getByText('テスト立替')).toBeVisible()
+    await expect(page.getByText('テスト立替')).toBeVisible({ timeout: 5000 })
     await expect(page.getByText('¥3,000').first()).toBeVisible()
   })
 
@@ -373,9 +370,6 @@ test.describe('4. 男気記録フロー', () => {
     await page.goto('/otokogi/new')
     await expect(page.getByText('男気を記録する')).toBeVisible()
 
-    // メンバーが読み込まれるまで待つ
-    await page.waitForTimeout(2000)
-
     // 日付（デフォルトで今日）
     const dateInput = page.locator('input[type="date"]')
     await expect(dateInput).not.toHaveValue('')
@@ -387,7 +381,9 @@ test.describe('4. 男気記録フロー', () => {
     await page.getByPlaceholder('例: 中目黒').fill('テスト場所')
 
     // 奢った人を選択（ラジオボタン — sr-only input の親label をクリック）
+    // メンバーが読み込まれてラジオが描画されたら準備完了
     const payerLabels = page.locator('label').filter({ has: page.locator('input[type="radio"]') })
+    await expect(payerLabels.first()).toBeVisible({ timeout: 10000 })
     await payerLabels.first().click()
 
     // 支払額
@@ -412,8 +408,7 @@ test.describe('4. 男気記録フロー', () => {
 
     // 男気一覧にリダイレクト
     await page.waitForURL(/\/otokogi$/, { timeout: 10000 })
-    await page.waitForTimeout(1000)
-    await expect(page.getByText('UAT_テスト男気').first()).toBeVisible({ timeout: 5000 })
+    await expect(page.getByText('UAT_テスト男気').first()).toBeVisible({ timeout: 10000 })
 
     // IDを取得
     const res = await page.request.get(`${BASE_URL}/api/otokogi`)
@@ -454,7 +449,6 @@ test.describe('4. 男気記録フロー', () => {
 test.describe('5. カレンダー操作', () => {
   test('カレンダー月ナビゲーション', async ({ page }) => {
     await page.goto('/calendar')
-    await page.waitForTimeout(1000)
 
     const now = new Date()
     const currentMonth = `${now.getFullYear()}年${now.getMonth() + 1}月`
@@ -464,7 +458,6 @@ test.describe('5. カレンダー操作', () => {
     const mainContent = page.locator('main')
     const prevBtn = mainContent.locator('button').filter({ has: page.locator('.lucide-chevron-left') })
     await prevBtn.click()
-    await page.waitForTimeout(500)
     const prevMonth = now.getMonth() === 0
       ? `${now.getFullYear() - 1}年12月`
       : `${now.getFullYear()}年${now.getMonth()}月`
@@ -472,7 +465,6 @@ test.describe('5. カレンダー操作', () => {
 
     // 「今日」ボタンで戻る
     await page.getByText('今日').click()
-    await page.waitForTimeout(500)
     await expect(page.getByText(currentMonth)).toBeVisible()
   })
 
@@ -512,14 +504,14 @@ test.describe('5. カレンダー操作', () => {
 
   test('カレンダー日付タップで詳細表示', async ({ page }) => {
     await page.goto('/calendar')
-    await page.waitForTimeout(1000)
+    // カレンダーAPI レスポンスを待ってドットインジケーターの描画を保証
+    await page.waitForLoadState('networkidle')
 
     // ドットインジケーターがある日付を探してクリック
     const cellsWithDots = page.locator('button').filter({ has: page.locator('.rounded-full.w-1\\.5') })
     const count = await cellsWithDots.count()
     if (count > 0) {
       await cellsWithDots.first().click()
-      await page.waitForTimeout(500)
       // 選択日の詳細が表示される
       await expect(page.getByText(/の予定/)).toBeVisible()
     }
@@ -570,7 +562,6 @@ test.describe('6. Walicaインポート', () => {
 test.describe('7. フィルター機能', () => {
   test('割り勘 — ステータスフィルター', async ({ page }) => {
     await page.goto('/warikan')
-    await page.waitForTimeout(1000)
 
     // 「全て」が選択されている
     await expect(page.getByText('全て').first()).toBeVisible()
@@ -580,7 +571,6 @@ test.describe('7. フィルター機能', () => {
     const count = await filterButtons.count()
     if (count > 0) {
       await filterButtons.first().click()
-      await page.waitForTimeout(1000)
       // フィルタリング後もページが正常（エラーなし）
       await expect(page.locator('main').getByText('割り勘管理')).toBeVisible()
     }
@@ -588,7 +578,8 @@ test.describe('7. フィルター機能', () => {
 
   test('割り勘 — 年度フィルター', async ({ page }) => {
     await page.goto('/warikan')
-    await page.waitForTimeout(1000)
+    // ページ描画完了を待つ（isVisible ガードが早期に発火して skip されないよう）
+    await expect(page.locator('main').getByText('割り勘管理')).toBeVisible()
 
     // 年度セレクター
     const yearSelect = page.locator('button[role="combobox"]').filter({ hasText: /全期間|\d{4}年/ })
@@ -598,7 +589,6 @@ test.describe('7. フィルター機能', () => {
       const yearOption = page.locator('[role="option"]').filter({ hasText: /2025/ })
       if (await yearOption.isVisible()) {
         await yearOption.click()
-        await page.waitForTimeout(1000)
         // ページが正常
         await expect(page.locator('main').getByText('割り勘管理')).toBeVisible()
       }
@@ -607,7 +597,8 @@ test.describe('7. フィルター機能', () => {
 
   test('男気 — 年度フィルター（履歴）', async ({ page }) => {
     await page.goto('/otokogi')
-    await page.waitForTimeout(1000)
+    // ページ描画完了を待つ（isVisible ガードで skip されないよう）
+    await expect(page.getByRole('button', { name: '履歴' })).toBeVisible()
 
     // 年度セレクター
     const yearSelect = page.locator('button[role="combobox"]')
@@ -616,7 +607,6 @@ test.describe('7. フィルター機能', () => {
       const yearOption = page.locator('[role="option"]').filter({ hasText: /2025/ })
       if (await yearOption.isVisible()) {
         await yearOption.click()
-        await page.waitForTimeout(1000)
         // 2025年のデータが表示（またはデータなし）
         await expect(page.getByRole('button', { name: '履歴' })).toBeVisible()
       }
@@ -626,7 +616,8 @@ test.describe('7. フィルター機能', () => {
   test('男気統計 — 年度フィルター', async ({ page }) => {
     // 統計ページに直接アクセス
     await page.goto('/otokogi/stats')
-    await page.waitForTimeout(2000)
+    // 統計ページ描画完了を待つ（isVisible ガードで skip されないよう）
+    await expect(page.getByText('男気統計')).toBeVisible({ timeout: 10000 })
 
     // 統計専用の年度フィルター
     const yearSelect = page.locator('button[role="combobox"]')
@@ -635,7 +626,6 @@ test.describe('7. フィルター機能', () => {
       const yearOption = page.locator('[role="option"]').filter({ hasText: /2025/ })
       if (await yearOption.isVisible()) {
         await yearOption.click()
-        await page.waitForTimeout(2000)
         // 男気統計が更新される
         await expect(page.getByText('男気統計')).toBeVisible()
       }
@@ -649,15 +639,14 @@ test.describe('7. フィルター機能', () => {
 test.describe('8. エッジケース', () => {
   test('存在しない割り勘IDでエラー表示', async ({ page }) => {
     await page.goto('/warikan/nonexistent-id-12345')
-    await page.waitForTimeout(3000)
     // 「イベントが見つかりません」が表示される
-    await expect(page.getByText('イベントが見つかりません')).toBeVisible()
+    await expect(page.getByText('イベントが見つかりません')).toBeVisible({ timeout: 10000 })
   })
 
   test('存在しないメンバーIDでエラー表示', async ({ page }) => {
     await page.goto('/members/nonexistent-id-12345/edit')
-    await page.waitForTimeout(3000)
-    // エラーかリダイレクトが発生
+    // API 応答完了を待って、エラー描画かリダイレクトが確定してから判定
+    await page.waitForLoadState('networkidle')
     const hasError = await page.getByText(/見つかりません|エラー/).isVisible().catch(() => false)
     const redirected = page.url().includes('/members')
     expect(hasError || redirected).toBeTruthy()
@@ -707,7 +696,6 @@ test.describe('9. レスポンシブ・モバイル表示', () => {
 
       // メニューを開く
       await menuBtn.click()
-      await page.waitForTimeout(300)
 
       // モバイルメニュー内のナビゲーションリンクが表示される
       const mobileMenu = page.locator('header .bg-slate-700')
@@ -718,7 +706,6 @@ test.describe('9. レスポンシブ・モバイル表示', () => {
 
   test('ダッシュボード — 金額が画面に収まる', async ({ page }) => {
     await page.goto('/')
-    await page.waitForTimeout(1000)
     // overflow-hidden / truncate が適用されているか視覚的に確認不可
     // テキストが表示されているかのみ検証
     await expect(page.getByText('未精算の割り勘')).toBeVisible()
@@ -726,10 +713,10 @@ test.describe('9. レスポンシブ・モバイル表示', () => {
 
   test('男気統計グラフが表示される', async ({ page }) => {
     await page.goto('/otokogi/stats')
-    await page.waitForTimeout(3000)
 
     // rechartsのSVGが描画されているか
     const svgElements = page.locator('svg.recharts-surface')
+    await expect(svgElements.first()).toBeVisible({ timeout: 10000 })
     const svgCount = await svgElements.count()
     // 最低1つのグラフがレンダリングされている
     expect(svgCount).toBeGreaterThanOrEqual(1)
@@ -745,7 +732,6 @@ test.describe('9. レスポンシブ・モバイル表示', () => {
     }
 
     await page.goto(`/warikan/${events[0].id}`)
-    await page.waitForTimeout(1000)
 
     // ページが正常に表示される
     await expect(page.getByText('精算詳細')).toBeVisible()
