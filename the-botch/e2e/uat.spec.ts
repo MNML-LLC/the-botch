@@ -39,14 +39,13 @@ test.describe('1. 画面表示・遷移', () => {
     // ヘッダー
     await expect(page.locator('header')).toBeVisible()
     await expect(page.getByRole('link', { name: 'The botch' })).toBeVisible()
-    // 累計統計セクション
-    await expect(page.getByText('累計統計')).toBeVisible()
-    await expect(page.getByText('総イベント数')).toBeVisible()
-    await expect(page.getByText('累計金額').first()).toBeVisible()
+    // 直近イベントセクション
+    await expect(page.getByText('直近イベント')).toBeVisible()
+    await expect(page.getByText('月次推移')).toBeVisible()
     // 未精算の割り勘セクション
     await expect(page.getByText('未精算の割り勘')).toBeVisible()
-    // 最近の男気セクション
-    await expect(page.getByText('最近の男気')).toBeVisible()
+    // 直近の男気セクション
+    await expect(page.getByText('直近の男気')).toBeVisible()
   })
 
   test('ナビゲーションリンクが全て機能する', async ({ page }) => {
@@ -106,17 +105,18 @@ test.describe('1. 画面表示・遷移', () => {
     // 履歴タブ（デフォルト）
     await expect(page.getByRole('button', { name: '履歴' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'ランキング' })).toBeVisible()
-    await expect(page.getByRole('button', { name: '統計' })).toBeVisible()
+    await expect(page.getByRole('link', { name: '統計' })).toBeVisible()
 
     // ランキングタブに切り替え
     await page.getByRole('button', { name: 'ランキング' }).click()
     await expect(page.getByText('支払額ランキング')).toBeVisible()
 
-    // 統計タブに切り替え
-    await page.getByRole('button', { name: '統計' }).click()
-    await expect(page.getByText('基本統計')).toBeVisible()
-    await expect(page.getByText('総回数')).toBeVisible()
-    await expect(page.getByText('累計金額').first()).toBeVisible()
+    // 統計リンクをクリック → /otokogi/stats へナビゲート
+    await page.getByRole('link', { name: '統計' }).click()
+    await page.waitForURL(/\/otokogi\/stats/)
+    await expect(page.getByText('男気統計')).toBeVisible()
+    await expect(page.getByText('総回数')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('累計金額').first()).toBeVisible({ timeout: 10000 })
   })
 
   test('メンバー一覧ページが正常表示される', async ({ page }) => {
@@ -249,7 +249,7 @@ test.describe('3. 割り勘完全フロー', () => {
 
     // IDを取得
     const res = await page.request.get(`${BASE_URL}/api/warikan`)
-    const events = await res.json()
+    const { data: events } = await res.json()
     const created = events.find((e: { eventName: string }) => e.eventName === 'UAT_テスト割り勘')
     if (created) {
       warikanId = created.id
@@ -315,22 +315,8 @@ test.describe('3. 割り勘完全フロー', () => {
     }
   })
 
-  test('割り勘詳細 — ステータス変更', async ({ page }) => {
-    if (!warikanId) test.skip()
-
-    await page.goto(`/warikan/${warikanId}`)
-    await page.waitForTimeout(1000)
-
-    // ステータスドロップダウンをクリック
-    const statusSelect = page.locator('button[role="combobox"]').first()
-    await statusSelect.click()
-
-    // 「支払待ち」を選択
-    await page.getByRole('option', { name: '支払待ち' }).click()
-
-    // ステータスが変わったか確認
-    await page.waitForTimeout(1000)
-    await expect(page.getByText('支払待ち')).toBeVisible()
+  test.skip('割り勘詳細 — ステータス変更', async () => {
+    // ステータスは読み取り専用バッジに変更されたため、このテストは無効
   })
 
   test.afterAll(async ({ browser }) => {
@@ -393,7 +379,7 @@ test.describe('4. 男気記録フロー', () => {
 
     // IDを取得
     const res = await page.request.get(`${BASE_URL}/api/otokogi`)
-    const events = await res.json()
+    const { data: events } = await res.json()
     const created = events.find((e: { eventName: string }) => e.eventName === 'UAT_テスト男気')
     if (created) {
       createdIds.otokogi.push(created.id)
@@ -401,21 +387,12 @@ test.describe('4. 男気記録フロー', () => {
   })
 
   test('男気統計に反映される', async ({ page }) => {
-    await page.goto('/otokogi')
-
-    // 統計タブに切り替え
-    await page.getByRole('button', { name: '統計' }).click()
-    await page.waitForTimeout(2000)
-
-    // 基本統計が表示される
-    await expect(page.getByText('基本統計')).toBeVisible()
-    await expect(page.getByText('総回数')).toBeVisible()
-
-    // グラフが表示される
-    await expect(page.getByText('月別支払額推移')).toBeVisible()
-    await expect(page.getByText('男気偏差値')).toBeVisible()
-    await expect(page.getByText('累積支払額レース')).toBeVisible()
-    await expect(page.getByText('奢りヒートマップ')).toBeVisible()
+    // 統計ページに直接アクセス
+    await page.goto('/otokogi/stats')
+    await expect(page.getByText('男気統計')).toBeVisible()
+    await expect(page.getByText('総回数')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('月別推移')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('漢気ランキング')).toBeVisible({ timeout: 10000 })
   })
 
   test('男気 — 必須項目未入力でボタン無効', async ({ page }) => {
@@ -463,7 +440,7 @@ test.describe('5. カレンダー操作', () => {
 
   test('カレンダー予定追加フロー', async ({ page }) => {
     await page.goto('/calendar/new')
-    await expect(page.getByText('予定を追加')).toBeVisible()
+    await expect(page.getByRole('heading', { name: '予定を追加' })).toBeVisible()
 
     // タイトル入力
     await page.getByPlaceholder('例: 韓国旅行、忘年会').fill('UATテスト予定')
@@ -486,7 +463,7 @@ test.describe('5. カレンダー操作', () => {
     await submitBtn.click()
 
     // カレンダーにリダイレクト
-    await page.waitForURL(/\/calendar/, { timeout: 10000 })
+    await page.waitForURL((url) => url.pathname === '/calendar', { timeout: 10000 })
 
     // IDを取得してクリーンアップ用に記録
     const res = await page.request.get(`${BASE_URL}/api/events`)
@@ -536,10 +513,9 @@ test.describe('6. Walicaインポート', () => {
     await page.getByPlaceholder('https://walica.jp/g/xxxxx').fill('https://example.com/invalid')
     await page.getByRole('button', { name: 'データ取得' }).click()
 
-    // エラーメッセージが表示される
-    await page.waitForTimeout(3000)
-    const errorMessage = page.locator('.bg-red-50')
-    await expect(errorMessage).toBeVisible()
+    // エラーメッセージが表示される（外部API呼び出しのため長めに待つ）
+    const errorMessage = page.locator('.bg-red-50').first()
+    await expect(errorMessage).toBeVisible({ timeout: 8000 })
   })
 
   test('Walica — 空URLでボタン無効', async ({ page }) => {
@@ -610,10 +586,8 @@ test.describe('7. フィルター機能', () => {
   })
 
   test('男気統計 — 年度フィルター', async ({ page }) => {
-    await page.goto('/otokogi')
-
-    // 統計タブに切り替え
-    await page.getByRole('button', { name: '統計' }).click()
+    // 統計ページに直接アクセス
+    await page.goto('/otokogi/stats')
     await page.waitForTimeout(2000)
 
     // 統計専用の年度フィルター
@@ -624,8 +598,8 @@ test.describe('7. フィルター機能', () => {
       if (await yearOption.isVisible()) {
         await yearOption.click()
         await page.waitForTimeout(2000)
-        // 基本統計が更新される
-        await expect(page.getByText('基本統計')).toBeVisible()
+        // 男気統計が更新される
+        await expect(page.getByText('男気統計')).toBeVisible()
       }
     }
   })
@@ -667,9 +641,8 @@ test.describe('8. エッジケース', () => {
     // 金額にマイナス値
     await page.getByPlaceholder('0').fill('-1000')
 
-    // UIレベルでは入力できるが、サーバー側でバリデーションされる
-    // ここではUI入力が可能かのみ確認
-    await expect(page.getByPlaceholder('0')).toHaveValue('-1000')
+    // parseAmount がマイナス記号を除去するため、表示値は 1000 になる
+    await expect(page.getByPlaceholder('0')).toHaveValue('1,000')
   })
 
   test('404ページへのアクセス', async ({ page }) => {
@@ -708,15 +681,13 @@ test.describe('9. レスポンシブ・モバイル表示', () => {
   test('ダッシュボード — 金額が画面に収まる', async ({ page }) => {
     await page.goto('/')
     await page.waitForTimeout(1000)
-
     // overflow-hidden / truncate が適用されているか視覚的に確認不可
     // テキストが表示されているかのみ検証
-    await expect(page.getByText('累計統計')).toBeVisible()
+    await expect(page.getByText('未精算の割り勘')).toBeVisible()
   })
 
   test('男気統計グラフが表示される', async ({ page }) => {
-    await page.goto('/otokogi')
-    await page.getByRole('button', { name: '統計' }).click()
+    await page.goto('/otokogi/stats')
     await page.waitForTimeout(3000)
 
     // rechartsのSVGが描画されているか
@@ -729,7 +700,7 @@ test.describe('9. レスポンシブ・モバイル表示', () => {
   test('割り勘詳細の精算結果がモバイルで見切れない', async ({ page }) => {
     // 既存の割り勘で精算済みのものを探す
     const res = await page.request.get(`${BASE_URL}/api/warikan?status=PAYING`)
-    const events = await res.json()
+    const { data: events } = await res.json()
     if (events.length === 0) {
       test.skip()
       return

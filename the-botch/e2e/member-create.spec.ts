@@ -33,7 +33,7 @@ test.describe('メンバー追加 → 銀行口座登録フロー', () => {
     // 必須3項目（表示名・姓・イニシャル）の入力
     await page.getByPlaceholder('例: ゆうき').fill(memberName)
     await page.getByPlaceholder('例: 内山').fill('テスト')
-    await page.getByPlaceholder('Y').fill('T')
+    await page.getByPlaceholder('Y', { exact: true }).fill('T')
 
     // 入力完了で「追加する」ボタンが有効化される
     const submitBtn = page.getByRole('button', { name: '追加する' })
