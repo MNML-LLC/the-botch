@@ -61,7 +61,8 @@
     "vitest": "^4.1.10"
   },
   "overrides": {
-    "picomatch": ">=4.0.4"
+    "picomatch": ">=4.0.4",
+    "deepmerge-ts": ">=8.0.0"
   },
   "engines": {
     "node": "^22.12.0"
