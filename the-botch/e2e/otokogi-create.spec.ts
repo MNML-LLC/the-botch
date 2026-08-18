@@ -64,10 +64,11 @@ test.describe('男気イベント登録フロー', () => {
     await expect(submitBtn).toBeEnabled({ timeout: 3000 })
     await submitBtn.click()
 
-    // 9. 男気一覧ページへリダイレクトされる
-    await page.waitForURL(/\/otokogi\/\d+\/edit/, { timeout: 10000 })
+    // 9. 編集ページ (/otokogi/{id}/edit) へリダイレクトされる
+    await page.waitForURL(/\/otokogi\/[^/]+\/edit/, { timeout: 10000 })
 
-    // 10. 一覧の最上位カードに作成イベントが表示される
+    // 10. 一覧に戻って最上位カードに作成イベントが表示されることを確認
+    await page.goto('/otokogi')
     // 一覧カード: <div className="bg-white rounded-lg p-3 border shadow-sm">
     const eventCards = page.locator('main div.bg-white.rounded-lg.p-3.border.shadow-sm')
     // レンダリング完了を待つ
