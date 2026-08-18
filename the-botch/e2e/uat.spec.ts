@@ -406,8 +406,11 @@ test.describe('4. 男気記録フロー', () => {
     await expect(submitBtn).toBeEnabled({ timeout: 3000 })
     await submitBtn.click()
 
-    // 男気一覧にリダイレクト
-    await page.waitForURL(/\/otokogi$/, { timeout: 10000 })
+    // 編集ページ (/otokogi/{id}/edit) へリダイレクト
+    await page.waitForURL(/\/otokogi\/[^/]+\/edit/, { timeout: 10000 })
+
+    // 一覧に戻って作成イベントが表示されることを確認
+    await page.goto('/otokogi')
     await expect(page.getByText('UAT_テスト男気').first()).toBeVisible({ timeout: 10000 })
 
     // IDを取得

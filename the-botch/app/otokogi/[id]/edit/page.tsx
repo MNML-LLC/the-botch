@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { ParticipantSelector } from '@/components/participant-selector';
+import { ImageUpload } from '@/components/otokogi/image-upload';
 import { useMembers } from '@/hooks/use-members';
 import {
   useOtokogiEvent,
@@ -36,6 +37,7 @@ function EditForm({ id, event, members }: { id: string; event: OtokogiEventDetai
   const [participantIds, setParticipantIds] = useState<string[]>(
     event.participants.map((p) => p.member.id)
   );
+  const [imageCount, setImageCount] = useState(event.images.length);
 
   const toggleParticipant = (memberId: string) => {
     setParticipantIds((prev) =>
@@ -169,9 +171,34 @@ function EditForm({ id, event, members }: { id: string; event: OtokogiEventDetai
             <Checkbox
               checked={hasAlbum}
               onCheckedChange={(checked) => setHasAlbum(checked === true)}
+              disabled={imageCount > 0}
             />
-            <span className="text-sm">アルバムあり</span>
+            <span className="text-sm">
+              アルバムあり
+              {imageCount > 0 && (
+                <span className="text-xs text-gray-500 ml-2">
+                  （写真 {imageCount} 枚に基づき自動更新）
+                </span>
+              )}
+            </span>
           </label>
+        </div>
+
+        <hr className="border-gray-200" />
+
+        <div>
+          <Label className="mb-2">写真（最大10枚 / 1枚3MBまで / 長辺2048px に自動リサイズ）</Label>
+          <div className="mt-2">
+            <ImageUpload
+              otokogiEventId={id}
+              initialImages={event.images}
+              blobEnabled={event.blobEnabled}
+              onImagesChange={(imgs) => {
+                setImageCount(imgs.length);
+                setHasAlbum(imgs.length > 0);
+              }}
+            />
+          </div>
         </div>
 
         <div>

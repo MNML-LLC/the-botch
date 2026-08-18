@@ -87,6 +87,7 @@ model OtokogiEvent {
   // リレーション
   payer        Member               @relation(fields: [payerId], references: [id])
   participants OtokogiParticipant[]
+  images       OtokogiImage[]
   event        Event?               @relation(fields: [eventId], references: [id])
 
   @@index([eventDate(sort: Desc)])
@@ -96,6 +97,19 @@ model OtokogiEvent {
   // 統計API: 日付範囲フィルタ + 支払者別集計の複合インデックス
   @@index([eventDate, payerId])
   @@map("otokogi_events")
+}
+
+// 男気イベント画像
+model OtokogiImage {
+  id             String   @id @default(uuid())
+  otokogiEventId String   @map("otokogi_event_id")
+  url            String   @db.VarChar(500)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  otokogiEvent OtokogiEvent @relation(fields: [otokogiEventId], references: [id], onDelete: Cascade)
+
+  @@index([otokogiEventId])
+  @@map("otokogi_images")
 }
 
 // 男気イベント参加者（多対多）
