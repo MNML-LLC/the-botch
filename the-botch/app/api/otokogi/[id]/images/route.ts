@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { handleApiError } from '@/lib/api-utils'
-import { isBlobConfigured, putBlob } from '@/lib/blob'
+import { deleteBlob, isBlobConfigured, putBlob } from '@/lib/blob'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -72,15 +72,27 @@ export async function POST(request: NextRequest, { params }: Params) {
     const pathname = `otokogi/${id}/${Date.now()}.${ext}`
     const blob = await putBlob(pathname, file, { access: 'public', contentType: file.type })
 
-    const [image] = await prisma.$transaction([
-      prisma.otokogiImage.create({
-        data: { otokogiEventId: id, url: blob.url },
-      }),
-      prisma.otokogiEvent.update({
-        where: { id },
-        data: { hasAlbum: true },
-      }),
-    ])
+    // Blob PUT が成功しても DB トランザクションが失敗するとオブジェクトが孤立するため、
+    // 失敗時は del() で Blob を巻き戻す。
+    let image
+    try {
+      ;[image] = await prisma.$transaction([
+        prisma.otokogiImage.create({
+          data: { otokogiEventId: id, url: blob.url },
+        }),
+        prisma.otokogiEvent.update({
+          where: { id },
+          data: { hasAlbum: true },
+        }),
+      ])
+    } catch (dbError) {
+      try {
+        await deleteBlob(blob.url)
+      } catch (cleanupError) {
+        console.error('Blob 巻き戻し失敗（孤立オブジェクトの可能性）:', cleanupError)
+      }
+      throw dbError
+    }
 
     return NextResponse.json(image, { status: 201 })
   } catch (error) {
