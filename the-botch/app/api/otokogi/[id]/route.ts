@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { handleApiError } from '@/lib/api-utils'
+import { isBlobConfigured } from '@/lib/blob'
 import { invalidateStatsCache } from '@/lib/stats-cache'
 import {
   readJsonBody,
@@ -40,6 +41,9 @@ export async function GET(_request: NextRequest, { params }: Params) {
         participants: {
           include: { member: true },
         },
+        images: {
+          orderBy: { createdAt: 'asc' },
+        },
       },
     })
 
@@ -50,9 +54,10 @@ export async function GET(_request: NextRequest, { params }: Params) {
       )
     }
 
-    return NextResponse.json(event, {
-      headers: { 'Cache-Control': 'private, max-age=600' },
-    })
+    return NextResponse.json(
+      { ...event, blobEnabled: isBlobConfigured() },
+      { headers: { 'Cache-Control': 'private, max-age=600' } }
+    )
   } catch (error) {
     return handleApiError(error, { logLabel: '男気イベント詳細取得エラー', fallbackMessage: '男気イベント詳細の取得に失敗しました' })
   }

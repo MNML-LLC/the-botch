@@ -72,9 +72,18 @@ export type OtokogiUpdateInput = Partial<{
   participantIds: string[];
 }>;
 
+export type OtokogiImage = {
+  id: string;
+  otokogiEventId: string;
+  url: string;
+  createdAt: string;
+};
+
 export type OtokogiEventDetail = OtokogiEvent & {
   payerId: string;
   eventId: string | null;
+  images: OtokogiImage[];
+  blobEnabled: boolean;
 };
 
 export function useOtokogiEvent(id: string | undefined) {

@@ -165,7 +165,18 @@ export default function OtokogiPage() {
                         {event.payer.initial}
                       </div>
                       <div className="min-w-0">
-                        <p className="font-medium text-slate-800 truncate">{event.eventName}</p>
+                        <p className="font-medium text-slate-800 truncate">
+                          {event.eventName}
+                          {event.hasAlbum && (
+                            <span
+                              className="ml-1.5 text-xs align-middle text-gray-500"
+                              title="写真あり"
+                              aria-label="写真あり"
+                            >
+                              📷
+                            </span>
+                          )}
+                        </p>
                         <p className="text-xs text-gray-500 mt-0.5">
                           {formatDate(event.eventDate)} / {event.payer.name}
                           {event.place && ` / ${event.place}`}

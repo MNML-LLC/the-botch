@@ -57,8 +57,13 @@ function OtokogiNewForm() {
   const perPerson = participantIds.length > 0 ? Math.round(amountNum / participantIds.length) : 0;
 
   const createMutation = useCreateOtokogi({
-    onSuccess: () => {
-      toast({ title: '男気イベントを登録しました' });
+    onSuccess: (data) => {
+      toast({ title: '男気イベントを登録しました', description: '写真を追加できます' });
+      const created = data as { id?: string } | null | undefined;
+      if (created?.id) {
+        router.push(`/otokogi/${created.id}/edit`);
+        return;
+      }
       const from = searchParams.get('from');
       router.push(from ?? '/otokogi');
     },
