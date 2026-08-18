@@ -65,7 +65,7 @@ test.describe('男気イベント登録フロー', () => {
     await submitBtn.click()
 
     // 9. 男気一覧ページへリダイレクトされる
-    await page.waitForURL(/\/otokogi(\?.*)?$/, { timeout: 10000 })
+    await page.waitForURL(/\/otokogi\/\d+\/edit/, { timeout: 10000 })
 
     // 10. 一覧の最上位カードに作成イベントが表示される
     // 一覧カード: <div className="bg-white rounded-lg p-3 border shadow-sm">

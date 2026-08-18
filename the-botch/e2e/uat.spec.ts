@@ -407,7 +407,7 @@ test.describe('4. 男気記録フロー', () => {
     await submitBtn.click()
 
     // 男気一覧にリダイレクト
-    await page.waitForURL(/\/otokogi$/, { timeout: 10000 })
+    await page.waitForURL(/\/otokogi\/\d+\/edit/, { timeout: 10000 })
     await expect(page.getByText('UAT_テスト男気').first()).toBeVisible({ timeout: 10000 })
 
     // IDを取得
