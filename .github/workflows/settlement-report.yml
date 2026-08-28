@@ -1,0 +1,59 @@
+name: 割り勘 精算完了率レポート
+
+on:
+  schedule:
+    # 週次: 毎週月曜 00:00 UTC = 09:00 JST
+    - cron: '0 0 * * 1'
+    # 月次: 毎月1日 00:00 UTC = 09:00 JST
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+    inputs:
+      period:
+        description: '集計期間（weekly または monthly）'
+        required: true
+        default: 'weekly'
+        type: choice
+        options:
+          - weekly
+          - monthly
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Determine period
+        id: period
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SCHEDULE_CRON: ${{ github.event.schedule }}
+          MANUAL_PERIOD: ${{ inputs.period }}
+        run: |
+          set -euo pipefail
+          if [ "${EVENT_NAME}" = "workflow_dispatch" ]; then
+            period="${MANUAL_PERIOD}"
+          elif [ "${SCHEDULE_CRON}" = "0 0 1 * *" ]; then
+            period="monthly"
+          else
+            period="weekly"
+          fi
+          echo "period=${period}" >> "$GITHUB_OUTPUT"
+          echo "Selected period: ${period}"
+
+      - name: Call settlement-report API
+        env:
+          APP_URL: ${{ secrets.THE_BOTCH_APP_URL != '' && secrets.THE_BOTCH_APP_URL || secrets.APP_URL }}
+          NOTIFY_API_TOKEN: ${{ secrets.NOTIFY_API_TOKEN }}
+          PERIOD: ${{ steps.period.outputs.period }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APP_URL:-}" ] || [ -z "${NOTIFY_API_TOKEN:-}" ]; then
+            echo "::error::THE_BOTCH_APP_URL(または APP_URL) / NOTIFY_API_TOKEN が未設定です"
+            exit 1
+          fi
+          echo "POST ${APP_URL}/api/warikan/settlement-report?period=${PERIOD}"
+          curl -fsS --max-time 60 \
+            -X POST "${APP_URL}/api/warikan/settlement-report?period=${PERIOD}" \
+            -H "Authorization: Bearer ${NOTIFY_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -w "\nHTTP %{http_code}\n"
