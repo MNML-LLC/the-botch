@@ -65,7 +65,8 @@
   },
   "overrides": {
     "picomatch": ">=4.0.4",
-    "deepmerge-ts": ">=8.0.0"
+    "deepmerge-ts": ">=8.0.0",
+    "mysql2": ">=3.24.0"
   },
   "engines": {
     "node": "^22.12.0"
