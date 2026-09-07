@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
-    "@line/bot-sdk": "^9.3.0",
+    "@line/bot-sdk": "^11.2.0",
     "@line/liff": "^2.24.0",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
