@@ -1,0 +1,37 @@
+name: Weekly npm audit
+
+on:
+  schedule:
+    # 毎週月曜 00:00 UTC = 09:00 JST
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: the-botch
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: the-botch/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit (HIGH 以上で fail)
+        run: npm audit --audit-level=high
+
+      - name: Audit summary (常に表示)
+        if: always()
+        run: |
+          echo "## npm audit summary" >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          npm audit --json | jq '.metadata.vulnerabilities' >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
