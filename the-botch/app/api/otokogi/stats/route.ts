@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     // 日付フィルタ構築（from/to 優先、なければ year から生成）
     let fromDate: Date | null = null
     let toDate: Date | null = null
-    let exclusive = false // year モードは lt（exclusive）、日付範囲は lte
+    let exclusive = false // year モードも日付範囲モードも lte（inclusive）
 
     if (from || to) {
       fromDate = from ? new Date(from) : null
