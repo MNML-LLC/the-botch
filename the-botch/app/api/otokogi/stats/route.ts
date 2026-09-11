@@ -65,15 +65,15 @@ export async function GET(request: NextRequest) {
     // 日付フィルタ構築（from/to 優先、なければ year から生成）
     let fromDate: Date | null = null
     let toDate: Date | null = null
-    let exclusive = false // year モードは lt（exclusive）、日付範囲は lte
+    let exclusive = false // year モードも日付範囲モードも lte（inclusive）
 
     if (from || to) {
       fromDate = from ? new Date(from) : null
       toDate = to ? new Date(to) : null
     } else if (year) {
-      fromDate = new Date(`${year}-01-01`)
-      toDate = new Date(`${Number(year) + 1}-01-01`)
-      exclusive = true
+      fromDate = new Date(`${Number(year) - 1}-11-01`)
+      toDate = new Date(`${year}-10-31`)
+      exclusive = false
     }
 
     // キャッシュキー（後方互換: year のみなら従来キー）

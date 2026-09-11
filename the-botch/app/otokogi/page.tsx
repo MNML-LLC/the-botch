@@ -70,8 +70,9 @@ export default function OtokogiPage() {
   const [activeTab, setActiveTab] = useState<Tab>('history');
   const [yearFilter, setYearFilter] = useState('all');
 
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 4 }, (_, i) => currentYear - i);
+  const today = new Date();
+  const currentFiscalYear = today.getMonth() >= 10 ? today.getFullYear() + 1 : today.getFullYear();
+  const years = Array.from({ length: 4 }, (_, i) => currentFiscalYear - i);
 
   const {
     data: eventsData,
@@ -132,12 +133,12 @@ export default function OtokogiPage() {
       <div className="flex gap-2 mb-4">
         <Select value={yearFilter} onValueChange={setYearFilter}>
           <SelectTrigger className="w-auto">
-            <SelectValue>{yearFilter === 'all' ? '全期間' : `${yearFilter}年`}</SelectValue>
+            <SelectValue>{yearFilter === 'all' ? '全期間' : `${yearFilter}年度`}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">全期間</SelectItem>
             {years.map((y) => (
-              <SelectItem key={y} value={String(y)}>{y}年</SelectItem>
+              <SelectItem key={y} value={String(y)}>{y}年度</SelectItem>
             ))}
           </SelectContent>
         </Select>
