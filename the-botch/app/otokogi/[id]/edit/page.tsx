@@ -15,6 +15,7 @@ import { ParticipantSelector } from '@/components/participant-selector';
 import { ImageUpload } from '@/components/otokogi/image-upload';
 import { useMembers } from '@/hooks/use-members';
 import {
+  useDeleteOtokogi,
   useOtokogiEvent,
   useUpdateOtokogi,
   type OtokogiEventDetail,
@@ -59,6 +60,19 @@ function EditForm({ id, event, members }: { id: string; event: OtokogiEventDetai
     },
   });
 
+  const deleteMutation = useDeleteOtokogi(id, {
+    onSuccess: () => {
+      toast({ title: '男気イベントを削除しました' });
+      router.push('/otokogi');
+    },
+    onError: (error) => {
+      console.error(error);
+      toast({ variant: 'destructive', title: '削除に失敗しました', description: error.message });
+    },
+  });
+
+  const isMutating = updateMutation.isPending || deleteMutation.isPending;
+
   const handleSubmit = () => {
     if (!eventDate || !eventName || !payerId || !amount || participantIds.length === 0) return;
     updateMutation.mutate({
@@ -71,6 +85,12 @@ function EditForm({ id, event, members }: { id: string; event: OtokogiEventDetai
       memo: memo || null,
       participantIds,
     });
+  };
+
+  const handleDelete = () => {
+    if (isMutating) return;
+    if (!confirm('この男気イベントを削除しますか？\nこの操作は取り消せません。')) return;
+    deleteMutation.mutate();
   };
 
   return (
@@ -219,9 +239,20 @@ function EditForm({ id, event, members }: { id: string; event: OtokogiEventDetai
           <Button
             className="flex-1 bg-slate-800 hover:bg-slate-700"
             onClick={handleSubmit}
-            disabled={updateMutation.isPending || !eventDate || !eventName || !payerId || !amount || participantIds.length === 0}
+            disabled={isMutating || !eventDate || !eventName || !payerId || !amount || participantIds.length === 0}
           >
             {updateMutation.isPending ? '更新中...' : '更新する'}
+          </Button>
+        </div>
+
+        <div className="pt-2 border-t border-gray-200">
+          <Button
+            variant="outline"
+            className="w-full text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+            onClick={handleDelete}
+            disabled={isMutating}
+          >
+            {deleteMutation.isPending ? '削除中...' : '削除する'}
           </Button>
         </div>
       </CardContent>
