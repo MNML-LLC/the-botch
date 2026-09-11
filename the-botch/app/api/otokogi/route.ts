@@ -18,9 +18,9 @@ export async function GET(request: NextRequest) {
     const where: Record<string, unknown> = {}
 
     if (year) {
-      const startDate = new Date(`${year}-01-01`)
-      const endDate = new Date(`${Number(year) + 1}-01-01`)
-      where.eventDate = { gte: startDate, lt: endDate }
+      const startDate = new Date(`${Number(year) - 1}-11-01`)
+      const endDate = new Date(`${year}-10-31`)
+      where.eventDate = { gte: startDate, lte: endDate }
     }
 
     if (payerId) {

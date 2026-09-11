@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
             SUM(oe.amount)::bigint AS total_paid
           FROM otokogi_events oe
           JOIN members m ON oe.payer_id = m.id
-          WHERE oe.event_date >= ${new Date(`${year}-01-01`)} AND oe.event_date < ${new Date(`${Number(year) + 1}-01-01`)}
+          WHERE oe.event_date >= ${new Date(`${Number(year) - 1}-11-01`)} AND oe.event_date <= ${new Date(`${year}-10-31`)}
           GROUP BY m.id, m.name, m.initial, m.color_bg, m.color_text
           ORDER BY total_paid DESC`
       : await prisma.$queryRaw<RankingRow[]>`

@@ -90,9 +90,11 @@ function computeDateRange(
     };
   }
   if (period === 'year') {
+    const yr = today.getFullYear();
+    const fiscalYear = today.getMonth() >= 10 ? yr + 1 : yr;
     return {
-      from: `${today.getFullYear()}-01-01`,
-      to: `${today.getFullYear()}-12-31`,
+      from: `${fiscalYear - 1}-11-01`,
+      to: `${fiscalYear}-10-31`,
     };
   }
   if (period === 'custom') {
@@ -105,7 +107,7 @@ function computeDateRange(
 
 const PERIOD_LABELS: { key: Period; label: string }[] = [
   { key: 'month', label: '今月' },
-  { key: 'year', label: '今年' },
+  { key: 'year', label: '今年度' },
   { key: 'all', label: '全期間' },
   { key: 'custom', label: 'カスタム' },
 ];

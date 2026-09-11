@@ -71,9 +71,9 @@ export async function GET(request: NextRequest) {
       fromDate = from ? new Date(from) : null
       toDate = to ? new Date(to) : null
     } else if (year) {
-      fromDate = new Date(`${year}-01-01`)
-      toDate = new Date(`${Number(year) + 1}-01-01`)
-      exclusive = true
+      fromDate = new Date(`${Number(year) - 1}-11-01`)
+      toDate = new Date(`${year}-10-31`)
+      exclusive = false
     }
 
     // キャッシュキー（後方互換: year のみなら従来キー）

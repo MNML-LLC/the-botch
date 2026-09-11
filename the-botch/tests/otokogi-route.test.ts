@@ -80,15 +80,15 @@ describe('GET /api/otokogi', () => {
     )
   })
 
-  test('year フィルタ → where.eventDate に指定年の範囲が設定される', async () => {
+  test('year フィルタ → where.eventDate に指定年度（前年11月〜当年10月）の範囲が設定される', async () => {
     mockedFindMany.mockResolvedValue([])
     await GET(createRequest('/api/otokogi', { searchParams: { year: '2026' } }))
 
     const callArgs = mockedFindMany.mock.calls[0][0] as {
-      where: { eventDate: { gte: Date; lt: Date } }
+      where: { eventDate: { gte: Date; lte: Date } }
     }
-    expect(callArgs.where.eventDate.gte).toEqual(new Date('2026-01-01'))
-    expect(callArgs.where.eventDate.lt).toEqual(new Date('2027-01-01'))
+    expect(callArgs.where.eventDate.gte).toEqual(new Date('2025-11-01'))
+    expect(callArgs.where.eventDate.lte).toEqual(new Date('2026-10-31'))
   })
 
   test('payer フィルタ → where.payerId に反映される', async () => {
@@ -118,11 +118,11 @@ describe('GET /api/otokogi', () => {
     )
 
     const callArgs = mockedFindMany.mock.calls[0][0] as {
-      where: { payerId: string; eventDate: { gte: Date; lt: Date } }
+      where: { payerId: string; eventDate: { gte: Date; lte: Date } }
     }
     expect(callArgs.where.payerId).toBe('00000000-0000-0000-0000-000000000010')
-    expect(callArgs.where.eventDate.gte).toEqual(new Date('2025-01-01'))
-    expect(callArgs.where.eventDate.lt).toEqual(new Date('2026-01-01'))
+    expect(callArgs.where.eventDate.gte).toEqual(new Date('2024-11-01'))
+    expect(callArgs.where.eventDate.lte).toEqual(new Date('2025-10-31'))
   })
 
   test('cursor 指定 → skip:1 と cursor:{id} が設定される', async () => {
