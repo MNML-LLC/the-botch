@@ -256,3 +256,29 @@ export function useUpdateOtokogi(
     },
   });
 }
+
+export function useDeleteOtokogi(
+  id: string,
+  options?: UseMutationOptions<unknown, Error, void>
+) {
+  const queryClient = useQueryClient();
+  return useMutation<unknown, Error, void>({
+    mutationFn: async () => {
+      const res = await fetch(`/api/otokogi/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error ?? '削除に失敗しました');
+      }
+      return res.json();
+    },
+    ...options,
+    onSuccess: (data, variables, onMutateResult, context) => {
+      queryClient.invalidateQueries({ queryKey: ['otokogi'] });
+      queryClient.invalidateQueries({ queryKey: ['otokogi-event', id] });
+      queryClient.invalidateQueries({ queryKey: ['otokogi-ranking'] });
+      queryClient.invalidateQueries({ queryKey: ['otokogi-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar'] });
+      options?.onSuccess?.(data, variables, onMutateResult, context);
+    },
+  });
+}
