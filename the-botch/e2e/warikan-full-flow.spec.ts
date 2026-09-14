@@ -170,11 +170,24 @@ test.describe('割り勘フルフロー: 作成 → 立替 → 精算 → クロ
 
     // ---------------------------------------------------------------------
     // 6) 最終検証: API 経由でも CLOSED であることを保証
+    //   UI 上のバッジが「クローズ」になった直後でも、Vercel エッジやレプリカ
+    //   反映のタイミングで一時的に PAYING が返るケースがあるためポーリングする
     // ---------------------------------------------------------------------
-    const detailRes = await page.request.get(`${BASE_URL}/api/warikan/${warikanId}`)
-    expect(detailRes.ok()).toBeTruthy()
-    const detail = (await detailRes.json()) as { status: string }
-    expect(detail.status, 'API で取得したステータスも CLOSED であること').toBe('CLOSED')
+    await expect
+      .poll(
+        async () => {
+          const res = await page.request.get(`${BASE_URL}/api/warikan/${warikanId}`)
+          if (!res.ok()) return null
+          const body = (await res.json()) as { status: string }
+          return body.status
+        },
+        {
+          message: 'API で取得したステータスも CLOSED であること',
+          timeout: 10_000,
+          intervals: [200, 500, 1000, 2000],
+        }
+      )
+      .toBe('CLOSED')
 
     // モバイルビューポートで実行された場合、精算詳細セクションが画面に表示されていることを軽く確認
     const viewportWidth = page.viewportSize()?.width ?? 1280
