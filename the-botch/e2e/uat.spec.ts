@@ -318,10 +318,22 @@ test.describe('3. 割り勘完全フロー', () => {
     // 遷移後: PAYING（支払待ち）バッジが表示される
     await expect(page.locator('main').getByText('支払待ち').first()).toBeVisible({ timeout: 10000 })
 
-    // API でもステータス遷移を確認
-    const res = await page.request.get(`${BASE_URL}/api/warikan/${warikanId}`)
-    const detail = await res.json()
-    expect(detail.status).toBe('PAYING')
+    // API でもステータス遷移を確認（read-after-write の一時不整合を吸収するためポーリング）
+    await expect
+      .poll(
+        async () => {
+          const res = await page.request.get(`${BASE_URL}/api/warikan/${warikanId}`)
+          if (!res.ok()) return null
+          const body = (await res.json()) as { status: string }
+          return body.status
+        },
+        {
+          message: 'API で取得したステータスも PAYING であること',
+          timeout: 20_000,
+          intervals: [200, 500, 1000, 2000, 3000],
+        }
+      )
+      .toBe('PAYING')
   })
 
   test('割り勘詳細 — PAYING → CLOSED（全て完了にするボタン）', async ({ page }) => {
@@ -348,10 +360,22 @@ test.describe('3. 割り勘完全フロー', () => {
     // 遷移後: CLOSED（クローズ）バッジが表示される
     await expect(page.locator('main').getByText('クローズ').first()).toBeVisible({ timeout: 10000 })
 
-    // API でもステータス遷移を確認
-    const res = await page.request.get(`${BASE_URL}/api/warikan/${warikanId}`)
-    const detail = await res.json()
-    expect(detail.status).toBe('CLOSED')
+    // API でもステータス遷移を確認（read-after-write の一時不整合を吸収するためポーリング）
+    await expect
+      .poll(
+        async () => {
+          const res = await page.request.get(`${BASE_URL}/api/warikan/${warikanId}`)
+          if (!res.ok()) return null
+          const body = (await res.json()) as { status: string }
+          return body.status
+        },
+        {
+          message: 'API で取得したステータスも CLOSED であること',
+          timeout: 20_000,
+          intervals: [200, 500, 1000, 2000, 3000],
+        }
+      )
+      .toBe('CLOSED')
   })
 
   test.afterAll(async ({ browser }) => {
