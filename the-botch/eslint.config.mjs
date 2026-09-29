@@ -17,6 +17,11 @@ const eslintConfig = [
   ...nextCoreWebVitals,
   ...nextTypescript,
   {
+    settings: {
+      react: {
+        version: '19.3.0',
+      },
+    },
     // react-hooks v7 の新ルール。既存コードが抵触するため暫定的に warn へ緩和。
     // 対象コードを修正したらこのブロックを削除して error に戻すこと。
     rules: {
