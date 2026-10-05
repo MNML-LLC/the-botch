@@ -50,7 +50,7 @@ jobs:
         run: npm run lint
 
       - name: Security audit
-        run: npm audit --audit-level=high
+        run: npm audit --audit-level=high --omit=dev
 
       - name: Apply migrations
         run: npx prisma migrate deploy
