@@ -8,6 +8,7 @@ export default defineConfig({
     testTimeout: 30000,
     hookTimeout: 30000,
     exclude: ['e2e/**', 'node_modules/**'],
+    setupFiles: ['./tests/setup.ts'],
     // テスト間でDBの競合を避けるため直列実行
     sequence: {
       concurrent: false,
