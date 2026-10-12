@@ -24,6 +24,11 @@ updates:
         patterns:
           - "react-hook-form"
           - "@hookform/*"
+      next-eslint:
+        patterns:
+          - "next"
+          - "eslint-config-next"
+          - "@next/*"
     ignore:
       - dependency-name: typescript
         update-types: [version-update:semver-major]
