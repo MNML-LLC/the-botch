@@ -16,7 +16,7 @@
     "test:e2e:mobile": "playwright test --project=mobile"
   },
   "dependencies": {
-    "@hookform/resolvers": "^5.9.1",
+    "@hookform/resolvers": "^6.0.0",
     "@line/bot-sdk": "^11.2.0",
     "@line/liff": "^2.31.0",
     "@prisma/adapter-pg": "^7.10.1",
