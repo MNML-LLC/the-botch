@@ -34,7 +34,7 @@ function basicAuthHeader(user: string, pass: string): string {
   return `Basic ${encoded}`
 }
 
-const ENV_KEYS = ['BASIC_AUTH_USER', 'BASIC_AUTH_PASS'] as const
+const ENV_KEYS = ['BASIC_AUTH_USER', 'BASIC_AUTH_PASS', 'E2E_CI'] as const
 const originalEnv: Partial<Record<(typeof ENV_KEYS)[number], string | undefined>> = {}
 
 describe('middleware (Basic 認証)', () => {
@@ -44,6 +44,8 @@ describe('middleware (Basic 認証)', () => {
     }
     process.env.BASIC_AUTH_USER = 'alice'
     process.env.BASIC_AUTH_PASS = 'secret-pass'
+    // 単体テストでは E2E_CI バイパスを無効化し、Basic 認証そのものを検証する
+    delete process.env.E2E_CI
   })
 
   afterEach(() => {
@@ -194,6 +196,28 @@ describe('middleware (Basic 認証)', () => {
       delete process.env.BASIC_AUTH_PASS
       const res = middleware(buildRequest('/api/line/link', { method: 'POST' }))
       expect(res.status).not.toBe(401)
+    })
+  })
+
+  describe('E2E_CI バイパス', () => {
+    test('E2E_CI=true なら保護対象でも 401 にならない', async () => {
+      process.env.E2E_CI = 'true'
+      const res = middleware(buildRequest('/'))
+      expect(res.status).not.toBe(401)
+    })
+
+    test('E2E_CI=true なら credential 未設定でも 401 にならない', async () => {
+      process.env.E2E_CI = 'true'
+      delete process.env.BASIC_AUTH_USER
+      delete process.env.BASIC_AUTH_PASS
+      const res = middleware(buildRequest('/api/warikan'))
+      expect(res.status).not.toBe(401)
+    })
+
+    test('E2E_CI="false" (文字列) は通常挙動 → 401', async () => {
+      process.env.E2E_CI = 'false'
+      const res = middleware(buildRequest('/'))
+      expect(res.status).toBe(401)
     })
   })
 

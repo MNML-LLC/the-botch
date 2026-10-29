@@ -14,6 +14,11 @@
 // 認証情報は環境変数 `BASIC_AUTH_USER` / `BASIC_AUTH_PASS` で設定する
 // (値は Vercel の Environment Variables に設定し、リポジトリには含めない)。
 // 未設定時は fail-closed で全アクセスを拒否する。
+//
+// 例外: E2E CI 環境 (`E2E_CI=true`) では認証をスキップする。GitHub Actions の
+// e2e ジョブは BASIC_AUTH 情報を持たず、ヘルスチェック (curl) や Playwright が
+// 401 で止まるため。Vercel ランタイムは E2E_CI を設定しないため、本番/プレビュー
+// には影響しない。
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
@@ -23,6 +28,11 @@ export function middleware(req: NextRequest): NextResponse {
   const { pathname } = req.nextUrl
 
   if (shouldBypass(pathname, req.method)) {
+    return NextResponse.next()
+  }
+
+  // E2E CI でのみ全パスバイパス (GitHub Actions の e2e ジョブ用)
+  if (process.env.E2E_CI === 'true') {
     return NextResponse.next()
   }
 
