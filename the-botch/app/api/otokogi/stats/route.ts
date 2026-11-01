@@ -4,6 +4,11 @@ import { prisma } from '@/lib/prisma'
 import { handleApiError } from '@/lib/api-utils'
 import { getCachedStats, setCachedStats } from '@/lib/stats-cache'
 import { MEMBER_SELECT } from '@/lib/prisma-selects'
+import {
+  CATEGORIES,
+  classifyOtokogiEvent,
+  type OtokogiCategory,
+} from '@/lib/otokogi-category'
 
 // max/min 統合クエリの結果型
 type MaxMinResult = {
@@ -136,6 +141,7 @@ export async function GET(request: NextRequest) {
       maxDayDb,
       cumulativeRaceDb,
       otokogiAmountDb,
+      categoryEvents,
     ] = await Promise.all([
       // 1. 全体集計
       prisma.otokogiEvent.aggregate({
@@ -268,6 +274,18 @@ export async function GET(request: NextRequest) {
           ) cnt ON oe.id = cnt.otokogi_event_id
           WHERE ${dateSqlOe} ${payerSqlOe}
           GROUP BY oe.payer_id`,
+
+      // 14. カテゴリ分類用の素データ (eventName / place / amount / 関連 Event.eventType)
+      prisma.otokogiEvent.findMany({
+        where: eventWhere,
+        select: {
+          id: true,
+          eventName: true,
+          place: true,
+          amount: true,
+          event: { select: { eventType: true } },
+        },
+      }),
     ])
 
     // max/min 結果の展開
@@ -440,6 +458,29 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // --- カテゴリ別支払分布 ---
+    const categoryCount: Record<OtokogiCategory, number> = {
+      TRIP: 0, HANGOUT: 0, ACTIVITY: 0, OTHER: 0,
+    }
+    const categoryAmount: Record<OtokogiCategory, number> = {
+      TRIP: 0, HANGOUT: 0, ACTIVITY: 0, OTHER: 0,
+    }
+    for (const e of categoryEvents) {
+      const category = classifyOtokogiEvent({
+        eventName: e.eventName,
+        place: e.place,
+        amount: e.amount,
+        linkedEventType: e.event?.eventType ?? null,
+      })
+      categoryCount[category] += 1
+      categoryAmount[category] += e.amount
+    }
+    const categoryBreakdown = CATEGORIES.map((category) => ({
+      category,
+      amount: categoryAmount[category],
+      count: categoryCount[category],
+    }))
+
     const result = {
       totalCount,
       totalAmount,
@@ -453,6 +494,7 @@ export async function GET(request: NextRequest) {
       records,
       otokogiByMember,
       totalOtokogiAmount,
+      categoryBreakdown,
     }
 
     await setCachedStats(cacheKey, result)
