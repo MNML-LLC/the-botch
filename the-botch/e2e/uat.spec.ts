@@ -745,8 +745,10 @@ test.describe('9. レスポンシブ・モバイル表示', () => {
   test('ダッシュボード — 金額が画面に収まる', async ({ page }) => {
     await page.goto('/')
     // overflow-hidden / truncate が適用されているか視覚的に確認不可
-    // テキストが表示されているかのみ検証
-    await expect(page.getByText('未精算の割り勘')).toBeVisible()
+    // 新トップ (Issue #338) の各セクションが表示されるかのみ検証
+    await expect(page.locator('main').getByText('要アクション')).toBeVisible()
+    await expect(page.locator('main').getByText('来週のイベント')).toBeVisible()
+    await expect(page.locator('main').getByText('今月の男気 Top 3')).toBeVisible()
   })
 
   test('男気統計グラフが表示される', async ({ page }) => {
