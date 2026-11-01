@@ -119,30 +119,50 @@ export async function GET(request: NextRequest) {
     }
     const eventWhere = hasDateFilter ? { eventDate: eventDateFilter } : {}
 
-    const [members, payerStats, participationStats, shouldHavePaidRows, maxSingleOtokogiRows] =
-      await Promise.all([
-        prisma.member.findMany({
-          where: {
-            isActive: true,
-            ...(memberIdList.length > 0 ? { id: { in: memberIdList } } : {}),
-          },
-          select: { id: true, name: true },
-          orderBy: { name: 'asc' },
-        }),
-        prisma.otokogiEvent.groupBy({
-          by: ['payerId'],
-          where: eventWhere,
-          _count: true,
-          _sum: { amount: true },
-        }),
-        prisma.otokogiParticipant.groupBy({
-          by: ['memberId'],
-          where: hasDateFilter ? { otokogiEvent: { eventDate: eventDateFilter } } : undefined,
-          _count: true,
-        }),
-        buildShouldHavePaidQuery(fromDate, toDate),
-        buildMaxSingleOtokogiQuery(fromDate, toDate),
-      ])
+    const jankenEventWhere = { ...eventWhere, wasJanken: true }
+    const [
+      members,
+      payerStats,
+      participationStats,
+      shouldHavePaidRows,
+      maxSingleOtokogiRows,
+      jankenParticipationStats,
+      jankenLostStats,
+      jankenEventCount,
+    ] = await Promise.all([
+      prisma.member.findMany({
+        where: {
+          isActive: true,
+          ...(memberIdList.length > 0 ? { id: { in: memberIdList } } : {}),
+        },
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' },
+      }),
+      prisma.otokogiEvent.groupBy({
+        by: ['payerId'],
+        where: eventWhere,
+        _count: true,
+        _sum: { amount: true },
+      }),
+      prisma.otokogiParticipant.groupBy({
+        by: ['memberId'],
+        where: hasDateFilter ? { otokogiEvent: { eventDate: eventDateFilter } } : undefined,
+        _count: true,
+      }),
+      buildShouldHavePaidQuery(fromDate, toDate),
+      buildMaxSingleOtokogiQuery(fromDate, toDate),
+      prisma.otokogiParticipant.groupBy({
+        by: ['memberId'],
+        where: { otokogiEvent: jankenEventWhere },
+        _count: true,
+      }),
+      prisma.otokogiEvent.groupBy({
+        by: ['payerId'],
+        where: jankenEventWhere,
+        _count: true,
+      }),
+      prisma.otokogiEvent.count({ where: jankenEventWhere }),
+    ])
 
     const payerMap = new Map(
       payerStats.map((s) => [s.payerId, { count: s._count, actualPaid: s._sum.amount ?? 0 }])
@@ -154,6 +174,10 @@ export async function GET(request: NextRequest) {
     const maxSingleOtokogiMap = new Map(
       maxSingleOtokogiRows.map((r) => [r.member_id, Number(r.max_single_otokogi)])
     )
+    const jankenParticipationMap = new Map(
+      jankenParticipationStats.map((s) => [s.memberId, s._count])
+    )
+    const jankenLostMap = new Map(jankenLostStats.map((s) => [s.payerId, s._count]))
 
     const result = members.map((member) => {
       const payer = payerMap.get(member.id)
@@ -161,6 +185,11 @@ export async function GET(request: NextRequest) {
       const payerCount = payer?.count ?? 0
       const actualPaid = payer?.actualPaid ?? 0
       const shouldHavePaid = shouldHavePaidMap.get(member.id) ?? 0
+
+      const jankenParticipated = jankenParticipationMap.get(member.id) ?? 0
+      const jankenLost = jankenLostMap.get(member.id) ?? 0
+      const jankenWinRate =
+        jankenParticipated > 0 ? (jankenParticipated - jankenLost) / jankenParticipated : null
 
       return {
         memberId: member.id,
@@ -173,13 +202,13 @@ export async function GET(request: NextRequest) {
         otokogiAmount: actualPaid - shouldHavePaid,
         averagePaymentAmount: payerCount > 0 ? Math.round(actualPaid / payerCount) : 0,
         maxSingleOtokogi: maxSingleOtokogiMap.get(member.id) ?? 0,
-        jankenWinRate: null as number | null,
+        jankenWinRate,
       }
     })
 
     return NextResponse.json({
       members: result,
-      hasJankenData: false,
+      hasJankenData: jankenEventCount > 0,
     })
   } catch (error) {
     return handleApiError(error, { logLabel: '収支分析取得エラー', fallbackMessage: '収支分析データの取得に失敗しました' })

@@ -97,6 +97,7 @@ model OtokogiEvent {
   amount    Int      // 支払額（円）
   place     String?  @db.VarChar(100)
   hasAlbum  Boolean  @default(false) @map("has_album")
+  wasJanken Boolean  @default(false) @map("was_janken") // じゃんけんで決めたか（勝率計算の母数判定）
   memo      String?
   eventId   String?  @map("event_id") // カレンダーイベント紐付け
   createdAt DateTime @default(now()) @map("created_at")

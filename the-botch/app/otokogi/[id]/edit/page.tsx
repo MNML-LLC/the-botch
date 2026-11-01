@@ -35,6 +35,7 @@ function EditForm({ id, event, members }: { id: string; event: OtokogiEventDetai
   const [amount, setAmount] = useState(String(event.amount));
   const [place, setPlace] = useState(event.place ?? '');
   const [hasAlbum, setHasAlbum] = useState(event.hasAlbum);
+  const [wasJanken, setWasJanken] = useState(event.wasJanken ?? false);
   const [memo, setMemo] = useState(event.memo ?? '');
   const [participantIds, setParticipantIds] = useState<string[]>(
     event.participants.map((p) => p.member.id)
@@ -83,6 +84,7 @@ function EditForm({ id, event, members }: { id: string; event: OtokogiEventDetai
       amount: amountNum,
       place: place || null,
       hasAlbum,
+      wasJanken,
       memo: memo || null,
       participantIds,
     });
@@ -187,7 +189,14 @@ function EditForm({ id, event, members }: { id: string; event: OtokogiEventDetai
           </div>
         )}
 
-        <div>
+        <div className="space-y-2">
+          <label className="flex items-center gap-2">
+            <Checkbox
+              checked={wasJanken}
+              onCheckedChange={(checked) => setWasJanken(checked === true)}
+            />
+            <span className="text-sm">じゃんけんで決めた（勝率計算の対象になる）</span>
+          </label>
           <label className="flex items-center gap-2">
             <Checkbox
               checked={hasAlbum}
