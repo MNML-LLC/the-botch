@@ -5,22 +5,25 @@ import { invalidateStatsCache } from '@/lib/stats-cache'
 import { MEMBER_SELECT } from '@/lib/prisma-selects'
 import { readJsonBody, validationErrorResponse } from '@/lib/api-validation'
 import { createOtokogiSchema } from '@/lib/schemas/otokogi'
+import { parsePeriodFromSearchParams } from '@/lib/date-utils'
 
-// GET /api/otokogi — 男気イベント一覧（フィルタ: year, payer、カーソルベースページネーション）
+// GET /api/otokogi — 男気イベント一覧
+// クエリ: period / from / to / year (backward compat) / payer / cursor
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const year = searchParams.get('year')
     const payerId = searchParams.get('payer')
     const cursor = searchParams.get('cursor')
     const take = 20
 
     const where: Record<string, unknown> = {}
 
-    if (year) {
-      const startDate = new Date(`${Number(year) - 1}-11-01`)
-      const endDate = new Date(`${year}-10-31`)
-      where.eventDate = { gte: startDate, lte: endDate }
+    const { from, to } = parsePeriodFromSearchParams(searchParams)
+    if (from || to) {
+      where.eventDate = {
+        ...(from ? { gte: from } : {}),
+        ...(to ? { lte: to } : {}),
+      }
     }
 
     if (payerId) {

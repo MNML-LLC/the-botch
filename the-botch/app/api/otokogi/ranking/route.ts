@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { handleApiError } from '@/lib/api-utils'
+import { parsePeriodFromSearchParams } from '@/lib/date-utils'
 
 // Raw SQL 結果型
 type RankingRow = {
@@ -14,40 +15,72 @@ type RankingRow = {
 }
 
 // GET /api/otokogi/ranking — 男気ランキング（Raw SQL JOIN 1クエリ化）
+// クエリ: period / from / to / year (backward compat)
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const year = searchParams.get('year')
+    const { from, to } = parsePeriodFromSearchParams(searchParams)
 
     // Raw SQL で JOIN して1クエリ化（2クエリ → 1クエリ）
-    const rows: RankingRow[] = year
-      ? await prisma.$queryRaw<RankingRow[]>`
-          SELECT
-            m.id AS member_id,
-            m.name,
-            m.initial,
-            m.color_bg,
-            m.color_text,
-            COUNT(*)::bigint AS count,
-            SUM(oe.amount)::bigint AS total_paid
-          FROM otokogi_events oe
-          JOIN members m ON oe.payer_id = m.id
-          WHERE oe.event_date >= ${new Date(`${Number(year) - 1}-11-01`)} AND oe.event_date <= ${new Date(`${year}-10-31`)}
-          GROUP BY m.id, m.name, m.initial, m.color_bg, m.color_text
-          ORDER BY total_paid DESC`
-      : await prisma.$queryRaw<RankingRow[]>`
-          SELECT
-            m.id AS member_id,
-            m.name,
-            m.initial,
-            m.color_bg,
-            m.color_text,
-            COUNT(*)::bigint AS count,
-            SUM(oe.amount)::bigint AS total_paid
-          FROM otokogi_events oe
-          JOIN members m ON oe.payer_id = m.id
-          GROUP BY m.id, m.name, m.initial, m.color_bg, m.color_text
-          ORDER BY total_paid DESC`
+    const rows: RankingRow[] =
+      from && to
+        ? await prisma.$queryRaw<RankingRow[]>`
+            SELECT
+              m.id AS member_id,
+              m.name,
+              m.initial,
+              m.color_bg,
+              m.color_text,
+              COUNT(*)::bigint AS count,
+              SUM(oe.amount)::bigint AS total_paid
+            FROM otokogi_events oe
+            JOIN members m ON oe.payer_id = m.id
+            WHERE oe.event_date >= ${from} AND oe.event_date <= ${to}
+            GROUP BY m.id, m.name, m.initial, m.color_bg, m.color_text
+            ORDER BY total_paid DESC`
+        : from
+          ? await prisma.$queryRaw<RankingRow[]>`
+              SELECT
+                m.id AS member_id,
+                m.name,
+                m.initial,
+                m.color_bg,
+                m.color_text,
+                COUNT(*)::bigint AS count,
+                SUM(oe.amount)::bigint AS total_paid
+              FROM otokogi_events oe
+              JOIN members m ON oe.payer_id = m.id
+              WHERE oe.event_date >= ${from}
+              GROUP BY m.id, m.name, m.initial, m.color_bg, m.color_text
+              ORDER BY total_paid DESC`
+          : to
+            ? await prisma.$queryRaw<RankingRow[]>`
+                SELECT
+                  m.id AS member_id,
+                  m.name,
+                  m.initial,
+                  m.color_bg,
+                  m.color_text,
+                  COUNT(*)::bigint AS count,
+                  SUM(oe.amount)::bigint AS total_paid
+                FROM otokogi_events oe
+                JOIN members m ON oe.payer_id = m.id
+                WHERE oe.event_date <= ${to}
+                GROUP BY m.id, m.name, m.initial, m.color_bg, m.color_text
+                ORDER BY total_paid DESC`
+            : await prisma.$queryRaw<RankingRow[]>`
+                SELECT
+                  m.id AS member_id,
+                  m.name,
+                  m.initial,
+                  m.color_bg,
+                  m.color_text,
+                  COUNT(*)::bigint AS count,
+                  SUM(oe.amount)::bigint AS total_paid
+                FROM otokogi_events oe
+                JOIN members m ON oe.payer_id = m.id
+                GROUP BY m.id, m.name, m.initial, m.color_bg, m.color_text
+                ORDER BY total_paid DESC`
 
     const ranking = rows.map((row, index) => ({
       rank: index + 1,

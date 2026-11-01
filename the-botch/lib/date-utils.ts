@@ -93,6 +93,162 @@ export function formatMonthLabel(date: Date | string): string {
 }
 
 /**
+ * 期間フィルタ値（UI/API 共通）
+ * - current-month: 今月（月初〜現在時刻）
+ * - current-fy:    今期（会計年度 11 月始まり）
+ * - last-fy:       前期（1 つ前の会計年度）
+ * - all:           全期間
+ * - custom:        カスタム範囲（from/to を併用）
+ */
+export type PeriodValue =
+  | 'current-month'
+  | 'current-fy'
+  | 'last-fy'
+  | 'all'
+  | 'custom'
+
+/**
+ * 期間フィルタ状態（コンポーネントが保持する値）
+ */
+export interface PeriodState {
+  period: PeriodValue
+  from?: string
+  to?: string
+}
+
+/**
+ * 指定日が属する会計年度の範囲を offset 分ずらして返す
+ * offset=0 → 今期、offset=-1 → 前期、offset=1 → 次期
+ * 会計年度: 11月1日 00:00 〜 翌年10月31日 23:59:59.999
+ */
+export function getFiscalYearRange(
+  ref: Date | string = new Date(),
+  offset: number = 0,
+): { from: Date; to: Date; label: string; fy: number } {
+  const d = toDate(ref)
+  const month = d.getMonth() + 1
+  const year = d.getFullYear()
+  const baseFy = month >= 11 ? year : year - 1
+  const fy = baseFy + offset
+  const from = new Date(fy, 10, 1, 0, 0, 0, 0) // 11月1日
+  const to = new Date(fy + 1, 9, 31, 23, 59, 59, 999) // 翌年10月31日
+  const fyShort = fy % 100
+  const label = `FY${fyShort.toString().padStart(2, '0')} (${fy}/11〜${fy + 1}/10)`
+  return { from, to, label, fy }
+}
+
+/**
+ * 指定日が属する「月初から現在時刻まで」の範囲
+ */
+export function getCurrentMonthRange(ref: Date = new Date()): {
+  from: Date
+  to: Date
+  label: string
+} {
+  const from = new Date(ref.getFullYear(), ref.getMonth(), 1, 0, 0, 0, 0)
+  const to = new Date(
+    ref.getFullYear(),
+    ref.getMonth(),
+    ref.getDate(),
+    23,
+    59,
+    59,
+    999,
+  )
+  const label = `${ref.getFullYear()}/${ref.getMonth() + 1}月`
+  return { from, to, label }
+}
+
+/**
+ * PeriodValue を日付範囲に変換（all / custom は null を返す場合あり）
+ */
+export function getPeriodRange(
+  period: PeriodValue,
+  ref: Date = new Date(),
+  custom?: { from?: string; to?: string },
+): { from: Date | null; to: Date | null; label: string } {
+  switch (period) {
+    case 'current-month': {
+      const r = getCurrentMonthRange(ref)
+      return { from: r.from, to: r.to, label: '今月' }
+    }
+    case 'current-fy': {
+      const r = getFiscalYearRange(ref, 0)
+      return { from: r.from, to: r.to, label: '今期' }
+    }
+    case 'last-fy': {
+      const r = getFiscalYearRange(ref, -1)
+      return { from: r.from, to: r.to, label: '前期' }
+    }
+    case 'all':
+      return { from: null, to: null, label: '全期間' }
+    case 'custom': {
+      const f = custom?.from ? new Date(custom.from) : null
+      const t = custom?.to ? new Date(custom.to) : null
+      return { from: f, to: t, label: 'カスタム' }
+    }
+  }
+}
+
+/**
+ * PeriodState を URLSearchParams 系クエリに書き出す
+ * - all: 何も書かない
+ * - current-month / current-fy / last-fy: period=... のみ
+ * - custom: period=custom + from/to
+ */
+export function appendPeriodSearchParams(
+  params: URLSearchParams,
+  state: PeriodState,
+): void {
+  if (state.period === 'all') return
+  params.set('period', state.period)
+  if (state.period === 'custom') {
+    if (state.from) params.set('from', state.from)
+    if (state.to) params.set('to', state.to)
+  }
+}
+
+/**
+ * サーバー側: SearchParams から期間フィルタを解釈して Date 範囲を返す
+ * 優先順: period > from/to > year（後方互換）
+ */
+export function parsePeriodFromSearchParams(
+  searchParams: URLSearchParams,
+  now: Date = new Date(),
+): { from: Date | null; to: Date | null } {
+  const periodParam = searchParams.get('period') as PeriodValue | null
+  const fromParam = searchParams.get('from')
+  const toParam = searchParams.get('to')
+  const yearParam = searchParams.get('year')
+
+  if (periodParam) {
+    const range = getPeriodRange(periodParam, now, {
+      from: fromParam ?? undefined,
+      to: toParam ?? undefined,
+    })
+    return { from: range.from, to: range.to }
+  }
+  if (fromParam || toParam) {
+    return {
+      from: fromParam ? new Date(fromParam) : null,
+      to: toParam ? new Date(toParam) : null,
+    }
+  }
+  if (yearParam) {
+    const n = Number(yearParam)
+    if (Number.isFinite(n)) {
+      // 既存の year=YYYY は会計年度（前年11月〜当年10月）として扱う。
+      // 旧実装と同じ ISO 日付文字列ベースの Date を返して後方互換を維持する。
+      return {
+        from: new Date(`${n - 1}-11-01`),
+        to: new Date(`${n}-10-31`),
+      }
+    }
+  }
+  return { from: null, to: null }
+}
+
+/**
  * WarikanEvent の displayDate を算出する
  * 優先順: eventName先頭YYYYMMDD → paymentDeadline → detailDeadline → null
  */

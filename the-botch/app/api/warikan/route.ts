@@ -2,17 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { handleApiError } from '@/lib/api-utils'
 import { WarikanStatus } from '@/lib/generated/prisma/client'
-import { computeDisplayDate } from '@/lib/date-utils'
+import { computeDisplayDate, parsePeriodFromSearchParams } from '@/lib/date-utils'
 import { MEMBER_SELECT } from '@/lib/prisma-selects'
 import { readJsonBody, validationErrorResponse } from '@/lib/api-validation'
 import { createWarikanSchema } from '@/lib/schemas/warikan'
 
-// GET /api/warikan — 割り勘イベント一覧（フィルタ: status, year、カーソルベースページネーション）
+// GET /api/warikan — 割り勘イベント一覧
+// クエリ: status / period / from / to / year (backward compat, calendar year) / cursor
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
-    const year = searchParams.get('year')
+    const yearLegacy = searchParams.get('year')
+    const periodParam = searchParams.get('period')
     const cursor = searchParams.get('cursor')
     const take = 20
 
@@ -22,9 +24,19 @@ export async function GET(request: NextRequest) {
       where.status = status as WarikanStatus
     }
 
-    if (year) {
-      const startDate = new Date(`${year}-01-01`)
-      const endDate = new Date(`${Number(year) + 1}-01-01`)
+    // period / from / to を優先。year だけならカレンダー年の後方互換を維持
+    if (periodParam || searchParams.get('from') || searchParams.get('to')) {
+      const { from, to } = parsePeriodFromSearchParams(searchParams)
+      if (from || to) {
+        where.createdAt = {
+          ...(from ? { gte: from } : {}),
+          ...(to ? { lte: to } : {}),
+        }
+      }
+    } else if (yearLegacy) {
+      // 既存契約: year=YYYY はカレンダー年範囲
+      const startDate = new Date(`${yearLegacy}-01-01`)
+      const endDate = new Date(`${Number(yearLegacy) + 1}-01-01`)
       where.createdAt = { gte: startDate, lt: endDate }
     }
 

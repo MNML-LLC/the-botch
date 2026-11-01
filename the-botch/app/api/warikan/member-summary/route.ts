@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { handleApiError } from '@/lib/api-utils'
 import { MEMBER_SELECT } from '@/lib/prisma-selects'
+import { parsePeriodFromSearchParams } from '@/lib/date-utils'
 
 // GET /api/warikan/member-summary
 // クエリパラメータ:
-//   year=YYYY  — 集計対象を該当年に作成された CLOSED イベントに限定（省略時は全期間）
+//   period=current-fy|last-fy|current-month|all|custom — 期間プリセット（優先）
+//   from / to                                           — カスタム範囲
+//   year=YYYY                                           — 後方互換（カレンダー年）
 //
 // 全 CLOSED イベントの精算結果（WarikanSettlement）を集計し、
 // メンバー間の純収支（ネット化した送金指示）を返す。
@@ -13,9 +16,23 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const yearParam = searchParams.get('year')
+    const periodParam = searchParams.get('period')
+    const fromParam = searchParams.get('from')
+    const toParam = searchParams.get('to')
 
-    let year: number | null = null
-    if (yearParam) {
+    let dateFilter: { createdAt?: { gte?: Date; lte?: Date; lt?: Date } } = {}
+
+    if (periodParam || fromParam || toParam) {
+      const { from, to } = parsePeriodFromSearchParams(searchParams)
+      if (from || to) {
+        dateFilter = {
+          createdAt: {
+            ...(from ? { gte: from } : {}),
+            ...(to ? { lte: to } : {}),
+          },
+        }
+      }
+    } else if (yearParam) {
       const parsed = Number.parseInt(yearParam, 10)
       if (!Number.isFinite(parsed) || parsed < 1970 || parsed > 9999) {
         return NextResponse.json(
@@ -23,18 +40,13 @@ export async function GET(request: NextRequest) {
           { status: 400 }
         )
       }
-      year = parsed
+      dateFilter = {
+        createdAt: {
+          gte: new Date(`${parsed}-01-01T00:00:00.000Z`),
+          lt: new Date(`${parsed + 1}-01-01T00:00:00.000Z`),
+        },
+      }
     }
-
-    const dateFilter =
-      year !== null
-        ? {
-            createdAt: {
-              gte: new Date(`${year}-01-01T00:00:00.000Z`),
-              lt: new Date(`${year + 1}-01-01T00:00:00.000Z`),
-            },
-          }
-        : {}
 
     // 集計対象イベント（CLOSED のみ）
     const [aggregated, closedEventIds, availableYearsRows] = await Promise.all([

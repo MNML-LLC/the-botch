@@ -3,13 +3,6 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Wallet } from 'lucide-react';
@@ -17,6 +10,8 @@ import {
   useWarikanMemberSummary,
   type WarikanMemberSummaryMember,
 } from '@/hooks/use-warikan';
+import type { PeriodState } from '@/lib/date-utils';
+import { PeriodFilter, DEFAULT_PERIOD_STATE } from '@/components/ui/period-filter';
 
 const fmt = new Intl.NumberFormat('ja-JP');
 
@@ -63,9 +58,9 @@ function SummarySkeleton() {
 }
 
 export default function WarikanSummaryPage() {
-  const [yearFilter, setYearFilter] = useState('all');
+  const [period, setPeriod] = useState<PeriodState>(DEFAULT_PERIOD_STATE);
 
-  const { data, isLoading, isFetching, error } = useWarikanMemberSummary(yearFilter);
+  const { data, isLoading, isFetching, error } = useWarikanMemberSummary(period);
 
   const memberMap = useMemo(() => {
     const map = new Map<string, WarikanMemberSummaryMember>();
@@ -100,20 +95,8 @@ export default function WarikanSummaryPage() {
       </p>
 
       {/* フィルタ */}
-      <div className="flex items-center gap-2 mb-4">
-        <Select value={yearFilter} onValueChange={setYearFilter}>
-          <SelectTrigger className="w-auto">
-            <SelectValue>{yearFilter === 'all' ? '全期間' : `${yearFilter}年`}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">全期間</SelectItem>
-            {(data?.availableYears ?? []).map((y) => (
-              <SelectItem key={y} value={String(y)}>
-                {y}年
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <PeriodFilter value={period} onChange={setPeriod} accent="warikan" />
         {isFetching && !isLoading && (
           <span className="text-xs text-gray-400">更新中...</span>
         )}
@@ -134,9 +117,9 @@ export default function WarikanSummaryPage() {
           icon={Wallet}
           title="収支データがありません"
           description={
-            yearFilter === 'all'
+            period.period === 'all'
               ? 'クローズ済みの割り勘イベントがまだありません'
-              : 'この年にクローズされた割り勘イベントがありません'
+              : 'この期間にクローズされた割り勘イベントがありません'
           }
         />
       ) : (
