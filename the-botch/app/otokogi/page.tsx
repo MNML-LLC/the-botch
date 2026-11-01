@@ -16,6 +16,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Swords, Trophy } from 'lucide-react';
 import { useOtokogiEvents, useOtokogiRanking } from '@/hooks/use-otokogi';
 import { useScrollRestoration } from '@/hooks/use-scroll-restoration';
+import { formatShortDateWithYear } from '@/lib/date-utils';
 
 function OtokogiHistorySkeleton() {
   return (
@@ -71,7 +72,8 @@ export default function OtokogiPage() {
   const [yearFilter, setYearFilter] = useState('all');
 
   const today = new Date();
-  const currentFiscalYear = today.getMonth() >= 10 ? today.getFullYear() + 1 : today.getFullYear();
+  // 年度 = 日本の会計年度 (4月〜翌年3月)。1〜3月は前年度扱い
+  const currentFiscalYear = today.getMonth() < 3 ? today.getFullYear() - 1 : today.getFullYear();
   const years = Array.from({ length: 4 }, (_, i) => currentFiscalYear - i);
 
   const {
@@ -91,10 +93,8 @@ export default function OtokogiPage() {
 
   useScrollRestoration(!eventsLoading);
 
-  const formatDate = (date: string) => {
-    const d = new Date(date);
-    return `${d.getMonth() + 1}/${d.getDate()}`;
-  };
+  // 一覧は年度を跨ぐ可能性があるため、常に年を併記 (2026/11/1)
+  const formatDate = (date: string) => formatShortDateWithYear(date);
 
   return (
     <div>
@@ -229,7 +229,12 @@ export default function OtokogiPage() {
       {activeTab === 'ranking' && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-slate-800">支払額ランキング</CardTitle>
+            <CardTitle className="text-slate-800">
+              支払額ランキング
+              <span className="ml-2 text-xs font-normal text-gray-500">
+                （{yearFilter === 'all' ? '全期間' : `${yearFilter}年度 = ${yearFilter}/4〜${Number(yearFilter) + 1}/3`}）
+              </span>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (

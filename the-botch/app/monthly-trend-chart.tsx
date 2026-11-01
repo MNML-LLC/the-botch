@@ -8,6 +8,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import { formatYearMonthFull, formatYearMonthLabel } from '@/lib/date-utils';
 
 export type MonthlyTrendData = {
   month: string;
@@ -15,9 +16,9 @@ export type MonthlyTrendData = {
   warikan: number;
 };
 
+// 月次推移は年を跨ぐ (過去12ヶ月) ため、X軸ラベルに年を含める
 function shortMonth(month: string) {
-  const parts = month.split('-');
-  return `${parseInt(parts[1])}月`;
+  return formatYearMonthLabel(month);
 }
 
 function formatYen(value: number) {
@@ -65,10 +66,7 @@ export default function MonthlyTrendChart({ data }: { data: MonthlyTrendData[] }
                 `¥${Number(value).toLocaleString()}`,
                 name === 'otokogi' ? '男気' : '割り勘',
               ]}
-              labelFormatter={(label) => {
-                const [y, m] = String(label).split('-');
-                return `${y}年${parseInt(m)}月`;
-              }}
+              labelFormatter={(label) => formatYearMonthFull(String(label))}
             />
             <Bar dataKey="warikan" stackId="a" fill="#3b82f6" name="warikan" />
             <Bar dataKey="otokogi" stackId="a" fill="#f59e0b" radius={[2, 2, 0, 0]} name="otokogi" />

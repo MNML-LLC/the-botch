@@ -7,6 +7,7 @@ import {
   LineChart, Line, CartesianGrid,
 } from 'recharts';
 import { useOtokogiStats } from '@/hooks/use-otokogi';
+import { formatYearMonthFull, formatYearMonthLabel } from '@/lib/date-utils';
 
 type PerMember = {
   id: string;
@@ -32,8 +33,8 @@ function formatYen(value: number) {
 }
 
 function shortMonth(month: string) {
-  const [, m] = month.split('-');
-  return `${parseInt(m)}月`;
+  // 累積レースは複数年に跨るため、年を含めた軸ラベルにする
+  return formatYearMonthLabel(month);
 }
 
 function deviationLabel(score: number) {
@@ -146,10 +147,7 @@ export default function PlaygroundPage() {
                           const member = stats.perMember.find((m) => m.id === String(name));
                           return [`¥${Number(value).toLocaleString()}`, member?.name ?? String(name)];
                         }}
-                        labelFormatter={(label) => {
-                          const [y, m] = String(label).split('-');
-                          return `${y}年${parseInt(m)}月`;
-                        }}
+                        labelFormatter={(label) => formatYearMonthFull(String(label))}
                       />
                       {stats.perMember.map((member, i) => (
                         <Line

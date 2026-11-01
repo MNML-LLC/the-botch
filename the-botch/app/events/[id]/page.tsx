@@ -13,6 +13,7 @@ import {
 import { EVENT_TYPE_LABELS } from '@/lib/constants';
 import { WarikanStatusBadge } from '@/components/ui/warikan-status-badge';
 import { toast } from '@/hooks/use-toast';
+import { formatShortDateWithYear } from '@/lib/date-utils';
 
 type Member = {
   id: string;
@@ -70,8 +71,8 @@ function formatDate(dateStr: string) {
 }
 
 function formatShortDate(dateStr: string) {
-  const d = new Date(dateStr);
-  return `${d.getMonth() + 1}/${d.getDate()}`;
+  // イベント詳細内の紐付けカードは年を跨ぐ可能性があるため、常に年を併記
+  return formatShortDateWithYear(dateStr);
 }
 
 function MemberAvatar({ member, size = 'sm' }: { member: Member; size?: 'sm' | 'md' }) {
@@ -159,7 +160,7 @@ function WarikanCard({
           </p>
           {item.paymentDeadline && (
             <p className="text-xs text-gray-500">
-              期日: {new Date(item.paymentDeadline).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })}
+              期日: {formatShortDateWithYear(item.paymentDeadline)}
             </p>
           )}
           {item.memo && (

@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useOtokogiMemberSummary } from '@/hooks/use-otokogi';
+import { formatPeriodLabel } from '@/lib/date-utils';
 
 type MemberSummaryEntry = {
   memberId: string;
@@ -127,12 +128,14 @@ function buildMetrics(hasJankenData: boolean): MetricDef[] {
   return metrics;
 }
 
-const PERIOD_LABELS: { key: PeriodFilter; label: string }[] = [
-  { key: 'all', label: '全期間' },
-  { key: 'month', label: '今月' },
-  { key: 'year', label: '今年' },
-  { key: 'custom', label: 'カスタム' },
-];
+function buildPeriodLabels(refDate: Date = new Date()): { key: PeriodFilter; label: string }[] {
+  return [
+    { key: 'all', label: '全期間' },
+    { key: 'month', label: formatPeriodLabel('month', refDate) },
+    { key: 'year', label: formatPeriodLabel('year', refDate) },
+    { key: 'custom', label: 'カスタム' },
+  ];
+}
 
 export default function MemberSummaryTable() {
   const [period, setPeriod] = useState<PeriodFilter>('all');
@@ -145,6 +148,7 @@ export default function MemberSummaryTable() {
 
   const metrics = buildMetrics(data?.hasJankenData ?? false);
   const members = data?.members ?? [];
+  const periodLabels = buildPeriodLabels();
 
   return (
     <Card>
@@ -154,7 +158,7 @@ export default function MemberSummaryTable() {
       <CardContent>
         {/* 期間フィルター */}
         <div className="flex flex-wrap gap-1.5 mb-4">
-          {PERIOD_LABELS.map(({ key, label }) => (
+          {periodLabels.map(({ key, label }) => (
             <button
               key={key}
               onClick={() => setPeriod(key)}

@@ -104,7 +104,7 @@ function WarikanNewForm() {
                   <SelectItem value="none">なし</SelectItem>
                   {events.map((ev) => (
                     <SelectItem key={ev.id} value={ev.id}>
-                      {ev.title}（{new Date(ev.date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' })}）
+                      {ev.title}（{new Date(ev.date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'short', day: 'numeric' })}）
                     </SelectItem>
                   ))}
                 </SelectContent>

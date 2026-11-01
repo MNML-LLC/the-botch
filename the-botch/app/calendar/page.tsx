@@ -246,7 +246,7 @@ export default function CalendarPage() {
       {selectedDay && (
         <div className="mt-4 space-y-2">
           <h3 className="text-sm font-bold text-slate-800">
-            {month}/{selectedDay.date} の予定
+            {year}/{month}/{selectedDay.date} の予定
           </h3>
 
           {/* カレンダーイベント */}
@@ -262,7 +262,7 @@ export default function CalendarPage() {
                     </span>
                   </div>
                   <p className="text-xs text-gray-500">
-                    {e.endDate && e.endDate !== e.date && `〜${new Date(e.endDate).getMonth() + 1}/${new Date(e.endDate).getDate()}`}
+                    {e.endDate && e.endDate !== e.date && `〜${new Date(e.endDate).getFullYear()}/${new Date(e.endDate).getMonth() + 1}/${new Date(e.endDate).getDate()}`}
                   </p>
                   {e.description && (
                     <p className="text-sm text-gray-500 mt-1 whitespace-pre-wrap">{e.description}</p>

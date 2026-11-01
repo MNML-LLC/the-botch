@@ -95,8 +95,11 @@ export default function WarikanSummaryPage() {
         </Link>
       </div>
 
-      <p className="text-xs text-gray-500 mb-4">
+      <p className="text-xs text-gray-500 mb-1">
         クローズ済みの割り勘イベントの精算を横断集計した、メンバー間の純収支です。
+      </p>
+      <p className="text-xs text-gray-500 mb-4">
+        対象期間: {yearFilter === 'all' ? '全期間' : `${yearFilter}年 (${yearFilter}/1/1〜${yearFilter}/12/31)`}
       </p>
 
       {/* フィルタ */}

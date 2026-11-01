@@ -9,10 +9,11 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Swords, Wallet } from 'lucide-react';
 import { useMemberDetail, type MemberProfileWarikanEvent } from '@/hooks/use-members';
 import { WARIKAN_STATUS_LABELS } from '@/lib/constants';
+import { formatShortDateWithYear } from '@/lib/date-utils';
 
 function formatShortDate(date: string) {
-  const d = new Date(date);
-  return `${d.getMonth() + 1}/${d.getDate()}`;
+  // 参加履歴は年を跨ぐため、常に年を併記 (2026/11/1)
+  return formatShortDateWithYear(date);
 }
 
 function warikanDisplayDate(event: MemberProfileWarikanEvent) {

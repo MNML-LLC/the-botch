@@ -43,6 +43,7 @@ import {
   useWarikanSettlements,
 } from '@/hooks/use-warikan';
 import { toast } from '@/hooks/use-toast';
+import { formatShortDateWithYear } from '@/lib/date-utils';
 
 type BankAccount = {
   bankName: string;
@@ -116,8 +117,8 @@ function accountTypeLabel(type: string): string {
 
 function formatShortDate(date: string | null) {
   if (!date) return '-';
-  const d = new Date(date);
-  return `${d.getMonth() + 1}/${d.getDate()}`;
+  // 期日・紐付けイベント日は年度を跨ぐため、常に年を併記 (2026/11/1)
+  return formatShortDateWithYear(date);
 }
 
 export default function WarikanDetailPage() {

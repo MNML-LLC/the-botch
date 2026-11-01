@@ -18,8 +18,10 @@ export async function GET(request: NextRequest) {
     const where: Record<string, unknown> = {}
 
     if (year) {
-      const startDate = new Date(`${Number(year) - 1}-11-01`)
-      const endDate = new Date(`${year}-10-31`)
+      // 年度 = 日本の会計年度 (4月〜翌年3月)
+      // 2026年度 = 2026/4/1〜2027/3/31
+      const startDate = new Date(`${year}-04-01`)
+      const endDate = new Date(`${Number(year) + 1}-03-31T23:59:59.999Z`)
       where.eventDate = { gte: startDate, lte: endDate }
     }
 

@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { WarikanStatusBadge } from '@/components/ui/warikan-status-badge';
 import MonthlyTrendChart from './monthly-trend-chart';
 import type { MonthlyTrendData } from './monthly-trend-chart';
+import { formatShortDateWithYear } from '@/lib/date-utils';
 
 const EVENT_TYPE_COLORS: Record<string, string> = {
   TRIP: 'bg-blue-100 text-blue-700',
@@ -21,13 +22,13 @@ const EVENT_TYPE_COLORS: Record<string, string> = {
 function formatEventDate(date: Date | string): string {
   const d = new Date(date);
   const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-  return `${d.getMonth() + 1}/${d.getDate()}(${weekdays[d.getDay()]})`;
+  // 直近イベントは過去/未来両方を混在表示するため、常に年を含める
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}(${weekdays[d.getDay()]})`;
 }
 
 function formatShortDate(date: Date | string | null) {
   if (!date) return '-';
-  const d = new Date(date);
-  return `${d.getMonth() + 1}/${d.getDate()}`;
+  return formatShortDateWithYear(date);
 }
 
 async function fetchDashboardData() {
@@ -204,7 +205,7 @@ export default async function DashboardPage() {
                   className="flex items-center gap-2 py-2 px-2 rounded-lg hover:bg-gray-50 transition group"
                 >
                   <div className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-                  <span className="text-xs text-amber-600 font-medium w-16 shrink-0">
+                  <span className="text-xs text-amber-600 font-medium w-24 shrink-0 tabular-nums">
                     {formatEventDate(ev.date)}
                   </span>
                   <span className="text-sm font-medium text-slate-800 flex-1 truncate group-hover:text-amber-700">
@@ -232,7 +233,7 @@ export default async function DashboardPage() {
                   className="flex items-center gap-2 py-2 px-2 rounded-lg hover:bg-gray-50 transition group"
                 >
                   <div className="w-1.5 h-1.5 rounded-full bg-gray-300 shrink-0" />
-                  <span className="text-xs text-gray-400 font-medium w-16 shrink-0">
+                  <span className="text-xs text-gray-400 font-medium w-24 shrink-0 tabular-nums">
                     {formatEventDate(ev.date)}
                   </span>
                   <span className="text-sm text-gray-600 flex-1 truncate">

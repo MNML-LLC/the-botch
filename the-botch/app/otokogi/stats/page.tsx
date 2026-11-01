@@ -12,6 +12,12 @@ import {
   useOtokogiMemberSummary,
   useOtokogiStatsMain,
 } from '@/hooks/use-otokogi';
+import {
+  formatPeriodLabel,
+  formatRangeTitle,
+  formatYearMonthFull,
+  formatYearMonthLabel,
+} from '@/lib/date-utils';
 
 // ---- 型定義 ----
 
@@ -70,8 +76,8 @@ function formatYenShort(value: number): string {
 }
 
 function shortMonth(month: string): string {
-  const [, m] = month.split('-');
-  return `${parseInt(m)}月`;
+  // "YYYY-MM" → "YYYY/M"（年を落とさない）
+  return formatYearMonthLabel(month);
 }
 
 function computeDateRange(
@@ -90,11 +96,12 @@ function computeDateRange(
     };
   }
   if (period === 'year') {
+    // 「今年度」 = 日本の会計年度 (4月〜翌年3月)。1〜3月は前年度扱い
     const yr = today.getFullYear();
-    const fiscalYear = today.getMonth() >= 10 ? yr + 1 : yr;
+    const fiscalYear = today.getMonth() < 3 ? yr - 1 : yr;
     return {
-      from: `${fiscalYear - 1}-11-01`,
-      to: `${fiscalYear}-10-31`,
+      from: `${fiscalYear}-04-01`,
+      to: `${fiscalYear + 1}-03-31`,
     };
   }
   if (period === 'custom') {
@@ -105,12 +112,14 @@ function computeDateRange(
 
 // ---- フィルタバー ----
 
-const PERIOD_LABELS: { key: Period; label: string }[] = [
-  { key: 'month', label: '今月' },
-  { key: 'year', label: '今年度' },
-  { key: 'all', label: '全期間' },
-  { key: 'custom', label: 'カスタム' },
-];
+function buildPeriodLabels(refDate: Date = new Date()): { key: Period; label: string }[] {
+  return [
+    { key: 'month', label: formatPeriodLabel('month', refDate) },
+    { key: 'year', label: formatPeriodLabel('fiscal_year', refDate) },
+    { key: 'all', label: '全期間' },
+    { key: 'custom', label: 'カスタム' },
+  ];
+}
 
 function FilterBar({
   period,
@@ -145,6 +154,8 @@ function FilterBar({
     );
   };
 
+  const periodLabels = buildPeriodLabels();
+
   return (
     <div className="sticky top-14 z-40 bg-white/95 backdrop-blur-sm border-b shadow-sm -mx-4 px-4">
       {/* SP: アコーディオントグル */}
@@ -167,7 +178,7 @@ function FilterBar({
         <div className="sm:flex sm:items-center sm:flex-wrap sm:gap-x-4 sm:gap-y-2 space-y-2 sm:space-y-0">
           {/* 期間プリセット */}
           <div className="flex gap-1 flex-wrap">
-            {PERIOD_LABELS.map(({ key, label }) => (
+            {periodLabels.map(({ key, label }) => (
               <button
                 key={key}
                 type="button"
@@ -360,10 +371,7 @@ function MonthlyTrendSection({ data }: { data?: { month: string; amount: number 
               />
               <Tooltip
                 formatter={(value) => [`¥${Number(value).toLocaleString()}`, '支払額']}
-                labelFormatter={(label) => {
-                  const [y, m] = String(label).split('-');
-                  return `${y}年${parseInt(m)}月`;
-                }}
+                labelFormatter={(label) => formatYearMonthFull(String(label))}
               />
               <Bar dataKey="amount" fill="#d97706" radius={[2, 2, 0, 0]} />
             </BarChart>
@@ -450,6 +458,14 @@ export default function OtokogiStatsPage() {
     [period, customFrom, customTo],
   );
 
+  // 期間ラベル（絶対参照付き）
+  const rangeLabel = useMemo(() => {
+    if (period === 'month') return formatRangeTitle('month');
+    if (period === 'year') return formatRangeTitle('fiscal_year');
+    if (period === 'custom') return formatRangeTitle('custom', { customFrom, customTo });
+    return formatRangeTitle('all');
+  }, [period, customFrom, customTo]);
+
   // メンバー一覧（フィルタバー用）
   const { data: membersData } = useMembers({ staleTime: 5 * 60 * 1000 });
   const members: Member[] = membersData ?? [];
@@ -484,6 +500,9 @@ export default function OtokogiStatsPage() {
         expanded={filterExpanded}
         setExpanded={setFilterExpanded}
       />
+
+      {/* 対象期間（絶対参照） */}
+      <p className="text-xs text-gray-500 mt-2">{rangeLabel}</p>
 
       {/* 概要バッジ */}
       {stats && (

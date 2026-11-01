@@ -18,6 +18,7 @@ import { WARIKAN_STATUS_LABELS } from '@/lib/constants';
 import { useState } from 'react';
 import { useWarikanList } from '@/hooks/use-warikan';
 import { useScrollRestoration } from '@/hooks/use-scroll-restoration';
+import { formatShortDateWithYear } from '@/lib/date-utils';
 
 function WarikanListSkeleton() {
   return (
@@ -151,7 +152,7 @@ export default function WarikanListPage() {
                     <span>{event.participants.length}人参加</span>
                     <span>明細 {event._count.expenses}件</span>
                     {event.paymentDeadline && (
-                      <span>期日: {new Date(event.paymentDeadline).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })}</span>
+                      <span>期日: {formatShortDateWithYear(event.paymentDeadline)}</span>
                     )}
                   </div>
                   <div className="flex flex-wrap gap-1 mt-2">
