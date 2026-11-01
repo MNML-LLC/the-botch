@@ -360,7 +360,7 @@ Prisma モデル `Event`（カレンダーイベント）を操作する。
     "eventDate": "YYYY-MM-DD",
     "eventName": "string (1〜100)",
     "payerId": "member uuid",
-    "amount": 1〜1000000000,
+    "amount": 10000〜1000000000,
     "place": "string (≤100) | null | 省略可",
     "hasAlbum": "boolean | 省略可 (default: false)",
     "memo": "string (≤1000) | null | 省略可",
@@ -368,6 +368,7 @@ Prisma モデル `Event`（カレンダーイベント）を操作する。
     "participantIds": ["member uuid", ...] // 1〜50, 必須
   }
   ```
+- **業務ルール**: 男気は ¥10,000 以上から記録可能（`lib/constants.ts` の `OTOKOGI_MIN_AMOUNT`）。未満は 400。
 - レスポンス 201: `OtokogiEvent`（`payer` + `participants.member` include）
 - 副作用: `/api/otokogi/stats` のキャッシュ無効化
 
@@ -380,6 +381,7 @@ Prisma モデル `Event`（カレンダーイベント）を操作する。
 **PATCH `/api/otokogi/:id`**
 
 - ボディ（すべて optional）: `eventDate` / `eventName` / `payerId` / `amount` / `place` / `hasAlbum` / `memo` / `participantIds`（1〜50）
+- `amount` は POST と同じく **¥10,000 以上**（`OTOKOGI_MIN_AMOUNT`）。未満は 400。
 - `participantIds` 指定時はトランザクションで全差し替え
 - レスポンス 200: 更新後の `OtokogiEvent` / 404: 未発見（`P2025`）
 - 副作用: 統計キャッシュ無効化
@@ -398,7 +400,7 @@ Prisma モデル `Event`（カレンダーイベント）を操作する。
 **GET `/api/otokogi/ranking`**
 
 - クエリ:
-  - `year=YYYY | all`（fiscal year: 11月開始 → 翌年10月末。省略 or 不正値は現在の fiscal year がデフォルト、`all` 明示で全期間）
+  - `year=YYYY | all`（fiscal year: 11月開始 → 翌年10月末。省略 or 不正値は現在の fiscal year がデフォルト、`all` 明示で全期間。helper: `lib/date-utils.ts` `getCurrentFiscalYear()`）
   - `metric=total|rate|clutch|streak|generosity`（default `total`。不正値は `total` にフォールバック）
 - amount 制限は clutch のみ（`OTOKOGI_CLUTCH_THRESHOLD` 以上）。total / rate / streak / generosity は全額対象（低額イベントも full amount でカウント）
 - 返却値には全 5 指標が含まれ、フロントで切替表示可能（ソート順は metric により変わる）
@@ -406,7 +408,7 @@ Prisma モデル `Event`（カレンダーイベント）を操作する。
   ```
   {
     metric: "total" | "rate" | "clutch" | "streak" | "generosity",
-    clutchThreshold: 10000,
+    clutchThreshold: 50000,
     ranking: Array<{
       rank, memberId, name, initial, colorBg, colorText,
       count,                    // 支払った回数
@@ -414,7 +416,7 @@ Prisma モデル `Event`（カレンダーイベント）を操作する。
       participatedCount,        // 参加した回数
       participatedTotal,        // 参加した会の総額
       otokogiRate,              // paid / participatedTotal (null = 参加 0)
-      clutchParticipatedCount,  // 高額(>=10000)参加回数
+      clutchParticipatedCount,  // 高額(>=50000)参加回数
       clutchPaidCount,          // 高額支払回数
       clutchRate,               // clutchPaid / clutchParticipated (null = 高額参加 0)
       maxStreak,                // 連続支払いの最長記録

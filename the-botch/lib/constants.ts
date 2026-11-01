@@ -1,5 +1,9 @@
 import type { EventType, WarikanStatus } from '@/lib/generated/prisma/client'
 
+// 男気として記録可能な最小金額（円）。業務ルール: これ未満は男気として存在しない。
+// POST /api/otokogi / PATCH /api/otokogi/:id の amount バリデーションとフォーム入力検証に使用。
+export const OTOKOGI_MIN_AMOUNT = 10000
+
 // 男気ランキングのクラッチ力（高額イベントでの支払率）判定閾値（円）
 // 「高額」= この金額以上の男気イベント
 // 男気イベント自体は amount >= 10000 で成立するが、クラッチ軸はさらに大きい額を区別する

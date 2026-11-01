@@ -22,6 +22,7 @@ import { ParticipantSelector } from '@/components/participant-selector';
 import { useMembers } from '@/hooks/use-members';
 import { useEvents } from '@/hooks/use-events';
 import { useCreateOtokogi } from '@/hooks/use-otokogi';
+import { OTOKOGI_MIN_AMOUNT } from '@/lib/constants';
 
 function OtokogiNewForm() {
   const router = useRouter();
@@ -55,6 +56,8 @@ function OtokogiNewForm() {
 
   const amountNum = Number(amount) || 0;
   const perPerson = participantIds.length > 0 ? Math.round(amountNum / participantIds.length) : 0;
+  // 業務ルール: 1万円未満は男気として存在しない (API 側 Zod validate と対応)
+  const amountBelowMin = amount !== '' && amountNum < OTOKOGI_MIN_AMOUNT;
 
   const createMutation = useCreateOtokogi({
     onSuccess: (data) => {
@@ -75,6 +78,7 @@ function OtokogiNewForm() {
 
   const handleSubmit = () => {
     if (!eventDate || !eventName || !payerId || !amount || participantIds.length === 0) return;
+    if (amountBelowMin) return;
     createMutation.mutate({
       eventDate,
       eventName,
@@ -180,12 +184,21 @@ function OtokogiNewForm() {
             <div className="relative mt-1">
               <span className="absolute left-3 top-2 text-gray-500">&yen;</span>
               <AmountInput
-                className="pl-7 text-right font-mono"
+                className={`pl-7 text-right font-mono ${amountBelowMin ? 'border-red-400 focus-visible:ring-red-300' : ''}`}
                 placeholder="0"
                 value={amount}
                 onChange={setAmount}
               />
             </div>
+            {amountBelowMin ? (
+              <p className="text-xs text-red-600 mt-1">
+                男気は ¥{OTOKOGI_MIN_AMOUNT.toLocaleString()} 以上から記録できます
+              </p>
+            ) : (
+              <p className="text-xs text-gray-500 mt-1">
+                ¥{OTOKOGI_MIN_AMOUNT.toLocaleString()} 以上
+              </p>
+            )}
           </div>
 
           <hr className="border-gray-200" />
@@ -241,7 +254,7 @@ function OtokogiNewForm() {
             <Button
               className="flex-1 bg-slate-800 hover:bg-slate-700"
               onClick={handleSubmit}
-              disabled={createMutation.isPending || !eventDate || !eventName || !payerId || !amount || participantIds.length === 0}
+              disabled={createMutation.isPending || !eventDate || !eventName || !payerId || !amount || amountBelowMin || participantIds.length === 0}
             >
               {createMutation.isPending ? '登録中...' : '登録する'}
             </Button>

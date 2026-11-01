@@ -13,6 +13,7 @@ import {
   positiveInt,
   memberIdArray,
 } from '@/lib/api-validation'
+import { OTOKOGI_MIN_AMOUNT } from '@/lib/constants'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -21,7 +22,11 @@ const updateOtokogiSchema = z.object({
   eventDate: dateString('イベント日').optional(),
   eventName: limitedString('イベント名', 100).min(1, { error: 'イベント名は必須項目です' }).optional(),
   payerId: idString('支払い担当').optional(),
-  amount: positiveInt('金額').optional(),
+  amount: positiveInt('金額')
+    .min(OTOKOGI_MIN_AMOUNT, {
+      error: `男気は¥${OTOKOGI_MIN_AMOUNT.toLocaleString()}以上から記録できます`,
+    })
+    .optional(),
   place: limitedString('場所', 100).nullable().optional(),
   hasAlbum: z.boolean({ error: 'アルバム有無は true/false で指定してください' }).optional(),
   memo: limitedString('メモ', 1000).nullable().optional(),

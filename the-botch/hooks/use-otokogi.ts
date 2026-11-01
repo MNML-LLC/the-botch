@@ -144,9 +144,9 @@ export function useOtokogiRanking(
   return useQuery({
     queryKey: ['otokogi-ranking', yearFilter, metric],
     queryFn: async () => {
+      // API 側は省略時に「現 fiscal year」が自動選択されるので、
+      // UI の '全期間' 選択 ('all') を明示的に送らないとデフォルトに上書きされる。
       const params = new URLSearchParams();
-      // yearFilter が 'all' の場合はサーバー側の現 fiscal year デフォルトを
-      // 上書きして明示的に全期間取得する。
       params.set('year', yearFilter === 'all' ? 'all' : yearFilter);
       if (metric !== 'total') params.set('metric', metric);
       const res = await fetch(`/api/otokogi/ranking?${params.toString()}`);

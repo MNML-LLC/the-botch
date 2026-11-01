@@ -200,11 +200,12 @@ describe('GET /api/otokogi', () => {
 // POST /api/otokogi
 // ============================================================
 describe('POST /api/otokogi', () => {
+  // 業務ルール: 男気は 10,000 円以上 (lib/constants.ts OTOKOGI_MIN_AMOUNT)
   const validPayload = {
     eventDate: '2026-04-01',
     eventName: 'テスト男気',
     payerId: '00000000-0000-0000-0000-000000000010',
-    amount: 5000,
+    amount: 10000,
     participantIds: ['00000000-0000-0000-0000-000000000001'],
   }
 
@@ -242,7 +243,7 @@ describe('POST /api/otokogi', () => {
     expect(args.data.eventDate).toEqual(new Date('2026-04-01'))
     expect(args.data.eventName).toBe('テスト男気')
     expect(args.data.payerId).toBe('00000000-0000-0000-0000-000000000010')
-    expect(args.data.amount).toBe(5000)
+    expect(args.data.amount).toBe(10000)
     expect(args.data.place).toBeNull()
     expect(args.data.hasAlbum).toBe(false)
     expect(args.data.memo).toBeNull()
@@ -417,6 +418,34 @@ describe('POST /api/otokogi', () => {
     expect(status).toBe(400)
     expect(data.error).toContain('金額')
     expect(mockedCreate).not.toHaveBeenCalled()
+  })
+
+  test('amount が 10,000 未満 → 400（業務ルール: 男気は 1 万円以上）', async () => {
+    const res = await POST(
+      createRequest('/api/otokogi', {
+        method: 'POST',
+        body: { ...validPayload, amount: 9999 },
+      })
+    )
+    const { status, data } = await parseResponse<{ error: string }>(res)
+
+    expect(status).toBe(400)
+    expect(data.error).toContain('男気は')
+    expect(mockedCreate).not.toHaveBeenCalled()
+    expect(mockedInvalidateStatsCache).not.toHaveBeenCalled()
+  })
+
+  test('amount が 10,000 ちょうど → 201（境界値）', async () => {
+    mockedCreate.mockResolvedValue({ id: 'min-amount' })
+    const res = await POST(
+      createRequest('/api/otokogi', {
+        method: 'POST',
+        body: { ...validPayload, amount: 10000 },
+      })
+    )
+    const { status } = await parseResponse(res)
+    expect(status).toBe(201)
+    expect(mockedCreate).toHaveBeenCalledTimes(1)
   })
 
   test('participantIds 欠損 → 400', async () => {

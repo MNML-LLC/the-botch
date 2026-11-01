@@ -125,7 +125,7 @@ function metricSubline(entry: OtokogiRankingEntry, metric: OtokogiRankingMetric)
 export default function OtokogiPage() {
   const currentFiscalYear = getCurrentFiscalYear();
   const [activeTab, setActiveTab] = useState<Tab>('history');
-  // デフォルトは今年度 (fiscal year, 11月開始)。全期間を見たい場合は 'all' を選択。
+  // 省略時/初期表示は現在の fiscal year（CEO 判断: Issue #335）。全期間は 'all' を選択。
   const [yearFilter, setYearFilter] = useState<string>(String(currentFiscalYear));
   const [rankingMetric, setRankingMetric] = useState<OtokogiRankingMetric>('total');
 
