@@ -8,6 +8,16 @@ import {
   useQueryClient,
   type UseMutationOptions,
 } from '@tanstack/react-query';
+import {
+  appendPeriodSearchParams,
+  type PeriodState,
+} from '@/lib/date-utils';
+
+function periodKey(state: PeriodState): string {
+  return state.period === 'custom'
+    ? `custom|${state.from ?? ''}|${state.to ?? ''}`
+    : state.period;
+}
 
 type Member = {
   id: string;
@@ -92,12 +102,13 @@ export type WarikanMemberSummaryResponse = {
   availableYears: number[];
 };
 
-export function useWarikanMemberSummary(yearFilter: string) {
+export function useWarikanMemberSummary(period: PeriodState) {
+  const key = periodKey(period);
   return useQuery<WarikanMemberSummaryResponse, Error>({
-    queryKey: ['warikan-member-summary', yearFilter],
+    queryKey: ['warikan-member-summary', key],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (yearFilter !== 'all') params.set('year', yearFilter);
+      appendPeriodSearchParams(params, period);
       const res = await fetch(`/api/warikan/member-summary?${params.toString()}`);
       if (!res.ok) throw new Error('累積サマリーの取得に失敗しました');
       return res.json() as Promise<WarikanMemberSummaryResponse>;
@@ -107,23 +118,24 @@ export function useWarikanMemberSummary(yearFilter: string) {
   });
 }
 
-export function useWarikanList(statusFilter: string, yearFilter: string) {
+export function useWarikanList(statusFilter: string, period: PeriodState) {
+  const key = periodKey(period);
   const fetchWarikanEvents = useCallback(
     async ({ pageParam }: { pageParam: string | null }) => {
       const params = new URLSearchParams();
       if (statusFilter !== 'all') params.set('status', statusFilter);
-      if (yearFilter !== 'all') params.set('year', yearFilter);
+      appendPeriodSearchParams(params, period);
       if (pageParam) params.set('cursor', pageParam);
 
       const res = await fetch(`/api/warikan?${params.toString()}`);
       if (!res.ok) throw new Error('割り勘イベントの取得に失敗しました');
       return res.json() as Promise<WarikanListResponse>;
     },
-    [statusFilter, yearFilter]
+    [statusFilter, period]
   );
 
   return useInfiniteQuery({
-    queryKey: ['warikan', statusFilter, yearFilter],
+    queryKey: ['warikan', statusFilter, key],
     queryFn: fetchWarikanEvents,
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor,

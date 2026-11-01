@@ -10,6 +10,11 @@ import {
   formatDateRel,
   formatDateBoth,
   getFiscalYear,
+  getFiscalYearRange,
+  getCurrentMonthRange,
+  getPeriodRange,
+  appendPeriodSearchParams,
+  parsePeriodFromSearchParams,
   formatMonthLabel,
   parseEventDate,
   computeDisplayDate,
@@ -110,6 +115,200 @@ describe('parseEventDate (既存)', () => {
   })
   test('マッチしない場合は null', () => {
     expect(parseEventDate('テニス')).toBeNull()
+  })
+})
+
+describe('getFiscalYearRange', () => {
+  test('offset=0 (今期): 2026-11-01 は FY26 (2026/11〜2027/10)', () => {
+    const r = getFiscalYearRange(new Date(2026, 10, 1), 0)
+    expect(r.fy).toBe(2026)
+    expect(r.from.getFullYear()).toBe(2026)
+    expect(r.from.getMonth()).toBe(10) // 11月
+    expect(r.from.getDate()).toBe(1)
+    expect(r.to.getFullYear()).toBe(2027)
+    expect(r.to.getMonth()).toBe(9) // 10月
+    expect(r.to.getDate()).toBe(31)
+    expect(r.label).toBe('FY26 (2026/11〜2027/10)')
+  })
+
+  test('offset=-1 (前期): 2026-11-01 → FY25 (2025/11〜2026/10)', () => {
+    const r = getFiscalYearRange(new Date(2026, 10, 1), -1)
+    expect(r.fy).toBe(2025)
+    expect(r.from.getFullYear()).toBe(2025)
+    expect(r.from.getMonth()).toBe(10)
+    expect(r.to.getFullYear()).toBe(2026)
+    expect(r.to.getMonth()).toBe(9)
+  })
+
+  test('offset=1 (次期): 2026-11-01 → FY27', () => {
+    const r = getFiscalYearRange(new Date(2026, 10, 1), 1)
+    expect(r.fy).toBe(2027)
+  })
+
+  test('境界 10/31 は前年 FY に属する (offset=0)', () => {
+    const r = getFiscalYearRange(new Date(2026, 9, 31), 0)
+    expect(r.fy).toBe(2025)
+    expect(r.label).toBe('FY25 (2025/11〜2026/10)')
+  })
+
+  test('境界 11/1 は当年 FY に属する (offset=0)', () => {
+    const r = getFiscalYearRange(new Date(2026, 10, 1), 0)
+    expect(r.fy).toBe(2026)
+  })
+
+  test('閏年 2024/2 → FY23 (2023/11〜2024/10)', () => {
+    const r = getFiscalYearRange(new Date(2024, 1, 29), 0)
+    expect(r.fy).toBe(2023)
+    expect(r.from.getFullYear()).toBe(2023)
+    expect(r.to.getFullYear()).toBe(2024)
+  })
+
+  test('年末年始跨ぎ 2027/1/15 → FY26', () => {
+    const r = getFiscalYearRange(new Date(2027, 0, 15), 0)
+    expect(r.fy).toBe(2026)
+  })
+
+  test('ref 省略時は "今" を基準に動く', () => {
+    const r = getFiscalYearRange()
+    // 現在が 11月以降なら当年、そうでなければ前年
+    const now = new Date()
+    const expectedFy = now.getMonth() + 1 >= 11 ? now.getFullYear() : now.getFullYear() - 1
+    expect(r.fy).toBe(expectedFy)
+  })
+})
+
+describe('getCurrentMonthRange', () => {
+  test('月初〜現在時刻', () => {
+    const ref = new Date(2026, 10, 15, 14, 30)
+    const r = getCurrentMonthRange(ref)
+    expect(r.from.getFullYear()).toBe(2026)
+    expect(r.from.getMonth()).toBe(10)
+    expect(r.from.getDate()).toBe(1)
+    expect(r.to.getFullYear()).toBe(2026)
+    expect(r.to.getDate()).toBe(15)
+    expect(r.label).toBe('2026/11月')
+  })
+})
+
+describe('getPeriodRange', () => {
+  const ref = new Date(2026, 10, 15) // 2026-11-15 (FY26 中盤)
+
+  test('current-month', () => {
+    const r = getPeriodRange('current-month', ref)
+    expect(r.from?.getDate()).toBe(1)
+    expect(r.to?.getDate()).toBe(15)
+    expect(r.label).toBe('今月')
+  })
+
+  test('current-fy', () => {
+    const r = getPeriodRange('current-fy', ref)
+    expect(r.from?.getFullYear()).toBe(2026)
+    expect(r.from?.getMonth()).toBe(10)
+    expect(r.to?.getFullYear()).toBe(2027)
+    expect(r.label).toBe('今期')
+  })
+
+  test('last-fy', () => {
+    const r = getPeriodRange('last-fy', ref)
+    expect(r.from?.getFullYear()).toBe(2025)
+    expect(r.to?.getFullYear()).toBe(2026)
+    expect(r.label).toBe('前期')
+  })
+
+  test('all は from/to とも null', () => {
+    const r = getPeriodRange('all', ref)
+    expect(r.from).toBeNull()
+    expect(r.to).toBeNull()
+    expect(r.label).toBe('全期間')
+  })
+
+  test('custom は入力をパースして返す', () => {
+    const r = getPeriodRange('custom', ref, { from: '2026-01-01', to: '2026-06-30' })
+    expect(r.from?.toISOString().slice(0, 10)).toBe('2026-01-01')
+    expect(r.to?.toISOString().slice(0, 10)).toBe('2026-06-30')
+  })
+
+  test('custom で値が無ければ null', () => {
+    const r = getPeriodRange('custom', ref, {})
+    expect(r.from).toBeNull()
+    expect(r.to).toBeNull()
+  })
+})
+
+describe('appendPeriodSearchParams', () => {
+  test('all は何も書かない', () => {
+    const p = new URLSearchParams()
+    appendPeriodSearchParams(p, { period: 'all' })
+    expect(p.toString()).toBe('')
+  })
+
+  test('current-fy は period のみ', () => {
+    const p = new URLSearchParams()
+    appendPeriodSearchParams(p, { period: 'current-fy' })
+    expect(p.get('period')).toBe('current-fy')
+    expect(p.get('from')).toBeNull()
+  })
+
+  test('custom は from/to も書く', () => {
+    const p = new URLSearchParams()
+    appendPeriodSearchParams(p, { period: 'custom', from: '2026-01-01', to: '2026-06-30' })
+    expect(p.get('period')).toBe('custom')
+    expect(p.get('from')).toBe('2026-01-01')
+    expect(p.get('to')).toBe('2026-06-30')
+  })
+})
+
+describe('parsePeriodFromSearchParams', () => {
+  const now = new Date(2026, 10, 15) // 2026-11-15
+
+  test('period=current-fy → FY26', () => {
+    const p = new URLSearchParams({ period: 'current-fy' })
+    const r = parsePeriodFromSearchParams(p, now)
+    expect(r.from?.getFullYear()).toBe(2026)
+    expect(r.from?.getMonth()).toBe(10)
+    expect(r.to?.getFullYear()).toBe(2027)
+  })
+
+  test('period=last-fy → FY25', () => {
+    const p = new URLSearchParams({ period: 'last-fy' })
+    const r = parsePeriodFromSearchParams(p, now)
+    expect(r.from?.getFullYear()).toBe(2025)
+    expect(r.to?.getFullYear()).toBe(2026)
+  })
+
+  test('period=all → null, null', () => {
+    const p = new URLSearchParams({ period: 'all' })
+    const r = parsePeriodFromSearchParams(p, now)
+    expect(r.from).toBeNull()
+    expect(r.to).toBeNull()
+  })
+
+  test('period=custom + from/to', () => {
+    const p = new URLSearchParams({ period: 'custom', from: '2026-01-01', to: '2026-06-30' })
+    const r = parsePeriodFromSearchParams(p, now)
+    expect(r.from?.toISOString().slice(0, 10)).toBe('2026-01-01')
+    expect(r.to?.toISOString().slice(0, 10)).toBe('2026-06-30')
+  })
+
+  test('backward compat: year=2026 → 2025/11〜2026/10 (旧実装互換)', () => {
+    const p = new URLSearchParams({ year: '2026' })
+    const r = parsePeriodFromSearchParams(p, now)
+    expect(r.from).toEqual(new Date('2025-11-01'))
+    expect(r.to).toEqual(new Date('2026-10-31'))
+  })
+
+  test('from/to のみ', () => {
+    const p = new URLSearchParams({ from: '2026-05-01', to: '2026-06-01' })
+    const r = parsePeriodFromSearchParams(p, now)
+    expect(r.from?.toISOString().slice(0, 10)).toBe('2026-05-01')
+    expect(r.to?.toISOString().slice(0, 10)).toBe('2026-06-01')
+  })
+
+  test('何も無ければ null, null', () => {
+    const p = new URLSearchParams()
+    const r = parsePeriodFromSearchParams(p, now)
+    expect(r.from).toBeNull()
+    expect(r.to).toBeNull()
   })
 })
 

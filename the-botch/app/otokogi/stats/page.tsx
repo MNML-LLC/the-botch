@@ -3,7 +3,6 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList, Cell,
 } from 'recharts';
@@ -22,10 +21,8 @@ import {
   TopRecentSection,
 } from './charts';
 import { Yen } from '@/components/ui/yen';
-
-// ---- 型定義 ----
-
-type Period = 'month' | 'year' | 'all' | 'custom';
+import { PeriodFilter, DEFAULT_PERIOD_STATE } from '@/components/ui/period-filter';
+import { getPeriodRange, type PeriodState } from '@/lib/date-utils';
 
 type Member = {
   id: string;
@@ -85,63 +82,35 @@ function shortMonth(month: string): string {
   return `${parseInt(m)}月`;
 }
 
-function computeDateRange(
-  period: Period,
-  customFrom: string,
-  customTo: string,
-): { from?: string; to?: string } {
-  const today = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+function toIsoDate(d: Date | null | undefined): string | undefined {
+  if (!d) return undefined;
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
 
-  if (period === 'month') {
-    return {
-      from: `${today.getFullYear()}-${pad(today.getMonth() + 1)}-01`,
-      to: todayStr,
-    };
-  }
-  if (period === 'year') {
-    const yr = today.getFullYear();
-    const fiscalYear = today.getMonth() >= 10 ? yr + 1 : yr;
-    return {
-      from: `${fiscalYear - 1}-11-01`,
-      to: `${fiscalYear}-10-31`,
-    };
-  }
-  if (period === 'custom') {
-    return { from: customFrom || undefined, to: customTo || undefined };
-  }
-  return {};
+function computeDateRange(period: PeriodState): { from?: string; to?: string } {
+  const r = getPeriodRange(period.period, new Date(), {
+    from: period.from,
+    to: period.to,
+  });
+  return { from: toIsoDate(r.from), to: toIsoDate(r.to) };
 }
 
 // ---- フィルタバー ----
 
-const PERIOD_LABELS: { key: Period; label: string }[] = [
-  { key: 'month', label: '今月' },
-  { key: 'year', label: '今年度' },
-  { key: 'all', label: '全期間' },
-  { key: 'custom', label: 'カスタム' },
-];
-
 function FilterBar({
   period,
   setPeriod,
-  customFrom,
-  setCustomFrom,
-  customTo,
-  setCustomTo,
   selectedMemberIds,
   setSelectedMemberIds,
   members,
   expanded,
   setExpanded,
 }: {
-  period: Period;
-  setPeriod: (p: Period) => void;
-  customFrom: string;
-  setCustomFrom: (v: string) => void;
-  customTo: string;
-  setCustomTo: (v: string) => void;
+  period: PeriodState;
+  setPeriod: (p: PeriodState) => void;
   selectedMemberIds: string[];
   setSelectedMemberIds: (ids: string[]) => void;
   members: Member[];
@@ -156,6 +125,8 @@ function FilterBar({
     );
   };
 
+  const isDefault = period.period === 'current-fy';
+
   return (
     <div className="sticky top-14 z-40 bg-white/95 backdrop-blur-sm border-b shadow-sm -mx-4 px-4">
       {/* SP: アコーディオントグル */}
@@ -166,7 +137,7 @@ function FilterBar({
       >
         <span className="font-medium">
           フィルタ
-          {(selectedMemberIds.length > 0 || period !== 'year') && (
+          {(selectedMemberIds.length > 0 || !isDefault) && (
             <span className="ml-1.5 text-xs text-amber-600">●</span>
           )}
         </span>
@@ -177,41 +148,7 @@ function FilterBar({
       <div className={`${expanded ? 'block' : 'hidden'} sm:block pb-2 sm:py-2`}>
         <div className="sm:flex sm:items-center sm:flex-wrap sm:gap-x-4 sm:gap-y-2 space-y-2 sm:space-y-0">
           {/* 期間プリセット */}
-          <div className="flex gap-1 flex-wrap">
-            {PERIOD_LABELS.map(({ key, label }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setPeriod(key)}
-                className={`px-3 py-1 text-xs rounded-full border transition ${
-                  period === key
-                    ? 'bg-slate-800 text-white border-slate-800'
-                    : 'bg-white text-gray-600 border-gray-300 hover:border-slate-400'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {/* カスタム日付範囲 */}
-          {period === 'custom' && (
-            <div className="flex items-center gap-2">
-              <Input
-                type="date"
-                value={customFrom}
-                onChange={(e) => setCustomFrom(e.target.value)}
-                className="h-7 text-xs w-36"
-              />
-              <span className="text-gray-400 text-xs">〜</span>
-              <Input
-                type="date"
-                value={customTo}
-                onChange={(e) => setCustomTo(e.target.value)}
-                className="h-7 text-xs w-36"
-              />
-            </div>
-          )}
+          <PeriodFilter value={period} onChange={setPeriod} accent="otokogi" />
 
           {/* メンバー絞り込み */}
           {members.length > 0 && (
@@ -449,16 +386,14 @@ function RankingSection({ data }: { data?: OtokogiByMember[] }) {
 // ---- メインページ ----
 
 export default function OtokogiStatsPage() {
-  const [period, setPeriod] = useState<Period>('year');
-  const [customFrom, setCustomFrom] = useState('');
-  const [customTo, setCustomTo] = useState('');
+  const [period, setPeriod] = useState<PeriodState>(DEFAULT_PERIOD_STATE);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [filterExpanded, setFilterExpanded] = useState(false);
 
   // 期間から from/to を計算
   const { from, to } = useMemo(
-    () => computeDateRange(period, customFrom, customTo),
-    [period, customFrom, customTo],
+    () => computeDateRange(period),
+    [period],
   );
 
   // メンバー一覧（フィルタバー用）
@@ -489,10 +424,6 @@ export default function OtokogiStatsPage() {
       <FilterBar
         period={period}
         setPeriod={setPeriod}
-        customFrom={customFrom}
-        setCustomFrom={setCustomFrom}
-        customTo={customTo}
-        setCustomTo={setCustomTo}
         selectedMemberIds={selectedMemberIds}
         setSelectedMemberIds={setSelectedMemberIds}
         members={members}

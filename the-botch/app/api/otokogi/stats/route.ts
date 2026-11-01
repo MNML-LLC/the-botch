@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { handleApiError } from '@/lib/api-utils'
 import { getCachedStats, setCachedStats } from '@/lib/stats-cache'
 import { MEMBER_SELECT } from '@/lib/prisma-selects'
+import { getPeriodRange, type PeriodValue } from '@/lib/date-utils'
 import {
   CATEGORIES,
   classifyOtokogiEvent,
@@ -54,36 +55,44 @@ function buildDateSqlOe(fromDate: Date | null, toDate: Date | null, exclusive: b
 
 // GET /api/otokogi/stats — 男気統計情報（DB集計活用版）
 // クエリパラメータ:
-//   year=YYYY          — 年度フィルタ（後方互換）
-//   from=YYYY-MM-DD    — 開始日（from/to は year より優先）
+//   period=current-fy|last-fy|current-month|all|custom — 期間プリセット
+//   year=YYYY          — 会計年度フィルタ（後方互換）
+//   from=YYYY-MM-DD    — 開始日（period=custom 時 or 単独指定）
 //   to=YYYY-MM-DD      — 終了日
 //   memberIds=id1,id2  — メンバー絞り込み（カンマ区切り、省略時は全員）
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
+    const periodParam = searchParams.get('period') as PeriodValue | null
     const year = searchParams.get('year')
     const from = searchParams.get('from')
     const to = searchParams.get('to')
     const memberIdsParam = searchParams.get('memberIds')
     const memberIdList = memberIdsParam ? memberIdsParam.split(',').filter(Boolean) : []
 
-    // 日付フィルタ構築（from/to 優先、なければ year から生成）
+    // 日付フィルタ構築（period > from/to > year）
     let fromDate: Date | null = null
     let toDate: Date | null = null
-    let exclusive = false // year モードも日付範囲モードも lte（inclusive）
+    const exclusive = false // 全モード lte（inclusive）
 
-    if (from || to) {
+    if (periodParam) {
+      const r = getPeriodRange(periodParam, new Date(), {
+        from: from ?? undefined,
+        to: to ?? undefined,
+      })
+      fromDate = r.from
+      toDate = r.to
+    } else if (from || to) {
       fromDate = from ? new Date(from) : null
       toDate = to ? new Date(to) : null
     } else if (year) {
       fromDate = new Date(`${Number(year) - 1}-11-01`)
       toDate = new Date(`${year}-10-31`)
-      exclusive = false
     }
 
-    // キャッシュキー（後方互換: year のみなら従来キー）
-    const cacheKey = (from || to || memberIdList.length > 0)
-      ? `f:${from ?? ''}_t:${to ?? ''}_m:${[...memberIdList].sort().join(',')}`
+    // キャッシュキー
+    const cacheKey = (periodParam || from || to || memberIdList.length > 0)
+      ? `p:${periodParam ?? ''}_f:${from ?? ''}_t:${to ?? ''}_m:${[...memberIdList].sort().join(',')}`
       : (year ?? 'all')
 
     const cached = await getCachedStats(cacheKey)

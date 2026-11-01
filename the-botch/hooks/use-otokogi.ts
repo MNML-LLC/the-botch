@@ -8,6 +8,16 @@ import {
   useQueryClient,
   type UseMutationOptions,
 } from '@tanstack/react-query';
+import {
+  appendPeriodSearchParams,
+  type PeriodState,
+} from '@/lib/date-utils';
+
+function periodKey(state: PeriodState): string {
+  return state.period === 'custom'
+    ? `custom|${state.from ?? ''}|${state.to ?? ''}`
+    : state.period;
+}
 
 type Member = {
   id: string;
@@ -100,22 +110,23 @@ export function useOtokogiEvent(id: string | undefined) {
   });
 }
 
-export function useOtokogiEvents(yearFilter: string) {
+export function useOtokogiEvents(period: PeriodState) {
+  const key = periodKey(period);
   const fetchOtokogiEvents = useCallback(
     async ({ pageParam }: { pageParam: string | null }) => {
       const params = new URLSearchParams();
-      if (yearFilter !== 'all') params.set('year', yearFilter);
+      appendPeriodSearchParams(params, period);
       if (pageParam) params.set('cursor', pageParam);
 
       const res = await fetch(`/api/otokogi?${params.toString()}`);
       if (!res.ok) throw new Error('男気イベントの取得に失敗しました');
       return res.json() as Promise<OtokogiResponse>;
     },
-    [yearFilter]
+    [period]
   );
 
   return useInfiniteQuery({
-    queryKey: ['otokogi', yearFilter],
+    queryKey: ['otokogi', key],
     queryFn: fetchOtokogiEvents,
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
@@ -124,12 +135,13 @@ export function useOtokogiEvents(yearFilter: string) {
   });
 }
 
-export function useOtokogiRanking(yearFilter: string) {
+export function useOtokogiRanking(period: PeriodState) {
+  const key = periodKey(period);
   return useQuery({
-    queryKey: ['otokogi-ranking', yearFilter],
+    queryKey: ['otokogi-ranking', key],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (yearFilter !== 'all') params.set('year', yearFilter);
+      appendPeriodSearchParams(params, period);
       const res = await fetch(`/api/otokogi/ranking?${params.toString()}`);
       if (!res.ok) throw new Error('ランキングの取得に失敗しました');
       return res.json() as Promise<OtokogiRankingResponse>;

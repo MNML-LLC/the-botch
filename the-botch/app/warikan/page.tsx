@@ -18,6 +18,8 @@ import { WARIKAN_STATUS_LABELS } from '@/lib/constants';
 import { useState } from 'react';
 import { useWarikanList } from '@/hooks/use-warikan';
 import { useScrollRestoration } from '@/hooks/use-scroll-restoration';
+import type { PeriodState } from '@/lib/date-utils';
+import { PeriodFilter, DEFAULT_PERIOD_STATE } from '@/components/ui/period-filter';
 
 function WarikanListSkeleton() {
   return (
@@ -57,7 +59,7 @@ function statusLabel(status: string) {
 
 export default function WarikanListPage() {
   const [statusFilter, setStatusFilter] = useState('all');
-  const [yearFilter, setYearFilter] = useState('all');
+  const [period, setPeriod] = useState<PeriodState>(DEFAULT_PERIOD_STATE);
 
   const {
     data,
@@ -65,15 +67,11 @@ export default function WarikanListPage() {
     isFetchingNextPage,
     hasNextPage,
     fetchNextPage,
-  } = useWarikanList(statusFilter, yearFilter);
+  } = useWarikanList(statusFilter, period);
 
   const events = data?.pages.flatMap((page) => page.data) ?? [];
 
   useScrollRestoration(!isLoading);
-
-  // 年度リスト生成
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 4 }, (_, i) => currentYear - i);
 
   return (
     <div>
@@ -93,9 +91,9 @@ export default function WarikanListPage() {
       </div>
 
       {/* フィルター */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex flex-col gap-2 mb-4 sm:flex-row sm:items-center">
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-auto">
+          <SelectTrigger className="w-auto min-h-[44px]">
             <SelectValue>{statusFilter === 'all' ? '全てのステータス' : statusLabel(statusFilter)}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -106,17 +104,7 @@ export default function WarikanListPage() {
           </SelectContent>
         </Select>
 
-        <Select value={yearFilter} onValueChange={setYearFilter}>
-          <SelectTrigger className="w-auto">
-            <SelectValue>{yearFilter === 'all' ? '全期間' : `${yearFilter}年`}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">全期間</SelectItem>
-            {years.map((y) => (
-              <SelectItem key={y} value={String(y)}>{y}年</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <PeriodFilter value={period} onChange={setPeriod} accent="warikan" />
       </div>
 
       {/* リスト */}
@@ -126,7 +114,7 @@ export default function WarikanListPage() {
         <EmptyState
           icon={Wallet}
           title="該当する割り勘イベントがありません"
-          description={statusFilter === 'all' && yearFilter === 'all' ? '新しい割り勘イベントを作成してみましょう' : 'フィルタを変更するか、新規作成してください'}
+          description={statusFilter === 'all' && period.period === 'all' ? '新しい割り勘イベントを作成してみましょう' : 'フィルタを変更するか、新規作成してください'}
           action={{ label: '+ 新規作成', href: '/warikan/new' }}
         />
       ) : (

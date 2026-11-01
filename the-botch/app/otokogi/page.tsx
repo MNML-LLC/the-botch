@@ -4,13 +4,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Swords, Trophy } from 'lucide-react';
@@ -18,6 +11,8 @@ import { useOtokogiEvents, useOtokogiRanking } from '@/hooks/use-otokogi';
 import { useScrollRestoration } from '@/hooks/use-scroll-restoration';
 import { Yen } from '@/components/ui/yen';
 import { formatDateBoth } from '@/lib/date-utils';
+import type { PeriodState } from '@/lib/date-utils';
+import { PeriodFilter, DEFAULT_PERIOD_STATE } from '@/components/ui/period-filter';
 
 function OtokogiHistorySkeleton() {
   return (
@@ -70,11 +65,7 @@ type Tab = 'history' | 'ranking';
 
 export default function OtokogiPage() {
   const [activeTab, setActiveTab] = useState<Tab>('history');
-  const [yearFilter, setYearFilter] = useState('all');
-
-  const today = new Date();
-  const currentFiscalYear = today.getMonth() >= 10 ? today.getFullYear() + 1 : today.getFullYear();
-  const years = Array.from({ length: 4 }, (_, i) => currentFiscalYear - i);
+  const [period, setPeriod] = useState<PeriodState>(DEFAULT_PERIOD_STATE);
 
   const {
     data: eventsData,
@@ -82,11 +73,11 @@ export default function OtokogiPage() {
     isFetchingNextPage,
     hasNextPage,
     fetchNextPage,
-  } = useOtokogiEvents(yearFilter);
+  } = useOtokogiEvents(period);
 
   const events = eventsData?.pages.flatMap((page) => page.data) ?? [];
 
-  const { data: rankingResponse, isLoading: rankingLoading } = useOtokogiRanking(yearFilter);
+  const { data: rankingResponse, isLoading: rankingLoading } = useOtokogiRanking(period);
   const rankingData = rankingResponse?.ranking ?? [];
 
   const loading = activeTab === 'history' ? eventsLoading : rankingLoading;
@@ -127,19 +118,9 @@ export default function OtokogiPage() {
         </Link>
       </div>
 
-      {/* 年度フィルタ */}
-      <div className="flex gap-2 mb-4">
-        <Select value={yearFilter} onValueChange={setYearFilter}>
-          <SelectTrigger className="w-auto">
-            <SelectValue>{yearFilter === 'all' ? '全期間' : `${yearFilter}年度`}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">全期間</SelectItem>
-            {years.map((y) => (
-              <SelectItem key={y} value={String(y)}>{y}年度</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* 期間フィルタ */}
+      <div className="mb-4">
+        <PeriodFilter value={period} onChange={setPeriod} accent="otokogi" />
       </div>
 
       {/* 履歴タブ */}
@@ -151,7 +132,7 @@ export default function OtokogiPage() {
             <EmptyState
               icon={Swords}
               title="該当する男気イベントがありません"
-              description={yearFilter === 'all' ? '最初の勝負を記録してみましょう' : '別の年度を選ぶか、新しく記録してください'}
+              description={period.period === 'all' ? '最初の勝負を記録してみましょう' : '別の期間を選ぶか、新しく記録してください'}
               action={{ label: '+ 記録する', href: '/otokogi/new' }}
             />
           ) : (
