@@ -39,13 +39,24 @@ test.describe('1. 画面表示・遷移', () => {
     // ヘッダー
     await expect(page.locator('header')).toBeVisible()
     await expect(page.getByRole('link', { name: 'The botch' })).toBeVisible()
-    // 直近イベントセクション
-    await expect(page.getByText('直近イベント')).toBeVisible()
-    await expect(page.getByText('月次推移')).toBeVisible()
-    // 未精算の割り勘セクション
-    await expect(page.getByText('未精算の割り勘')).toBeVisible()
-    // 直近の男気セクション
-    await expect(page.getByText('直近の男気')).toBeVisible()
+    // 新 5 セクション (Issue #338): A 要アクション / B 承認待ち / C 来週 / D Top 3 / E サマリ
+    await expect(page.locator('main').getByText('要アクション')).toBeVisible()
+    await expect(page.locator('main').getByText('承認待ち / 要確認')).toBeVisible()
+    await expect(page.locator('main').getByText('来週のイベント')).toBeVisible()
+    await expect(page.locator('main').getByText('今月の男気 Top 3')).toBeVisible()
+    await expect(page.locator('main').getByText(/サマリ/)).toBeVisible()
+  })
+
+  test('タイムラインページが正常に表示される', async ({ page }) => {
+    await page.goto('/timeline')
+    await expect(page.locator('main').getByRole('heading', { name: /タイムライン/ })).toBeVisible()
+  })
+
+  test('メニューページが正常に表示される', async ({ page }) => {
+    await page.goto('/menu')
+    await expect(page.locator('main').getByRole('heading', { name: /メニュー/ })).toBeVisible()
+    await expect(page.locator('main').getByRole('link', { name: /割り勘管理/ })).toBeVisible()
+    await expect(page.locator('main').getByRole('link', { name: /男気管理/ })).toBeVisible()
   })
 
   test('ナビゲーションリンクが全て機能する', async ({ page }) => {
