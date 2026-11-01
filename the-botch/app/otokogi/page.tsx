@@ -16,6 +16,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Swords, Trophy } from 'lucide-react';
 import { useOtokogiEvents, useOtokogiRanking } from '@/hooks/use-otokogi';
 import { useScrollRestoration } from '@/hooks/use-scroll-restoration';
+import { Yen } from '@/components/ui/yen';
+import { formatDateBoth } from '@/lib/date-utils';
 
 function OtokogiHistorySkeleton() {
   return (
@@ -91,10 +93,6 @@ export default function OtokogiPage() {
 
   useScrollRestoration(!eventsLoading);
 
-  const formatDate = (date: string) => {
-    const d = new Date(date);
-    return `${d.getMonth() + 1}/${d.getDate()}`;
-  };
 
   return (
     <div>
@@ -179,7 +177,7 @@ export default function OtokogiPage() {
                           )}
                         </p>
                         <p className="text-xs text-gray-500 mt-0.5">
-                          {formatDate(event.eventDate)} / {event.payer.name}
+                          <span className="tabular-nums">{formatDateBoth(event.eventDate)}</span> / {event.payer.name}
                           {event.place && ` / ${event.place}`}
                         </p>
                         {event.memo && (
@@ -199,8 +197,8 @@ export default function OtokogiPage() {
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1 shrink-0">
-                      <p className="font-bold text-slate-800 text-sm">¥{event.amount.toLocaleString()}</p>
-                      <Button variant="outline" size="sm" asChild className="h-6 px-2 text-xs">
+                      <Yen value={event.amount} size="sm" className="font-bold text-slate-800" />
+                      <Button variant="outline" size="sm" asChild className="min-h-[44px] px-3 text-xs">
                         <Link href={`/otokogi/${event.id}/edit`}>編集</Link>
                       </Button>
                     </div>
@@ -257,7 +255,7 @@ export default function OtokogiPage() {
                       <p className="text-sm font-medium text-slate-800 truncate">{member.name}</p>
                       <p className="text-xs text-gray-500">{member.count}回</p>
                     </div>
-                    <p className="font-bold text-sm sm:text-base text-slate-800 shrink-0">¥{member.totalPaid.toLocaleString()}</p>
+                    <Yen value={member.totalPaid} className="font-bold text-sm sm:text-base text-slate-800 shrink-0" />
                   </div>
                 ))}
               </div>

@@ -107,7 +107,7 @@ export default function BottomNav() {
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="p-1 rounded hover:bg-gray-100 text-gray-500"
+                className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded hover:bg-gray-100 text-gray-500"
                 aria-label="閉じる"
               >
                 <X className="h-5 w-5" />

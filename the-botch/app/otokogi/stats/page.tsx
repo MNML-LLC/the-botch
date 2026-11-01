@@ -21,6 +21,7 @@ import {
   ComparisonSection,
   TopRecentSection,
 } from './charts';
+import { Yen } from '@/components/ui/yen';
 
 // ---- 型定義 ----
 
@@ -507,11 +508,11 @@ export default function OtokogiStatsPage() {
             <p className="text-[10px] text-gray-500">総回数</p>
           </div>
           <div className="flex-1">
-            <p className="text-sm font-bold text-slate-800 truncate">¥{stats.totalAmount.toLocaleString()}</p>
+            <Yen value={stats.totalAmount} size="sm" className="font-bold text-slate-800 truncate block" />
             <p className="text-[10px] text-gray-500">累計金額</p>
           </div>
           <div className="flex-1">
-            <p className="text-sm font-bold text-slate-800 truncate">¥{stats.averageAmount.toLocaleString()}</p>
+            <Yen value={stats.averageAmount} size="sm" className="font-bold text-slate-800 truncate block" />
             <p className="text-[10px] text-gray-500">平均金額</p>
           </div>
         </div>

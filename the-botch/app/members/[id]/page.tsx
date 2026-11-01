@@ -9,11 +9,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Swords, Wallet } from 'lucide-react';
 import { useMemberDetail, type MemberProfileWarikanEvent } from '@/hooks/use-members';
 import { WARIKAN_STATUS_LABELS } from '@/lib/constants';
-
-function formatShortDate(date: string) {
-  const d = new Date(date);
-  return `${d.getMonth() + 1}/${d.getDate()}`;
-}
+import { Yen } from '@/components/ui/yen';
+import { formatDateBoth } from '@/lib/date-utils';
 
 function warikanDisplayDate(event: MemberProfileWarikanEvent) {
   return event.displayDate ?? event.paymentDeadline ?? event.detailDeadline ?? event.createdAt;
@@ -134,22 +131,22 @@ export default function MemberProfilePage() {
             </div>
             <div className="text-center rounded-md border border-gray-200 py-2">
               <p className="text-xs text-gray-500">累計支払額</p>
-              <p className="font-bold text-slate-800 mt-0.5">¥{stats.totalPaid.toLocaleString()}</p>
+              <Yen value={stats.totalPaid} className="font-bold text-slate-800 mt-0.5 block" />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3 mt-3">
             <div className="text-xs text-gray-500 rounded-md bg-gray-50 px-3 py-2">
               男気で支払った額
-              <span className="block font-semibold text-slate-700 mt-0.5">
-                ¥{stats.otokogiPaidTotal.toLocaleString()}
+              <span className="block mt-0.5">
+                <Yen value={stats.otokogiPaidTotal} className="font-semibold text-slate-700" />
                 <span className="text-xs font-normal text-gray-500 ml-1">/ {stats.otokogiPaidCount}件</span>
               </span>
             </div>
             <div className="text-xs text-gray-500 rounded-md bg-gray-50 px-3 py-2">
               割り勘で立替えた額
-              <span className="block font-semibold text-slate-700 mt-0.5">
-                ¥{stats.warikanPaidTotal.toLocaleString()}
+              <span className="block mt-0.5">
+                <Yen value={stats.warikanPaidTotal} className="font-semibold text-slate-700" />
                 <span className="text-xs font-normal text-gray-500 ml-1">/ {stats.warikanPaidCount}件</span>
               </span>
             </div>
@@ -184,12 +181,12 @@ export default function MemberProfilePage() {
                       <div className="min-w-0">
                         <p className="font-medium text-slate-800 truncate">{event.eventName}</p>
                         <p className="text-xs text-gray-500 mt-0.5">
-                          {formatShortDate(event.eventDate)} / 支払: {event.payer.name}
+                          <span className="tabular-nums">{formatDateBoth(event.eventDate)}</span> / 支払: {event.payer.name}
                           {event.place && ` / ${event.place}`}
                         </p>
                       </div>
                     </div>
-                    <p className="font-bold text-slate-800 text-sm shrink-0">¥{event.amount.toLocaleString()}</p>
+                    <Yen value={event.amount} size="sm" className="font-bold text-slate-800 shrink-0" />
                   </div>
                 </Link>
               ))}
@@ -220,7 +217,7 @@ export default function MemberProfilePage() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="font-medium text-slate-800 truncate">{event.eventName}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">{formatShortDate(warikanDisplayDate(event))}</p>
+                      <p className="text-xs text-gray-500 mt-0.5 tabular-nums">{formatDateBoth(warikanDisplayDate(event))}</p>
                     </div>
                     <div className="shrink-0">{warikanStatusBadge(event.status)}</div>
                   </div>

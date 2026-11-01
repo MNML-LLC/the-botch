@@ -15,6 +15,7 @@ import {
 } from 'recharts';
 import { CATEGORY_LABELS, CATEGORY_COLORS, type OtokogiCategory } from '@/lib/otokogi-category';
 import type { OtokogiChartsResponse } from '@/hooks/use-otokogi';
+import { Yen } from '@/components/ui/yen';
 
 // ---- 共通 ----
 
@@ -537,9 +538,7 @@ export function TopRecentSection({ data }: { data?: OtokogiChartsResponse['topRe
                   <span className="text-lg font-bold text-slate-500">{ranks[i] ?? ''}</span>
                   <Avatar member={entry.payer} size="md" />
                 </div>
-                <p className="text-2xl font-extrabold text-slate-800 tabular-nums">
-                  ¥{entry.amount.toLocaleString()}
-                </p>
+                <Yen value={entry.amount} className="text-2xl font-extrabold text-slate-800 block" />
                 <p className="text-sm font-medium text-slate-700 mt-1 truncate">
                   {entry.payer.name}
                 </p>

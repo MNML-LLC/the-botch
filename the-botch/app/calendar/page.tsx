@@ -12,6 +12,7 @@ import {
   type CalendarWarikanEvent,
 } from '@/hooks/use-calendar';
 import { EVENT_TYPE_LABELS, eventTypeStyle } from '@/lib/constants';
+import { Yen } from '@/components/ui/yen';
 
 // カレンダーセル内に表示するイベント数の上限（超過分は "+N" 表示）
 const MAX_VISIBLE_EVENTS = 2;
@@ -137,16 +138,16 @@ export default function CalendarPage() {
 
       {/* 月ナビゲーション */}
       <div className="flex items-center justify-between mb-3">
-        <button onClick={prevMonth} className="p-2 hover:bg-gray-100 rounded-md">
+        <button onClick={prevMonth} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center hover:bg-gray-100 rounded-md" aria-label="前の月">
           <ChevronLeft className="w-5 h-5 text-slate-600" />
         </button>
         <div className="flex items-center gap-2">
           <span className="text-lg font-bold text-slate-800">{year}年{month}月</span>
-          <button onClick={today} className="text-xs text-gray-500 hover:text-slate-800 px-2 py-1 rounded border">
+          <button onClick={today} className="text-xs text-gray-500 hover:text-slate-800 min-h-[44px] px-3 rounded border">
             今日
           </button>
         </div>
-        <button onClick={nextMonth} className="p-2 hover:bg-gray-100 rounded-md">
+        <button onClick={nextMonth} className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center hover:bg-gray-100 rounded-md" aria-label="次の月">
           <ChevronRight className="w-5 h-5 text-slate-600" />
         </button>
       </div>
@@ -287,7 +288,7 @@ export default function CalendarPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-medium text-slate-800 text-sm truncate">{o.eventName}</p>
-                    <p className="text-sm font-bold text-slate-800 shrink-0">¥{o.amount.toLocaleString()}</p>
+                    <Yen value={o.amount} size="sm" className="font-bold text-slate-800 shrink-0" />
                   </div>
                   <p className="text-xs text-gray-500">男気 — {o.payer.name}</p>
                   {o.memo && (

@@ -7,6 +7,8 @@ import { MEMBER_SELECT } from '@/lib/prisma-selects';
 import { EVENT_TYPE_LABELS, WARIKAN_STATUS_LABELS } from '@/lib/constants';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Yen } from '@/components/ui/yen';
+import { formatDateBoth } from '@/lib/date-utils';
 import MonthlySummaryCollapsible from './(dashboard)/monthly-summary-collapsible';
 
 const EVENT_TYPE_COLORS: Record<string, string> = {
@@ -16,11 +18,6 @@ const EVENT_TYPE_COLORS: Record<string, string> = {
   OTHER: 'bg-gray-100 text-gray-600',
 };
 
-function formatEventDate(date: Date | string): string {
-  const d = new Date(date);
-  const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-  return `${d.getMonth() + 1}/${d.getDate()}(${weekdays[d.getDay()]})`;
-}
 
 function formatShortDate(date: Date | string | null) {
   if (!date) return '-';
@@ -194,7 +191,7 @@ export default async function DashboardPage() {
               <span aria-hidden>🔴</span>
               要アクション
             </CardTitle>
-            <Button variant="ghost" size="sm" asChild className="text-xs text-gray-500 h-7 px-2">
+            <Button variant="ghost" size="sm" asChild className="text-xs text-gray-500 min-h-[44px] px-3">
               <Link href="/warikan">全て →</Link>
             </Button>
           </div>
@@ -279,7 +276,7 @@ export default async function DashboardPage() {
               <span aria-hidden>📅</span>
               来週のイベント
             </CardTitle>
-            <Button variant="ghost" size="sm" asChild className="text-xs text-gray-500 h-7 px-2">
+            <Button variant="ghost" size="sm" asChild className="text-xs text-gray-500 min-h-[44px] px-3">
               <Link href="/calendar">カレンダー →</Link>
             </Button>
           </div>
@@ -296,8 +293,8 @@ export default async function DashboardPage() {
                   className="flex items-center gap-2 py-2 px-2 rounded-lg hover:bg-gray-50 transition group"
                 >
                   <div className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-                  <span className="text-xs text-amber-600 font-medium w-16 shrink-0">
-                    {formatEventDate(ev.date)}
+                  <span className="text-xs text-amber-600 font-medium shrink-0 tabular-nums">
+                    {formatDateBoth(ev.date)}
                   </span>
                   <span className="text-sm font-medium text-slate-800 flex-1 truncate group-hover:text-amber-700">
                     {ev.title}
@@ -323,7 +320,7 @@ export default async function DashboardPage() {
               <span aria-hidden>🏆</span>
               今月の男気 Top 3
             </CardTitle>
-            <Button variant="ghost" size="sm" asChild className="text-xs text-gray-500 h-7 px-2">
+            <Button variant="ghost" size="sm" asChild className="text-xs text-gray-500 min-h-[44px] px-3">
               <Link href="/otokogi/stats">全部見る →</Link>
             </Button>
           </div>
@@ -350,9 +347,7 @@ export default async function DashboardPage() {
                       <p className="text-sm font-medium text-slate-800 truncate">{row.member.name}</p>
                       <p className="text-[10px] text-gray-500">{row.count}回</p>
                     </div>
-                    <p className="text-sm font-bold text-slate-800 shrink-0">
-                      ¥{row.total.toLocaleString()}
-                    </p>
+                    <Yen value={row.total} size="sm" className="font-bold text-slate-800 shrink-0" />
                   </div>
                 );
               })}

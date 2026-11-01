@@ -78,7 +78,7 @@ export default function Header() {
           <div className="md:hidden">
             <button
               type="button"
-              className="p-2 rounded-md text-gray-300 hover:text-white hover:bg-slate-700"
+              className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-md text-gray-300 hover:text-white hover:bg-slate-700"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
               <span className="sr-only">メニューを開く</span>
@@ -104,7 +104,7 @@ export default function Header() {
                   isActive(item.href)
                     ? 'bg-slate-600 text-amber-400'
                     : 'text-gray-300 hover:bg-slate-600 hover:text-white',
-                  'block px-3 py-2 rounded-md text-base font-medium'
+                  'flex items-center min-h-[44px] px-3 py-2 rounded-md text-base font-medium'
                 )}
                 onTouchStart={() => handlePrefetch(item.href)}
                 onClick={() => setMobileMenuOpen(false)}
