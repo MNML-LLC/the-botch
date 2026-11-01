@@ -14,7 +14,7 @@ import {
   type OtokogiEventInput,
 } from '@/lib/otokogi-ranking'
 
-const CLUTCH = 10000
+const CLUTCH = 50000
 
 function member(id: string, name: string = id): MemberBase {
   return {
@@ -104,13 +104,13 @@ describe('computeRanking - 男気率 (otokogi_rate)', () => {
 })
 
 describe('computeRanking - クラッチ力 (clutch_rate)', () => {
-  test('高額イベント (>= 10000) 限定で払った率を算出', () => {
+  test('高額イベント (>= 50000) 限定で払った率を算出', () => {
     const members = [member('a'), member('b')]
     const events = [
-      event('e1', '2026-01-01', 'a', 15000, ['a', 'b']), // clutch
-      event('e2', '2026-01-02', 'a', 20000, ['a', 'b']), // clutch
-      event('e3', '2026-01-03', 'b', 12000, ['a', 'b']), // clutch
-      event('e4', '2026-01-04', 'a', 500, ['a', 'b']),   // 対象外（<10000）
+      event('e1', '2026-01-01', 'a', 60000, ['a', 'b']), // clutch
+      event('e2', '2026-01-02', 'a', 80000, ['a', 'b']), // clutch
+      event('e3', '2026-01-03', 'b', 55000, ['a', 'b']), // clutch
+      event('e4', '2026-01-04', 'a', 15000, ['a', 'b']), // 対象外（10000-49999 の男気はクラッチ外）
     ]
     const result = computeRanking(members, events, { metric: 'clutch', clutchThreshold: CLUTCH })
     const a = result.find((r) => r.memberId === 'a')!
@@ -130,20 +130,44 @@ describe('computeRanking - クラッチ力 (clutch_rate)', () => {
   test('高額イベントに参加していない → clutchRate は null', () => {
     const members = [member('a'), member('b')]
     const events = [
-      event('e1', '2026-01-01', 'a', 5000, ['a']), // b は参加なし / 低額
-      event('e2', '2026-01-02', 'a', 20000, ['a']), // b は参加なし
+      event('e1', '2026-01-01', 'a', 15000, ['a']), // b は参加なし / 非クラッチ
+      event('e2', '2026-01-02', 'a', 80000, ['a']), // b は参加なし
     ]
     const result = computeRanking(members, events, { metric: 'clutch', clutchThreshold: CLUTCH })
     const b = result.find((r) => r.memberId === 'b')
     expect(b).toBeUndefined() // 参加 0 のため除外
   })
 
-  test('閾値ちょうど (= 10000) はクラッチ扱い', () => {
+  test('閾値ちょうど (= 50000) はクラッチ扱い', () => {
     const members = [member('a')]
-    const events = [event('e1', '2026-01-01', 'a', 10000, ['a'])]
+    const events = [event('e1', '2026-01-01', 'a', 50000, ['a'])]
     const result = computeRanking(members, events, { metric: 'clutch', clutchThreshold: CLUTCH })
     expect(result[0].clutchParticipatedCount).toBe(1)
     expect(result[0].clutchPaidCount).toBe(1)
+  })
+
+  test('10000〜49999 の男気は clutch にカウントされない', () => {
+    const members = [member('a'), member('b')]
+    const events = [
+      event('e1', '2026-01-01', 'a', 10000, ['a', 'b']), // 男気成立しているが非クラッチ
+      event('e2', '2026-01-02', 'a', 25000, ['a', 'b']), // 非クラッチ
+      event('e3', '2026-01-03', 'b', 49999, ['a', 'b']), // 境界: 50000 未満は非クラッチ
+    ]
+    const result = computeRanking(members, events, { metric: 'clutch', clutchThreshold: CLUTCH })
+    const a = result.find((r) => r.memberId === 'a')!
+    const b = result.find((r) => r.memberId === 'b')!
+    // 誰もクラッチイベントに参加していない
+    expect(a.clutchParticipatedCount).toBe(0)
+    expect(a.clutchPaidCount).toBe(0)
+    expect(a.clutchRate).toBeNull()
+    expect(b.clutchParticipatedCount).toBe(0)
+    expect(b.clutchPaidCount).toBe(0)
+    expect(b.clutchRate).toBeNull()
+    // ただし total/count には反映される
+    expect(a.count).toBe(2)
+    expect(a.totalPaid).toBe(35000)
+    expect(b.count).toBe(1)
+    expect(b.totalPaid).toBe(49999)
   })
 })
 

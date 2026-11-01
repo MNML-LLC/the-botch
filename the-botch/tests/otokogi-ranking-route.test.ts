@@ -80,7 +80,7 @@ describe('GET /api/otokogi/ranking', () => {
 
     expect(status).toBe(200)
     expect(data.metric).toBe('total')
-    expect(data.clutchThreshold).toBe(10000)
+    expect(data.clutchThreshold).toBe(50000)
     expect(data.ranking).toHaveLength(2)
 
     // total 順: a が 15000, b が 3000

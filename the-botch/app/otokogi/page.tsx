@@ -145,7 +145,7 @@ export default function OtokogiPage() {
     rankingMetric
   );
   const rankingData = rankingResponse?.ranking ?? [];
-  const clutchThreshold = rankingResponse?.clutchThreshold ?? 10000;
+  const clutchThreshold = rankingResponse?.clutchThreshold ?? 50000;
 
   const loading = activeTab === 'history' ? eventsLoading : rankingLoading;
 

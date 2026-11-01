@@ -2,7 +2,7 @@
 //
 // Issue #335 で導入: 従来の total_paid 絶対額ランキングに加えて以下 4 指標を算出する。
 //   1. 男気率 (otokogi_rate): 自分が払った額 ÷ 自分が参加した会の総額
-//   2. クラッチ力 (clutch_rate): 高額イベント（amount >= OTOKOGI_CLUTCH_THRESHOLD）での payer 率
+//   2. クラッチ力 (clutch_rate): 高額イベント（amount >= OTOKOGI_CLUTCH_THRESHOLD, 既定 50,000円）での payer 率
 //   3. 最長 / 現在ストリーク (max_streak / current_streak): 同じ人が連続で払った回数
 //   4. 気前度 (generosity): 1回あたりの平均 payer 額
 //

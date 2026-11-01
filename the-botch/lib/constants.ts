@@ -2,7 +2,8 @@ import type { EventType, WarikanStatus } from '@/lib/generated/prisma/client'
 
 // 男気ランキングのクラッチ力（高額イベントでの支払率）判定閾値（円）
 // 「高額」= この金額以上の男気イベント
-export const OTOKOGI_CLUTCH_THRESHOLD = 10000
+// 男気イベント自体は amount >= 10000 で成立するが、クラッチ軸はさらに大きい額を区別する
+export const OTOKOGI_CLUTCH_THRESHOLD = 50000
 
 // 割り勘イベントのステータス日本語ラベル
 export const WARIKAN_STATUS_LABELS: Record<WarikanStatus, string> = {
