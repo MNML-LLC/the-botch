@@ -14,7 +14,12 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Swords, Trophy } from 'lucide-react';
-import { useOtokogiEvents, useOtokogiRanking } from '@/hooks/use-otokogi';
+import {
+  useOtokogiEvents,
+  useOtokogiRanking,
+  type OtokogiRankingEntry,
+  type OtokogiRankingMetric,
+} from '@/hooks/use-otokogi';
 import { useScrollRestoration } from '@/hooks/use-scroll-restoration';
 
 function OtokogiHistorySkeleton() {
@@ -66,9 +71,60 @@ function OtokogiRankingSkeleton() {
 
 type Tab = 'history' | 'ranking';
 
+const RANKING_METRIC_LABELS: { key: OtokogiRankingMetric; label: string; shortLabel: string }[] = [
+  { key: 'total', label: '支払額', shortLabel: '支払額' },
+  { key: 'rate', label: '男気率', shortLabel: '男気率' },
+  { key: 'clutch', label: 'クラッチ力', shortLabel: 'クラッチ' },
+  { key: 'streak', label: 'ストリーク', shortLabel: '連続' },
+  { key: 'generosity', label: '気前度', shortLabel: '気前' },
+];
+
+const yenFmt = new Intl.NumberFormat('ja-JP');
+
+function formatPercent(value: number | null): string {
+  if (value === null) return '—';
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function formatYen(value: number | null): string {
+  if (value === null) return '—';
+  return `¥${yenFmt.format(value)}`;
+}
+
+function metricPrimary(entry: OtokogiRankingEntry, metric: OtokogiRankingMetric): string {
+  switch (metric) {
+    case 'total':
+      return `¥${entry.totalPaid.toLocaleString()}`;
+    case 'rate':
+      return formatPercent(entry.otokogiRate);
+    case 'clutch':
+      return formatPercent(entry.clutchRate);
+    case 'streak':
+      return `最長${entry.maxStreak}回`;
+    case 'generosity':
+      return formatYen(entry.generosity);
+  }
+}
+
+function metricSubline(entry: OtokogiRankingEntry, metric: OtokogiRankingMetric): string {
+  switch (metric) {
+    case 'total':
+      return `${entry.count}回`;
+    case 'rate':
+      return `払 ¥${entry.totalPaid.toLocaleString()} / 参 ¥${entry.participatedTotal.toLocaleString()}`;
+    case 'clutch':
+      return `${entry.clutchParticipatedCount}回中${entry.clutchPaidCount}回`;
+    case 'streak':
+      return `現在 ${entry.currentStreak}回連続`;
+    case 'generosity':
+      return `${entry.count}回払 / 累計¥${entry.totalPaid.toLocaleString()}`;
+  }
+}
+
 export default function OtokogiPage() {
   const [activeTab, setActiveTab] = useState<Tab>('history');
   const [yearFilter, setYearFilter] = useState('all');
+  const [rankingMetric, setRankingMetric] = useState<OtokogiRankingMetric>('total');
 
   const today = new Date();
   const currentFiscalYear = today.getMonth() >= 10 ? today.getFullYear() + 1 : today.getFullYear();
@@ -84,8 +140,12 @@ export default function OtokogiPage() {
 
   const events = eventsData?.pages.flatMap((page) => page.data) ?? [];
 
-  const { data: rankingResponse, isLoading: rankingLoading } = useOtokogiRanking(yearFilter);
+  const { data: rankingResponse, isLoading: rankingLoading } = useOtokogiRanking(
+    yearFilter,
+    rankingMetric
+  );
   const rankingData = rankingResponse?.ranking ?? [];
+  const clutchThreshold = rankingResponse?.clutchThreshold ?? 10000;
 
   const loading = activeTab === 'history' ? eventsLoading : rankingLoading;
 
@@ -229,7 +289,31 @@ export default function OtokogiPage() {
       {activeTab === 'ranking' && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-slate-800">支払額ランキング</CardTitle>
+            <CardTitle className="text-slate-800">男気ランキング</CardTitle>
+            {/* 指標切替タブ */}
+            <div className="flex gap-1 mt-2 overflow-x-auto -mx-1 px-1">
+              {RANKING_METRIC_LABELS.map((m) => (
+                <button
+                  key={m.key}
+                  type="button"
+                  onClick={() => setRankingMetric(m.key)}
+                  className={`px-3 py-1 text-xs rounded-full border transition whitespace-nowrap ${
+                    rankingMetric === m.key
+                      ? 'bg-slate-800 text-white border-slate-800'
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-slate-400'
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-gray-500 mt-1.5">
+              {rankingMetric === 'total' && '期間中に自分が払った金額の合計'}
+              {rankingMetric === 'rate' && '参加した会の総額に対して自分がどれだけ払ったか'}
+              {rankingMetric === 'clutch' && `高額イベント（¥${clutchThreshold.toLocaleString()}以上）での payer 率`}
+              {rankingMetric === 'streak' && '同じ人が連続で払った最長回数（と現在の連続数）'}
+              {rankingMetric === 'generosity' && '1回あたりの平均 payer 額'}
+            </p>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -244,7 +328,7 @@ export default function OtokogiPage() {
             ) : (
               <div className="space-y-3">
                 {rankingData.map((member) => (
-                  <div key={member.memberId} className="flex items-center gap-2 sm:gap-3">
+                  <div key={member.memberId} className="flex items-start gap-2 sm:gap-3">
                     <span className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold shrink-0 ${
                       member.rank === 1 ? 'bg-amber-100 text-amber-700' : member.rank === 2 ? 'bg-gray-100 text-gray-600' : member.rank === 3 ? 'bg-orange-100 text-orange-700' : 'bg-gray-50 text-gray-500'
                     }`}>
@@ -255,9 +339,19 @@ export default function OtokogiPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-800 truncate">{member.name}</p>
-                      <p className="text-xs text-gray-500">{member.count}回</p>
+                      <p className="text-[11px] text-gray-500 truncate">{metricSubline(member, rankingMetric)}</p>
+                      {/* 他指標の併記（コンパクト） */}
+                      <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1 text-[10px] text-gray-400">
+                        {RANKING_METRIC_LABELS.filter((m) => m.key !== rankingMetric).map((m) => (
+                          <span key={m.key}>
+                            {m.shortLabel}: <span className="text-gray-500">{metricPrimary(member, m.key)}</span>
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                    <p className="font-bold text-sm sm:text-base text-slate-800 shrink-0">¥{member.totalPaid.toLocaleString()}</p>
+                    <p className="font-bold text-sm sm:text-base text-slate-800 shrink-0">
+                      {metricPrimary(member, rankingMetric)}
+                    </p>
                   </div>
                 ))}
               </div>

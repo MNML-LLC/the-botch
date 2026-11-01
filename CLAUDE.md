@@ -342,7 +342,7 @@ Prisma モデル `Event`（カレンダーイベント）を操作する。
 | PATCH | `/api/otokogi/:id` | 男気イベント部分更新 |
 | DELETE | `/api/otokogi/:id` | 男気イベント削除 |
 | GET | `/api/otokogi/stats` | 男気統計（キャッシュ有） |
-| GET | `/api/otokogi/ranking` | 支払額ランキング |
+| GET | `/api/otokogi/ranking` | 男気ランキング（4軸 + 支払額、`metric` 切替） |
 | GET | `/api/otokogi/member-summary` | メンバー別収支サマリー |
 
 **GET `/api/otokogi`**
@@ -397,8 +397,32 @@ Prisma モデル `Event`（カレンダーイベント）を操作する。
 
 **GET `/api/otokogi/ranking`**
 
-- クエリ: `year=YYYY`（省略時は全期間）
-- レスポンス 200: `{ ranking: Array<{ rank, memberId, name, initial, colorBg, colorText, count, totalPaid }> }`（`totalPaid DESC` ソート）
+- クエリ:
+  - `year=YYYY`（省略時は全期間。fiscal year: 11月開始 → 翌年10月末）
+  - `metric=total|rate|clutch|streak|generosity`（default `total`。不正値は `total` にフォールバック）
+- 返却値には全 5 指標が含まれ、フロントで切替表示可能（ソート順は metric により変わる）
+- レスポンス 200:
+  ```
+  {
+    metric: "total" | "rate" | "clutch" | "streak" | "generosity",
+    clutchThreshold: 10000,
+    ranking: Array<{
+      rank, memberId, name, initial, colorBg, colorText,
+      count,                    // 支払った回数
+      totalPaid,                // 支払った合計額
+      participatedCount,        // 参加した回数
+      participatedTotal,        // 参加した会の総額
+      otokogiRate,              // paid / participatedTotal (null = 参加 0)
+      clutchParticipatedCount,  // 高額(>=10000)参加回数
+      clutchPaidCount,          // 高額支払回数
+      clutchRate,               // clutchPaid / clutchParticipated (null = 高額参加 0)
+      maxStreak,                // 連続支払いの最長記録
+      currentStreak,            // 末尾の払い手に対する連続カウント (他は 0)
+      generosity                // 1回あたりの平均 payer 額 (null = 支払 0)
+    }>
+  }
+  ```
+- 参加・支払が共に 0 のメンバーは除外。クラッチ閾値は `lib/constants.ts` の `OTOKOGI_CLUTCH_THRESHOLD`
 - キャッシュ: `Cache-Control: private, max-age=60, stale-while-revalidate=300`
 
 **GET `/api/otokogi/member-summary`**

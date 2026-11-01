@@ -34,6 +34,8 @@ export type OtokogiResponse = {
   nextCursor: string | null;
 };
 
+export type OtokogiRankingMetric = 'total' | 'rate' | 'clutch' | 'streak' | 'generosity';
+
 export type OtokogiRankingEntry = {
   rank: number;
   memberId: string;
@@ -43,9 +45,20 @@ export type OtokogiRankingEntry = {
   colorText: string;
   count: number;
   totalPaid: number;
+  participatedCount: number;
+  participatedTotal: number;
+  otokogiRate: number | null;
+  clutchParticipatedCount: number;
+  clutchPaidCount: number;
+  clutchRate: number | null;
+  maxStreak: number;
+  currentStreak: number;
+  generosity: number | null;
 };
 
 export type OtokogiRankingResponse = {
+  metric: OtokogiRankingMetric;
+  clutchThreshold: number;
   ranking: OtokogiRankingEntry[];
 };
 
@@ -124,12 +137,16 @@ export function useOtokogiEvents(yearFilter: string) {
   });
 }
 
-export function useOtokogiRanking(yearFilter: string) {
+export function useOtokogiRanking(
+  yearFilter: string,
+  metric: OtokogiRankingMetric = 'total'
+) {
   return useQuery({
-    queryKey: ['otokogi-ranking', yearFilter],
+    queryKey: ['otokogi-ranking', yearFilter, metric],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (yearFilter !== 'all') params.set('year', yearFilter);
+      if (metric !== 'total') params.set('metric', metric);
       const res = await fetch(`/api/otokogi/ranking?${params.toString()}`);
       if (!res.ok) throw new Error('ランキングの取得に失敗しました');
       return res.json() as Promise<OtokogiRankingResponse>;

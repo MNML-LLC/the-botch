@@ -1,70 +1,85 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { handleApiError } from '@/lib/api-utils'
+import { OTOKOGI_CLUTCH_THRESHOLD } from '@/lib/constants'
+import {
+  computeRanking,
+  fiscalYearRange,
+  isRankingMetric,
+  type OtokogiEventInput,
+  type RankingMetric,
+} from '@/lib/otokogi-ranking'
 
-// Raw SQL 結果型
-type RankingRow = {
-  member_id: string
-  name: string
-  initial: string
-  color_bg: string
-  color_text: string
-  count: bigint
-  total_paid: bigint
-}
-
-// GET /api/otokogi/ranking — 男気ランキング（Raw SQL JOIN 1クエリ化）
+// GET /api/otokogi/ranking — 男気ランキング（4軸対応 / Issue #335）
+//
+// クエリ:
+//   - year=YYYY     fiscal year フィルタ (11月開始)。省略時は全期間。
+//   - metric=total|rate|clutch|streak|generosity (default: total)
+//     ソート基準。レスポンスには全指標が含まれるのでフロントで切替可能。
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const year = searchParams.get('year')
+    const yearParam = searchParams.get('year')
+    const metricParam = searchParams.get('metric')
 
-    // Raw SQL で JOIN して1クエリ化（2クエリ → 1クエリ）
-    const rows: RankingRow[] = year
-      ? await prisma.$queryRaw<RankingRow[]>`
-          SELECT
-            m.id AS member_id,
-            m.name,
-            m.initial,
-            m.color_bg,
-            m.color_text,
-            COUNT(*)::bigint AS count,
-            SUM(oe.amount)::bigint AS total_paid
-          FROM otokogi_events oe
-          JOIN members m ON oe.payer_id = m.id
-          WHERE oe.event_date >= ${new Date(`${Number(year) - 1}-11-01`)} AND oe.event_date <= ${new Date(`${year}-10-31`)}
-          GROUP BY m.id, m.name, m.initial, m.color_bg, m.color_text
-          ORDER BY total_paid DESC`
-      : await prisma.$queryRaw<RankingRow[]>`
-          SELECT
-            m.id AS member_id,
-            m.name,
-            m.initial,
-            m.color_bg,
-            m.color_text,
-            COUNT(*)::bigint AS count,
-            SUM(oe.amount)::bigint AS total_paid
-          FROM otokogi_events oe
-          JOIN members m ON oe.payer_id = m.id
-          GROUP BY m.id, m.name, m.initial, m.color_bg, m.color_text
-          ORDER BY total_paid DESC`
+    const metric: RankingMetric = isRankingMetric(metricParam) ? metricParam : 'total'
 
-    const ranking = rows.map((row, index) => ({
-      rank: index + 1,
-      memberId: row.member_id,
-      name: row.name,
-      initial: row.initial,
-      colorBg: row.color_bg,
-      colorText: row.color_text,
-      count: Number(row.count),
-      totalPaid: Number(row.total_paid),
+    const dateRange = yearParam && /^\d{4}$/.test(yearParam)
+      ? fiscalYearRange(Number(yearParam))
+      : null
+
+    // メンバー・男気イベント（参加者込み）を並列取得
+    const whereDate = dateRange
+      ? { eventDate: { gte: dateRange.from, lte: dateRange.to } }
+      : {}
+
+    const [members, events] = await Promise.all([
+      prisma.member.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          name: true,
+          initial: true,
+          colorBg: true,
+          colorText: true,
+        },
+      }),
+      prisma.otokogiEvent.findMany({
+        where: whereDate,
+        select: {
+          id: true,
+          eventDate: true,
+          payerId: true,
+          amount: true,
+          participants: { select: { memberId: true } },
+        },
+      }),
+    ])
+
+    const eventInputs: OtokogiEventInput[] = events.map((e) => ({
+      id: e.id,
+      eventDate: e.eventDate,
+      payerId: e.payerId,
+      amount: e.amount,
+      participantIds: e.participants.map((p) => p.memberId),
     }))
 
-    const response = NextResponse.json({ ranking })
-    // クライアントキャッシュ: 60秒有効 + 300秒のstale-while-revalidate
+    const ranking = computeRanking(members, eventInputs, {
+      metric,
+      clutchThreshold: OTOKOGI_CLUTCH_THRESHOLD,
+    })
+
+    const response = NextResponse.json({
+      metric,
+      clutchThreshold: OTOKOGI_CLUTCH_THRESHOLD,
+      ranking,
+    })
     response.headers.set('Cache-Control', 'private, max-age=60, stale-while-revalidate=300')
     return response
   } catch (error) {
-    return handleApiError(error, { logLabel: 'ランキング取得エラー', fallbackMessage: 'ランキングの取得に失敗しました' })
+    return handleApiError(error, {
+      logLabel: 'ランキング取得エラー',
+      fallbackMessage: 'ランキングの取得に失敗しました',
+    })
   }
 }
