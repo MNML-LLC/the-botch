@@ -9,9 +9,18 @@ import {
 } from 'recharts';
 import { useMembers } from '@/hooks/use-members';
 import {
+  useOtokogiCharts,
   useOtokogiMemberSummary,
   useOtokogiStatsMain,
 } from '@/hooks/use-otokogi';
+import type { OtokogiCategory } from '@/lib/otokogi-category';
+import {
+  HeatmapSection,
+  CategoryPieSection,
+  CumulativeYearlySection,
+  ComparisonSection,
+  TopRecentSection,
+} from './charts';
 
 // ---- 型定義 ----
 
@@ -40,6 +49,7 @@ type StatsData = {
   totalCount: number;
   totalAmount: number;
   averageAmount: number;
+  categoryBreakdown: { category: OtokogiCategory; amount: number; count: number }[];
 };
 
 type MemberSummaryEntry = {
@@ -460,6 +470,10 @@ export default function OtokogiStatsPage() {
     selectedMemberIds
   );
 
+  // 新チャート用データ（期間フィルタ非依存）
+  const { data: charts } = useOtokogiCharts();
+  const currentYear = new Date().getFullYear();
+
   return (
     <div>
       {/* ヘッダー */}
@@ -506,7 +520,7 @@ export default function OtokogiStatsPage() {
         <p className="text-sm text-gray-500 py-4">読み込み中...</p>
       )}
 
-      {/* グラフ 3 本（縦スタック） */}
+      {/* グラフ（縦スタック、モバイル縦スクロール最適化） */}
       <div className="space-y-4">
         {/* 1. メンバー別収支表 */}
         <MemberBalanceSection
@@ -515,11 +529,26 @@ export default function OtokogiStatsPage() {
           memberIds={selectedMemberIds}
         />
 
-        {/* 2. 月別推移 */}
+        {/* 2. 月別推移（既存） */}
         <MonthlyTrendSection data={stats?.monthlyTrend} />
 
-        {/* 3. 漢気ランキング */}
+        {/* 3. 漢気ランキング（既存） */}
         <RankingSection data={stats?.otokogiByMember} />
+
+        {/* 4. ヒートマップ（直近 12ヶ月固定） */}
+        <HeatmapSection data={charts?.heatmap} />
+
+        {/* 5. カテゴリ別支払分布 */}
+        <CategoryPieSection data={stats?.categoryBreakdown} />
+
+        {/* 6. 累積折れ線（今年 / 昨年 / 一昨年、固定） */}
+        <CumulativeYearlySection data={charts?.cumulativeYearly} thisYearLabel={currentYear} />
+
+        {/* 7. 比較棒グラフ（今月vs先月 / 今年vs昨年、固定） */}
+        <ComparisonSection data={charts?.comparison} />
+
+        {/* 8. Top 3 カード（直近 3ヶ月、固定） */}
+        <TopRecentSection data={charts?.topRecent} />
       </div>
     </div>
   );

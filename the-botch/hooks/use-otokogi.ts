@@ -175,6 +175,49 @@ export function useOtokogiStatsMain<T>(
   });
 }
 
+export type OtokogiChartsResponse = {
+  heatmap: {
+    months: string[];
+    members: Member[];
+    cells: { month: string; memberId: string; amount: number }[];
+  };
+  cumulativeYearly: {
+    month: number;
+    thisYear: number | null;
+    lastYear: number;
+    yearBefore: number;
+  }[];
+  comparison: {
+    thisMonth: { total: number; byMember: { memberId: string; memberName: string; amount: number }[] };
+    lastMonth: { total: number; byMember: { memberId: string; memberName: string; amount: number }[] };
+    thisYear: { total: number; byMember: { memberId: string; memberName: string; amount: number }[] };
+    lastYear: { total: number; byMember: { memberId: string; memberName: string; amount: number }[] };
+    labels: { thisMonth: string; lastMonth: string; thisYear: string; lastYear: string };
+  };
+  topRecent: {
+    id: string;
+    eventName: string;
+    eventDate: string;
+    amount: number;
+    place: string | null;
+    payer: Member;
+  }[];
+  members: Member[];
+};
+
+export function useOtokogiCharts() {
+  return useQuery({
+    queryKey: ['otokogi-charts'],
+    queryFn: async () => {
+      const res = await fetch('/api/otokogi/charts');
+      if (!res.ok) throw new Error('チャートデータの取得に失敗しました');
+      return res.json() as Promise<OtokogiChartsResponse>;
+    },
+    staleTime: 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+}
+
 export function useOtokogiMemberSummary<T>(
   from: string | undefined,
   to: string | undefined,
@@ -221,6 +264,7 @@ export function useCreateOtokogi(
       queryClient.invalidateQueries({ queryKey: ['otokogi'] });
       queryClient.invalidateQueries({ queryKey: ['otokogi-ranking'] });
       queryClient.invalidateQueries({ queryKey: ['otokogi-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['otokogi-charts'] });
       queryClient.invalidateQueries({ queryKey: ['calendar'] });
       options?.onSuccess?.(data, variables, onMutateResult, context);
     },
@@ -251,6 +295,7 @@ export function useUpdateOtokogi(
       queryClient.invalidateQueries({ queryKey: ['otokogi-event', id] });
       queryClient.invalidateQueries({ queryKey: ['otokogi-ranking'] });
       queryClient.invalidateQueries({ queryKey: ['otokogi-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['otokogi-charts'] });
       queryClient.invalidateQueries({ queryKey: ['calendar'] });
       options?.onSuccess?.(data, variables, onMutateResult, context);
     },
@@ -277,6 +322,7 @@ export function useDeleteOtokogi(
       queryClient.invalidateQueries({ queryKey: ['otokogi-event', id] });
       queryClient.invalidateQueries({ queryKey: ['otokogi-ranking'] });
       queryClient.invalidateQueries({ queryKey: ['otokogi-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['otokogi-charts'] });
       queryClient.invalidateQueries({ queryKey: ['calendar'] });
       options?.onSuccess?.(data, variables, onMutateResult, context);
     },
