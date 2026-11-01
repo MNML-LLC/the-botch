@@ -43,6 +43,7 @@ import {
   useWarikanSettlements,
 } from '@/hooks/use-warikan';
 import { toast } from '@/hooks/use-toast';
+import { Yen } from '@/components/ui/yen';
 
 type BankAccount = {
   bankName: string;
@@ -559,7 +560,7 @@ export default function WarikanDetailPage() {
                         <p className="text-xs text-gray-400 truncate">対象: {debtorNames}</p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <p className="font-bold text-sm text-slate-800">¥{expense.amount.toLocaleString()}</p>
+                        <Yen value={expense.amount} size="sm" className="font-bold text-slate-800" />
                         {/* 編集・削除ボタンはENTERINGのみ */}
                         {isEntering && (
                           <>
@@ -587,9 +588,11 @@ export default function WarikanDetailPage() {
                 <div className="mt-3 pt-3 border-t font-bold text-slate-800">
                   <div className="flex justify-between">
                     <span>合計</span>
-                    <span>¥{totalExpenses.toLocaleString()}</span>
+                    <Yen value={totalExpenses} />
                   </div>
-                  <p className="text-xs font-normal text-gray-500 text-right mt-0.5">1人あたり ¥{perPerson.toLocaleString()}</p>
+                  <p className="text-xs font-normal text-gray-500 text-right mt-0.5">
+                    1人あたり <Yen value={perPerson} size="xs" />
+                  </p>
                 </div>
               </div>
             )}
@@ -726,13 +729,13 @@ export default function WarikanDetailPage() {
                       return (
                         <tr key={mb.memberId} className="border-b last:border-b-0">
                           <td className="py-2 pr-2 font-medium text-slate-800">{member?.name ?? mb.memberId}</td>
-                          <td className="py-2 px-2 text-right text-gray-600">¥{mb.owed.toLocaleString()}</td>
-                          <td className="py-2 px-2 text-right text-gray-600">¥{mb.paid.toLocaleString()}</td>
+                          <td className="py-2 px-2 text-right text-gray-600"><Yen value={mb.owed} size="sm" /></td>
+                          <td className="py-2 px-2 text-right text-gray-600"><Yen value={mb.paid} size="sm" /></td>
                           <td className="py-2 pl-2 text-right font-medium">
                             {mb.balance > 0 ? (
-                              <span className="text-green-600">+¥{mb.balance.toLocaleString()}（受取）</span>
+                              <span className="text-green-600"><Yen value={mb.balance} size="sm" signed />（受取）</span>
                             ) : mb.balance < 0 ? (
-                              <span className="text-amber-600">-¥{Math.abs(mb.balance).toLocaleString()}（払う）</span>
+                              <span className="text-amber-600"><Yen value={mb.balance} size="sm" signed />（払う）</span>
                             ) : (
                               <span className="text-gray-400">±0</span>
                             )}
@@ -771,7 +774,7 @@ export default function WarikanDetailPage() {
                         <span className="font-medium text-slate-800">{fromMember?.name ?? s.fromMemberId}</span>
                         <span className="text-gray-400">&rarr;</span>
                         <span className="font-medium text-slate-800">{toMember?.name ?? s.toMemberId}</span>
-                        <span className="ml-auto font-bold text-slate-800">¥{s.amount.toLocaleString()}</span>
+                        <Yen value={s.amount} size="sm" className="ml-auto font-bold text-slate-800" />
                       </li>
                     );
                   })}
@@ -816,7 +819,7 @@ export default function WarikanDetailPage() {
                           <span className="font-medium text-slate-800">{fromMember?.name ?? s.fromMemberId}</span>
                           <span className="text-gray-400">&rarr;</span>
                           <span className="font-medium text-slate-800">{toMember?.name ?? s.toMemberId}</span>
-                          <span className="ml-auto font-bold text-slate-800">¥{s.amount.toLocaleString()}</span>
+                          <Yen value={s.amount} size="sm" className="ml-auto font-bold text-slate-800" />
                         </li>
                       );
                     })}
@@ -901,7 +904,7 @@ export default function WarikanDetailPage() {
                         <span className="text-gray-400 shrink-0">&rarr;</span>
                         <span className="font-medium shrink-0">{settlement.toMember.name}</span>
                       </div>
-                      <span className="font-bold text-sm sm:text-lg shrink-0 ml-2">¥{settlement.amount.toLocaleString()}</span>
+                      <Yen value={settlement.amount} className="font-bold text-sm sm:text-lg shrink-0 ml-2" />
                     </div>
                     {settlement.toMember.paypayId && (
                       <p className="text-xs text-gray-500 mb-2">

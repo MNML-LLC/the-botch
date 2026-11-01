@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Yen } from '@/components/ui/yen';
 import { EVENT_TYPE_LABELS } from '@/lib/constants';
 
 type Member = {
@@ -96,7 +97,7 @@ function renderText(item: TimelineItem): React.ReactNode {
             {' で '}
           </>
         ) : null}
-        <span className="font-bold">¥{amount.toLocaleString()}</span>
+        <Yen value={amount} className="font-bold" />
         {' 支払いました'}
         <span className="ml-1 text-xs text-gray-500">#{eventName}</span>
       </>
@@ -113,7 +114,7 @@ function renderText(item: TimelineItem): React.ReactNode {
         {' が '}
         <span className="font-medium">{to?.name ?? '誰か'}</span>
         {' に '}
-        <span className="font-bold">¥{amount.toLocaleString()}</span>
+        <Yen value={amount} className="font-bold" />
         {' を'}
         {phase}
         {warikanName ? <span className="ml-1 text-xs text-gray-500">#{warikanName}</span> : null}

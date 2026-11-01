@@ -22,6 +22,7 @@ import { ParticipantSelector } from '@/components/participant-selector';
 import { useMembers } from '@/hooks/use-members';
 import { useEvents } from '@/hooks/use-events';
 import { useCreateOtokogi } from '@/hooks/use-otokogi';
+import { Yen } from '@/components/ui/yen';
 
 function OtokogiNewForm() {
   const router = useRouter();
@@ -205,10 +206,10 @@ function OtokogiNewForm() {
             <div className="bg-amber-50 rounded-lg border border-amber-200 p-4">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-700">期待値（1人あたり）</span>
-                <span className="font-bold text-lg text-slate-800">¥{perPerson.toLocaleString()}</span>
+                <Yen value={perPerson} size="lg" className="font-bold text-slate-800" />
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                ¥{amountNum.toLocaleString()} &divide; {participantIds.length}人 = ¥{perPerson.toLocaleString()}
+                <Yen value={amountNum} size="xs" /> &divide; {participantIds.length}人 = <Yen value={perPerson} size="xs" />
               </p>
             </div>
           )}

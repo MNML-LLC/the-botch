@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Yen } from '@/components/ui/yen';
 import {
   Select,
   SelectContent,
@@ -162,9 +163,7 @@ export default function WalicaImportPage() {
                   <p className="text-xs text-gray-500">立替件数</p>
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-slate-800 truncate">
-                    ¥{preview.totalAmount.toLocaleString()}
-                  </p>
+                  <Yen value={preview.totalAmount} size="sm" className="font-bold text-slate-800 truncate block" />
                   <p className="text-xs text-gray-500">合計金額</p>
                 </div>
               </div>
@@ -226,9 +225,7 @@ export default function WalicaImportPage() {
                       <p className="text-sm text-slate-800 truncate">{e.itemName}</p>
                       <p className="text-xs text-gray-500">{e.payerName}が立替</p>
                     </div>
-                    <p className="text-sm font-medium text-slate-800 shrink-0 ml-2">
-                      ¥{e.amount.toLocaleString()}
-                    </p>
+                    <Yen value={e.amount} size="sm" className="font-medium text-slate-800 shrink-0 ml-2" />
                   </div>
                 ))}
               </div>
@@ -250,9 +247,7 @@ export default function WalicaImportPage() {
                       <p className="text-sm text-slate-800">
                         {s.senderName} → {s.receiverName}
                       </p>
-                      <p className="text-sm font-medium text-slate-800 shrink-0">
-                        ¥{s.amount.toLocaleString()}
-                      </p>
+                      <Yen value={s.amount} size="sm" className="font-medium text-slate-800 shrink-0" />
                     </div>
                   ))}
                 </div>

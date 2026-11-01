@@ -1,12 +1,8 @@
-import { Inter } from 'next/font/google';
 import './globals.css';
 import Header from '@/components/layout/Header';
 import BottomNav from '@/components/layout/bottom-nav';
 import Providers from './providers';
 import { Toaster } from '@/components/ui/toaster';
-import { cn } from '@/lib/utils';
-
-const inter = Inter({ subsets: ['latin'] });
 
 export const metadata = {
   title: 'The botch',
@@ -20,7 +16,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ja" className="h-full">
-      <body className={cn(inter.className, "h-full bg-gray-50")}>
+      <body className="h-full bg-gray-50 font-sans">
         <Providers>
           <div className="min-h-screen flex flex-col">
             <Header />

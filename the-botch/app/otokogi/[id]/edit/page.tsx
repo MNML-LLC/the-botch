@@ -20,6 +20,7 @@ import {
   useUpdateOtokogi,
   type OtokogiEventDetail,
 } from '@/hooks/use-otokogi';
+import { Yen } from '@/components/ui/yen';
 
 type Member = {
   id: string;
@@ -178,10 +179,10 @@ function EditForm({ id, event, members }: { id: string; event: OtokogiEventDetai
           <div className="bg-amber-50 rounded-lg border border-amber-200 p-4">
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-700">期待値（1人あたり）</span>
-              <span className="font-bold text-lg text-slate-800">¥{perPerson.toLocaleString()}</span>
+              <Yen value={perPerson} size="lg" className="font-bold text-slate-800" />
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              ¥{amountNum.toLocaleString()} &divide; {participantIds.length}人 = ¥{perPerson.toLocaleString()}
+              <Yen value={amountNum} size="xs" /> &divide; {participantIds.length}人 = <Yen value={perPerson} size="xs" />
             </p>
           </div>
         )}

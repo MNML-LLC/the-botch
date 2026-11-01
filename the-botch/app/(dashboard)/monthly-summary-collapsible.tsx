@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Yen } from '@/components/ui/yen';
 
 type Props = {
   monthLabel: string;
@@ -48,11 +49,11 @@ export default function MonthlySummaryCollapsible({
         <CardContent id="monthly-summary-body" className="pt-0">
           <div className="grid grid-cols-2 gap-2">
             <StatTile label="男気 件数" value={`${otokogiCount}件`} />
-            <StatTile label="男気 総額" value={`¥${otokogiTotal.toLocaleString()}`} />
+            <StatTile label="男気 総額" value={<Yen value={otokogiTotal} size="sm" />} />
             <StatTile label="割り勘 件数" value={`${warikanCount}件`} />
-            <StatTile label="割り勘 総額" value={`¥${warikanTotal.toLocaleString()}`} />
-            <StatTile label="合計" value={`¥${totalAmount.toLocaleString()}`} />
-            <StatTile label="1件平均" value={`¥${average.toLocaleString()}`} />
+            <StatTile label="割り勘 総額" value={<Yen value={warikanTotal} size="sm" />} />
+            <StatTile label="合計" value={<Yen value={totalAmount} size="sm" />} />
+            <StatTile label="1件平均" value={<Yen value={average} size="sm" />} />
           </div>
         </CardContent>
       )}
@@ -60,7 +61,7 @@ export default function MonthlySummaryCollapsible({
   );
 }
 
-function StatTile({ label, value }: { label: string; value: string }) {
+function StatTile({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="rounded-md border border-gray-200 bg-gray-50 p-2">
       <p className="text-[10px] text-gray-500">{label}</p>

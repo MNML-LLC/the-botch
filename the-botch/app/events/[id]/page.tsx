@@ -12,6 +12,8 @@ import {
 } from '@/hooks/use-events';
 import { EVENT_TYPE_LABELS } from '@/lib/constants';
 import { WarikanStatusBadge } from '@/components/ui/warikan-status-badge';
+import { Yen } from '@/components/ui/yen';
+import { formatDateBoth } from '@/lib/date-utils';
 import { toast } from '@/hooks/use-toast';
 
 type Member = {
@@ -69,10 +71,6 @@ function formatDate(dateStr: string) {
   return d.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-function formatShortDate(dateStr: string) {
-  const d = new Date(dateStr);
-  return `${d.getMonth() + 1}/${d.getDate()}`;
-}
 
 function MemberAvatar({ member, size = 'sm' }: { member: Member; size?: 'sm' | 'md' }) {
   const sizeClass = size === 'md' ? 'w-9 h-9 text-sm' : 'w-6 h-6 text-[10px]';
@@ -105,7 +103,7 @@ function OtokogiCard({
               {item.eventName}
             </Link>
             <p className="text-xs text-gray-500 mt-0.5">
-              {formatShortDate(item.eventDate)} / {item.payer.name}
+              <span className="tabular-nums">{formatDateBoth(item.eventDate)}</span> / {item.payer.name}
               {item.place && ` / ${item.place}`}
             </p>
             {item.memo && (
@@ -119,11 +117,11 @@ function OtokogiCard({
           </div>
         </div>
         <div className="flex flex-col items-end gap-2 shrink-0">
-          <p className="font-bold text-slate-800 text-sm">¥{item.amount.toLocaleString()}</p>
+          <Yen value={item.amount} size="sm" className="font-bold text-slate-800" />
           <button
             onClick={() => onUnlink(item.id)}
             disabled={unlinking}
-            className="text-xs text-gray-400 hover:text-red-500 transition flex items-center gap-0.5"
+            className="text-xs text-gray-400 hover:text-red-500 transition flex items-center gap-0.5 min-h-[44px] px-2"
             title="紐付け解除"
           >
             <X size={12} />
@@ -174,7 +172,7 @@ function WarikanCard({
         <button
           onClick={() => onUnlink(item.id)}
           disabled={unlinking}
-          className="text-xs text-gray-400 hover:text-red-500 transition flex items-center gap-0.5 shrink-0"
+          className="text-xs text-gray-400 hover:text-red-500 transition flex items-center gap-0.5 shrink-0 min-h-[44px] px-2"
           title="紐付け解除"
         >
           <X size={12} />
@@ -224,7 +222,7 @@ export default function EventDetailPage() {
   if (error || !event) {
     return (
       <div>
-        <button onClick={() => router.back()} className="flex items-center gap-1 text-gray-500 hover:text-gray-700 mb-4">
+        <button onClick={() => router.back()} className="flex items-center gap-1 text-gray-500 hover:text-gray-700 mb-4 min-h-[44px] px-2">
           <ChevronLeft size={16} />
           戻る
         </button>
@@ -305,7 +303,8 @@ export default function EventDetailPage() {
       <div className="flex items-center gap-2 mb-4">
         <button
           onClick={() => router.back()}
-          className="p-1 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition"
+          className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition"
+          aria-label="戻る"
         >
           <ChevronLeft size={20} />
         </button>
@@ -349,7 +348,7 @@ export default function EventDetailPage() {
           ]).map((tab) => (
             <button
               key={tab.key}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition flex items-center justify-center gap-1 ${
+              className={`flex-1 min-h-[44px] py-2 text-sm font-medium rounded-md transition flex items-center justify-center gap-1 ${
                 activeTab === tab.key ? 'bg-slate-800 text-white' : 'text-gray-600 hover:text-gray-900'
               }`}
               onClick={() => setActiveTab(tab.key)}
