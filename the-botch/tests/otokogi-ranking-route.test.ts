@@ -123,8 +123,46 @@ describe('GET /api/otokogi/ranking', () => {
     expect(call.where.eventDate.lte.toISOString()).toBe('2026-10-31T23:59:59.999Z')
   })
 
-  test('year が YYYY 形式でない場合は無視する', async () => {
+  test('year が YYYY 形式でない場合は現在の fiscal year にフォールバック', async () => {
     await GET(createRequest('/api/otokogi/ranking', { searchParams: { year: 'abcd' } }))
+    expect(mockedEventFindMany).toHaveBeenCalledTimes(1)
+    const call = mockedEventFindMany.mock.calls[0][0]
+    // 不正値は無視し、デフォルト（現在の fiscal year）が適用される
+    expect(call.where.eventDate.gte).toBeInstanceOf(Date)
+    expect(call.where.eventDate.lte).toBeInstanceOf(Date)
+  })
+
+  test('year を省略すると現在の fiscal year がデフォルトで適用される', async () => {
+    // システム時刻を 2026-06-15 (fiscal year 2026 内) に固定（タイムゾーン非依存）
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 5, 15, 12, 0, 0, 0))
+    try {
+      await GET(createRequest('/api/otokogi/ranking'))
+      expect(mockedEventFindMany).toHaveBeenCalledTimes(1)
+      const call = mockedEventFindMany.mock.calls[0][0]
+      expect(call.where.eventDate.gte.toISOString()).toBe('2025-11-01T00:00:00.000Z')
+      expect(call.where.eventDate.lte.toISOString()).toBe('2026-10-31T23:59:59.999Z')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  test('年度境界 (11月1日) で fiscal year が切り替わる', async () => {
+    vi.useFakeTimers()
+    // ローカル 2026-11-01 00:00 → month index 10 → fiscal year 2027
+    vi.setSystemTime(new Date(2026, 10, 1, 0, 0, 0, 0))
+    try {
+      await GET(createRequest('/api/otokogi/ranking'))
+      const call = mockedEventFindMany.mock.calls[0][0]
+      expect(call.where.eventDate.gte.toISOString()).toBe('2026-11-01T00:00:00.000Z')
+      expect(call.where.eventDate.lte.toISOString()).toBe('2027-10-31T23:59:59.999Z')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  test('year=all を指定すると日付フィルタなし', async () => {
+    await GET(createRequest('/api/otokogi/ranking', { searchParams: { year: 'all' } }))
     expect(mockedEventFindMany).toHaveBeenCalledTimes(1)
     const call = mockedEventFindMany.mock.calls[0][0]
     expect(call.where).toEqual({})

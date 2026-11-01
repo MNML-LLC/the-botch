@@ -295,6 +295,67 @@ describe('computeRanking - ソート (metric 別)', () => {
   })
 })
 
+describe('computeRanking - amount 制限 (clutch 以外は全額対象)', () => {
+  // CEO フィードバック: total / rate / streak / generosity は amount に関わらず全額カウント。
+  // clutch のみが OTOKOGI_CLUTCH_THRESHOLD 以上に絞られる。
+  test('1 万円未満の男気も total / rate / generosity に反映される', () => {
+    const members = [member('a'), member('b')]
+    const events = [
+      event('e1', '2026-01-01', 'a', 500, ['a', 'b']), // 低額
+      event('e2', '2026-01-02', 'a', 1500, ['a', 'b']), // 低額
+      event('e3', '2026-01-03', 'b', 2000, ['a', 'b']), // 低額
+    ]
+    const result = computeRanking(members, events, { metric: 'total', clutchThreshold: CLUTCH })
+    const a = result.find((r) => r.memberId === 'a')!
+    const b = result.find((r) => r.memberId === 'b')!
+
+    // total: 低額でも full amount カウント
+    expect(a.totalPaid).toBe(2000)
+    expect(b.totalPaid).toBe(2000)
+    expect(a.count).toBe(2)
+    expect(b.count).toBe(1)
+
+    // rate: 低額でも分母・分子に加算
+    expect(a.participatedTotal).toBe(4000)
+    expect(a.otokogiRate).toBeCloseTo(2000 / 4000)
+
+    // generosity: 低額でも平均に反映
+    expect(a.generosity).toBe(1000) // (500 + 1500) / 2
+    expect(b.generosity).toBe(2000)
+
+    // clutch: 全イベントが閾値未満 → 全員 null
+    expect(a.clutchRate).toBeNull()
+    expect(b.clutchRate).toBeNull()
+    expect(a.clutchParticipatedCount).toBe(0)
+  })
+
+  test('1 万円未満だけでも streak は普通にカウントされる', () => {
+    const members = [member('a'), member('b')]
+    const events = [
+      event('e1', '2026-01-01', 'a', 300, ['a', 'b']),
+      event('e2', '2026-01-02', 'a', 400, ['a', 'b']),
+      event('e3', '2026-01-03', 'a', 500, ['a', 'b']), // a 3 連続（全部低額）
+    ]
+    const result = computeRanking(members, events, { metric: 'streak', clutchThreshold: CLUTCH })
+    const a = result.find((r) => r.memberId === 'a')!
+    expect(a.maxStreak).toBe(3)
+    expect(a.currentStreak).toBe(3)
+  })
+
+  test('低額のみでも 1 位になり得る (clutch 以外)', () => {
+    const members = [member('a', 'Alice'), member('b', 'Bob')]
+    const events = [
+      event('e1', '2026-01-01', 'a', 100, ['a', 'b']),
+      event('e2', '2026-01-02', 'a', 200, ['a', 'b']),
+      event('e3', '2026-01-03', 'a', 300, ['a', 'b']), // a: 600 円 payer
+      event('e4', '2026-01-04', 'b', 50, ['a', 'b']), // b: 50 円 payer
+    ]
+    const totalResult = computeRanking(members, events, { metric: 'total', clutchThreshold: CLUTCH })
+    expect(totalResult[0].memberId).toBe('a')
+    expect(totalResult[0].totalPaid).toBe(600)
+  })
+})
+
 describe('computeRanking - エッジケース', () => {
   test('event 0 件 → 空配列を返す', () => {
     const members = [member('a'), member('b')]

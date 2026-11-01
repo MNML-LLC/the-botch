@@ -145,7 +145,9 @@ export function useOtokogiRanking(
     queryKey: ['otokogi-ranking', yearFilter, metric],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (yearFilter !== 'all') params.set('year', yearFilter);
+      // yearFilter が 'all' の場合はサーバー側の現 fiscal year デフォルトを
+      // 上書きして明示的に全期間取得する。
+      params.set('year', yearFilter === 'all' ? 'all' : yearFilter);
       if (metric !== 'total') params.set('metric', metric);
       const res = await fetch(`/api/otokogi/ranking?${params.toString()}`);
       if (!res.ok) throw new Error('ランキングの取得に失敗しました');

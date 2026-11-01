@@ -21,6 +21,7 @@ import {
   type OtokogiRankingMetric,
 } from '@/hooks/use-otokogi';
 import { useScrollRestoration } from '@/hooks/use-scroll-restoration';
+import { getCurrentFiscalYear } from '@/lib/date-utils';
 
 function OtokogiHistorySkeleton() {
   return (
@@ -122,12 +123,12 @@ function metricSubline(entry: OtokogiRankingEntry, metric: OtokogiRankingMetric)
 }
 
 export default function OtokogiPage() {
+  const currentFiscalYear = getCurrentFiscalYear();
   const [activeTab, setActiveTab] = useState<Tab>('history');
-  const [yearFilter, setYearFilter] = useState('all');
+  // デフォルトは今年度 (fiscal year, 11月開始)。全期間を見たい場合は 'all' を選択。
+  const [yearFilter, setYearFilter] = useState<string>(String(currentFiscalYear));
   const [rankingMetric, setRankingMetric] = useState<OtokogiRankingMetric>('total');
 
-  const today = new Date();
-  const currentFiscalYear = today.getMonth() >= 10 ? today.getFullYear() + 1 : today.getFullYear();
   const years = Array.from({ length: 4 }, (_, i) => currentFiscalYear - i);
 
   const {

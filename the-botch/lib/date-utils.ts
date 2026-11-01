@@ -1,6 +1,18 @@
 // カレンダー表示用日付ユーティリティ
 
 /**
+ * 指定日時点の fiscal year（11月開始〜翌年10月末）を返す。
+ *
+ * - 11月〜12月: 翌年を返す（例: 2026-11-01 → 2027）
+ * - 1月〜10月: その年を返す（例: 2026-02-01 → 2026）
+ *
+ * @param now 判定基準日（省略時は現在時刻）
+ */
+export function getCurrentFiscalYear(now: Date = new Date()): number {
+  return now.getMonth() >= 10 ? now.getFullYear() + 1 : now.getFullYear()
+}
+
+/**
  * イベント名から日付をパース（例: "20260207_テニス" → "2026-02-07"）
  * 先頭8桁が YYYYMMDD パターンの場合のみ抽出
  */

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { handleApiError } from '@/lib/api-utils'
 import { OTOKOGI_CLUTCH_THRESHOLD } from '@/lib/constants'
+import { getCurrentFiscalYear } from '@/lib/date-utils'
 import {
   computeRanking,
   fiscalYearRange,
@@ -13,9 +14,13 @@ import {
 // GET /api/otokogi/ranking — 男気ランキング（4軸対応 / Issue #335）
 //
 // クエリ:
-//   - year=YYYY     fiscal year フィルタ (11月開始)。省略時は全期間。
+//   - year=YYYY | all   fiscal year フィルタ (11月開始)。
+//                       省略時は現在の fiscal year、`all` 指定時は全期間。
 //   - metric=total|rate|clutch|streak|generosity (default: total)
 //     ソート基準。レスポンスには全指標が含まれるのでフロントで切替可能。
+//
+// 注意: amount 制限は clutch (高額イベント >= OTOKOGI_CLUTCH_THRESHOLD) のみ
+//       に適用され、total / rate / streak / generosity は全額対象。
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -24,9 +29,18 @@ export async function GET(request: NextRequest) {
 
     const metric: RankingMetric = isRankingMetric(metricParam) ? metricParam : 'total'
 
-    const dateRange = yearParam && /^\d{4}$/.test(yearParam)
-      ? fiscalYearRange(Number(yearParam))
-      : null
+    // year パラメータ解決:
+    //   - `all` 明示 → 期間フィルタなし
+    //   - `YYYY` → 指定 fiscal year
+    //   - 省略 or 不正値 → 現在の fiscal year（デフォルト）
+    let dateRange: { from: Date; to: Date } | null
+    if (yearParam === 'all') {
+      dateRange = null
+    } else if (yearParam && /^\d{4}$/.test(yearParam)) {
+      dateRange = fiscalYearRange(Number(yearParam))
+    } else {
+      dateRange = fiscalYearRange(getCurrentFiscalYear())
+    }
 
     // メンバー・男気イベント（参加者込み）を並列取得
     const whereDate = dateRange

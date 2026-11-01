@@ -398,8 +398,9 @@ Prisma モデル `Event`（カレンダーイベント）を操作する。
 **GET `/api/otokogi/ranking`**
 
 - クエリ:
-  - `year=YYYY`（省略時は全期間。fiscal year: 11月開始 → 翌年10月末）
+  - `year=YYYY | all`（fiscal year: 11月開始 → 翌年10月末。省略 or 不正値は現在の fiscal year がデフォルト、`all` 明示で全期間）
   - `metric=total|rate|clutch|streak|generosity`（default `total`。不正値は `total` にフォールバック）
+- amount 制限は clutch のみ（`OTOKOGI_CLUTCH_THRESHOLD` 以上）。total / rate / streak / generosity は全額対象（低額イベントも full amount でカウント）
 - 返却値には全 5 指標が含まれ、フロントで切替表示可能（ソート順は metric により変わる）
 - レスポンス 200:
   ```
