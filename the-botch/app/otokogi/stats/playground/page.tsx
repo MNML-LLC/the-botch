@@ -1,12 +1,15 @@
 "use client";
 
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line, CartesianGrid,
 } from 'recharts';
-import { useOtokogiStats } from '@/hooks/use-otokogi';
+import { useOtokogiStatsMain } from '@/hooks/use-otokogi';
+import { PeriodFilter, DEFAULT_PERIOD_STATE } from '@/components/ui/period-filter';
+import { getPeriodRange, type PeriodState } from '@/lib/date-utils';
 
 type PerMember = {
   id: string;
@@ -43,8 +46,24 @@ function deviationLabel(score: number) {
   return 'しっかり者';
 }
 
+function toIsoDate(d: Date | null | undefined): string | undefined {
+  if (!d) return undefined;
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export default function PlaygroundPage() {
-  const { data: stats } = useOtokogiStats<PlaygroundStatsData>('all');
+  const [period, setPeriod] = useState<PeriodState>(DEFAULT_PERIOD_STATE);
+  const { from, to } = useMemo(() => {
+    const r = getPeriodRange(period.period, new Date(), {
+      from: period.from,
+      to: period.to,
+    });
+    return { from: toIsoDate(r.from), to: toIsoDate(r.to) };
+  }, [period]);
+  const { data: stats } = useOtokogiStatsMain<PlaygroundStatsData>(from, to, []);
 
   const deviationChartData = stats?.deviationScores
     .slice()
@@ -72,6 +91,9 @@ export default function PlaygroundPage() {
         <p className="text-base font-bold text-amber-800">お遊び統計</p>
         <p className="mt-0.5 text-xs text-amber-600">本流とは別の、ちょっと遊び心のある統計たち</p>
       </div>
+
+      {/* 期間フィルタ */}
+      <PeriodFilter value={period} onChange={setPeriod} accent="otokogi" />
 
       {!stats ? (
         <p className="text-sm text-gray-500">読み込み中...</p>
