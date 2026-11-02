@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { handleApiError } from '@/lib/api-utils'
+import { CLUTCH_THRESHOLD } from '@/lib/constants'
 
 type ShouldHavePaidRow = {
   member_id: string
@@ -120,6 +121,8 @@ export async function GET(request: NextRequest) {
     const eventWhere = hasDateFilter ? { eventDate: eventDateFilter } : {}
 
     const jankenEventWhere = { ...eventWhere, wasJanken: true }
+    // クラッチ (¥50,000 以上) の男気を支払った集計 (Issue #354)
+    const clutchEventWhere = { ...eventWhere, amount: { gte: CLUTCH_THRESHOLD } }
     const [
       members,
       payerStats,
@@ -129,6 +132,7 @@ export async function GET(request: NextRequest) {
       jankenParticipationStats,
       jankenLostStats,
       jankenEventCount,
+      clutchStats,
     ] = await Promise.all([
       prisma.member.findMany({
         where: {
@@ -162,6 +166,12 @@ export async function GET(request: NextRequest) {
         _count: true,
       }),
       prisma.otokogiEvent.count({ where: jankenEventWhere }),
+      prisma.otokogiEvent.groupBy({
+        by: ['payerId'],
+        where: clutchEventWhere,
+        _count: true,
+        _sum: { amount: true },
+      }),
     ])
 
     const payerMap = new Map(
@@ -178,6 +188,9 @@ export async function GET(request: NextRequest) {
       jankenParticipationStats.map((s) => [s.memberId, s._count])
     )
     const jankenLostMap = new Map(jankenLostStats.map((s) => [s.payerId, s._count]))
+    const clutchMap = new Map(
+      clutchStats.map((s) => [s.payerId, { count: s._count, total: s._sum.amount ?? 0 }])
+    )
 
     const result = members.map((member) => {
       const payer = payerMap.get(member.id)
@@ -191,6 +204,8 @@ export async function GET(request: NextRequest) {
       const jankenWinRate =
         jankenParticipated > 0 ? (jankenParticipated - jankenLost) / jankenParticipated : null
 
+      const clutch = clutchMap.get(member.id)
+
       return {
         memberId: member.id,
         memberName: member.name,
@@ -203,6 +218,9 @@ export async function GET(request: NextRequest) {
         averagePaymentAmount: payerCount > 0 ? Math.round(actualPaid / payerCount) : 0,
         maxSingleOtokogi: maxSingleOtokogiMap.get(member.id) ?? 0,
         jankenWinRate,
+        clutchCount: clutch?.count ?? 0,
+        clutchTotal: clutch?.total ?? 0,
+        clutchRate: payerCount > 0 ? (clutch?.count ?? 0) / payerCount : 0,
       }
     })
 

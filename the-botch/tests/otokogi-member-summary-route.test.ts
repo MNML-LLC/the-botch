@@ -42,6 +42,7 @@ let consoleErrorSpy: ReturnType<typeof vi.spyOn>
  *   otokogiEvent.groupBy:
  *     1) payerStats           (全体の payer 集計)
  *     2) jankenLostStats      (janken 対象のみ)
+ *     3) clutchStats          (¥50,000 以上の payer 集計、Issue #354)
  *   otokogiParticipant.groupBy:
  *     1) participationStats   (全体の参加集計)
  *     2) jankenParticipationStats (janken 対象のみ)
@@ -58,6 +59,7 @@ function setupMocks(options: {
   jankenParticipationStats?: Array<{ memberId: string; _count: number }>
   jankenLostStats?: Array<{ payerId: string; _count: number }>
   jankenEventCount?: number
+  clutchStats?: Array<{ payerId: string; _count: number; _sum: { amount: number } }>
 }) {
   mockedMemberFindMany.mockResolvedValue(
     options.members ?? [
@@ -69,6 +71,7 @@ function setupMocks(options: {
   mockedEventGroupBy
     .mockResolvedValueOnce(options.payerStats ?? [])
     .mockResolvedValueOnce(options.jankenLostStats ?? [])
+    .mockResolvedValueOnce(options.clutchStats ?? [])
   mockedParticipantGroupBy
     .mockResolvedValueOnce(options.participationStats ?? [])
     .mockResolvedValueOnce(options.jankenParticipationStats ?? [])
@@ -193,5 +196,98 @@ describe('GET /api/otokogi/member-summary — じゃんけん勝率', () => {
     expect(data.members.find((m) => m.memberId === 'a')?.jankenWinRate).toBe(1)
     expect(data.members.find((m) => m.memberId === 'b')?.jankenWinRate).toBe(0)
     expect(data.members.find((m) => m.memberId === 'c')?.jankenWinRate).toBe(0.5)
+  })
+})
+
+// Issue #354: ¥50,000 以上の男気 (= クラッチ) の集計
+describe('GET /api/otokogi/member-summary — クラッチ集計', () => {
+  test('clutchStats が無ければ全員 clutchCount=0 / clutchTotal=0 / clutchRate=0', async () => {
+    setupMocks({})
+
+    const res = await GET(createRequest('/api/otokogi/member-summary'))
+    const { status, data } = await parseResponse<{
+      members: Array<{
+        memberId: string
+        clutchCount: number
+        clutchTotal: number
+        clutchRate: number
+      }>
+    }>(res)
+
+    expect(status).toBe(200)
+    for (const m of data.members) {
+      expect(m.clutchCount).toBe(0)
+      expect(m.clutchTotal).toBe(0)
+      expect(m.clutchRate).toBe(0)
+    }
+  })
+
+  test('clutchStats が返ったメンバーに count / total が反映される', async () => {
+    setupMocks({
+      // a は payer として 4 回支払って内 2 回がクラッチ、合計 ¥150,000
+      payerStats: [
+        { payerId: 'a', _count: 4, _sum: { amount: 200_000 } },
+      ],
+      clutchStats: [
+        { payerId: 'a', _count: 2, _sum: { amount: 150_000 } },
+      ],
+    })
+
+    const res = await GET(createRequest('/api/otokogi/member-summary'))
+    const { data } = await parseResponse<{
+      members: Array<{
+        memberId: string
+        payerCount: number
+        clutchCount: number
+        clutchTotal: number
+        clutchRate: number
+      }>
+    }>(res)
+
+    const a = data.members.find((m) => m.memberId === 'a')
+    expect(a?.payerCount).toBe(4)
+    expect(a?.clutchCount).toBe(2)
+    expect(a?.clutchTotal).toBe(150_000)
+    expect(a?.clutchRate).toBe(0.5) // 2/4
+
+    const b = data.members.find((m) => m.memberId === 'b')
+    expect(b?.clutchCount).toBe(0)
+    expect(b?.clutchTotal).toBe(0)
+    expect(b?.clutchRate).toBe(0)
+  })
+
+  test('_sum.amount が null の場合は 0 に正規化される', async () => {
+    setupMocks({
+      payerStats: [
+        { payerId: 'a', _count: 1, _sum: { amount: 10_000 } },
+      ],
+      // 件数は 0 だが Prisma の仕様で _sum.amount が null になる可能性があるケース
+      clutchStats: [
+        { payerId: 'a', _count: 0, _sum: { amount: null as unknown as number } },
+      ],
+    })
+
+    const res = await GET(createRequest('/api/otokogi/member-summary'))
+    const { data } = await parseResponse<{
+      members: Array<{ memberId: string; clutchTotal: number }>
+    }>(res)
+
+    expect(data.members.find((m) => m.memberId === 'a')?.clutchTotal).toBe(0)
+  })
+
+  test('payerCount=0 なら clutchRate=0 (0 除算を避ける)', async () => {
+    setupMocks({
+      payerStats: [], // 誰も支払っていない
+      clutchStats: [],
+    })
+
+    const res = await GET(createRequest('/api/otokogi/member-summary'))
+    const { data } = await parseResponse<{
+      members: Array<{ memberId: string; clutchRate: number }>
+    }>(res)
+
+    for (const m of data.members) {
+      expect(m.clutchRate).toBe(0)
+    }
   })
 })

@@ -81,7 +81,9 @@ describe('participantIds — 最大件数バリデーション', () => {
     eventDate: '2026-07-24',
     eventName: 'テストイベント',
     payerId: '00000000-0000-0000-0000-000000000000',
-    amount: 1000,
+    // Issue #354: 男気は ¥10,000 以上。この test は participantIds 件数の検証が目的なので
+    // 金額側のバリデーションに引っかからない値を使う。
+    amount: 10_000,
   }
 
   test(`POST /api/otokogi — participantIds ${MAX_PARTICIPANTS + 1}件 → 400`, async () => {
@@ -131,7 +133,8 @@ describe('文字列フィールド — 最大長バリデーション', () => {
           eventDate: '2026-07-24',
           eventName: 'あ'.repeat(101),
           payerId: '00000000-0000-0000-0000-000000000000',
-          amount: 1000,
+          // Issue #354: 文字列長の検証が目的なので金額側は通る値を使う
+          amount: 10_000,
           participantIds: ['00000000-0000-0000-0000-000000000000'],
         },
       })

@@ -10,9 +10,9 @@ import {
   idString,
   limitedString,
   dateString,
-  positiveInt,
   memberIdArray,
 } from '@/lib/api-validation'
+import { otokogiAmountSchema } from '@/lib/schemas/otokogi'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -21,7 +21,7 @@ const updateOtokogiSchema = z.object({
   eventDate: dateString('イベント日').optional(),
   eventName: limitedString('イベント名', 100).min(1, { error: 'イベント名は必須項目です' }).optional(),
   payerId: idString('支払い担当').optional(),
-  amount: positiveInt('金額').optional(),
+  amount: otokogiAmountSchema.optional(),
   place: limitedString('場所', 100).nullable().optional(),
   hasAlbum: z.boolean({ error: 'アルバム有無は true/false で指定してください' }).optional(),
   wasJanken: z.boolean({ error: 'じゃんけん有無は true/false で指定してください' }).optional(),

@@ -204,7 +204,7 @@ describe('POST /api/otokogi', () => {
     eventDate: '2026-04-01',
     eventName: 'テスト男気',
     payerId: '00000000-0000-0000-0000-000000000010',
-    amount: 5000,
+    amount: 10_000,
     participantIds: ['00000000-0000-0000-0000-000000000001'],
   }
 
@@ -242,7 +242,7 @@ describe('POST /api/otokogi', () => {
     expect(args.data.eventDate).toEqual(new Date('2026-04-01'))
     expect(args.data.eventName).toBe('テスト男気')
     expect(args.data.payerId).toBe('00000000-0000-0000-0000-000000000010')
-    expect(args.data.amount).toBe(5000)
+    expect(args.data.amount).toBe(10_000)
     expect(args.data.place).toBeNull()
     expect(args.data.hasAlbum).toBe(false)
     expect(args.data.memo).toBeNull()
@@ -417,6 +417,50 @@ describe('POST /api/otokogi', () => {
     expect(status).toBe(400)
     expect(data.error).toContain('金額')
     expect(mockedCreate).not.toHaveBeenCalled()
+  })
+
+  // Issue #354: 男気は ¥10,000 以上から成立する (CEO ルール)
+  test('amount が MIN 未満 (¥9,999) → 400 で拒否される', async () => {
+    const res = await POST(
+      createRequest('/api/otokogi', {
+        method: 'POST',
+        body: { ...validPayload, amount: 9_999 },
+      })
+    )
+    const { status, data } = await parseResponse<{ error: string }>(res)
+
+    expect(status).toBe(400)
+    expect(data.error).toContain('男気')
+    expect(data.error).toContain('10,000')
+    expect(mockedCreate).not.toHaveBeenCalled()
+    expect(mockedInvalidateStatsCache).not.toHaveBeenCalled()
+  })
+
+  test('amount が ¥1 → 400 で拒否される (以前は positiveInt だけで通っていた)', async () => {
+    const res = await POST(
+      createRequest('/api/otokogi', {
+        method: 'POST',
+        body: { ...validPayload, amount: 1 },
+      })
+    )
+    const { status, data } = await parseResponse<{ error: string }>(res)
+
+    expect(status).toBe(400)
+    expect(data.error).toContain('男気')
+    expect(mockedCreate).not.toHaveBeenCalled()
+  })
+
+  test('amount が MIN ちょうど (¥10,000) → 201 で成立する', async () => {
+    mockedCreate.mockResolvedValue({ id: 'min-ok' })
+    const res = await POST(
+      createRequest('/api/otokogi', {
+        method: 'POST',
+        body: { ...validPayload, amount: 10_000 },
+      })
+    )
+    const { status } = await parseResponse(res)
+    expect(status).toBe(201)
+    expect(mockedCreate).toHaveBeenCalledTimes(1)
   })
 
   test('participantIds 欠損 → 400', async () => {

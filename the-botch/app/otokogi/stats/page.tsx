@@ -62,6 +62,9 @@ type MemberSummaryEntry = {
   averagePaymentAmount: number;
   maxSingleOtokogi: number;
   jankenWinRate: number | null;
+  clutchCount: number;
+  clutchTotal: number;
+  clutchRate: number;
 };
 
 // ---- ユーティリティ ----
@@ -203,6 +206,8 @@ const BALANCE_METRICS: { label: string; key: keyof MemberSummaryEntry; format: (
   { label: '本来払うべき額', key: 'shouldHavePaid', format: formatYen },
   { label: '漢気金額', key: 'otokogiAmount', format: formatYen },
   { label: '平均支払単価', key: 'averagePaymentAmount', format: formatYen },
+  { label: '★ CLUTCH回数', key: 'clutchCount', format: (v) => fmt.format(v) },
+  { label: '★ CLUTCH総額', key: 'clutchTotal', format: formatYen },
 ];
 
 function MemberBalanceSection({
