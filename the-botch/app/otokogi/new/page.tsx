@@ -34,6 +34,7 @@ function OtokogiNewForm() {
   const [amount, setAmount] = useState('');
   const [place, setPlace] = useState('');
   const [hasAlbum, setHasAlbum] = useState(false);
+  const [wasJanken, setWasJanken] = useState(false);
   const [memo, setMemo] = useState('');
   const [participantIds, setParticipantIds] = useState<string[]>([]);
 
@@ -83,6 +84,7 @@ function OtokogiNewForm() {
       amount: amountNum,
       place: place || null,
       hasAlbum,
+      wasJanken,
       memo: memo || null,
       eventId: (eventId && eventId !== 'none') ? eventId : null,
       participantIds,
@@ -214,7 +216,14 @@ function OtokogiNewForm() {
             </div>
           )}
 
-          <div>
+          <div className="space-y-2">
+            <label className="flex items-center gap-2">
+              <Checkbox
+                checked={wasJanken}
+                onCheckedChange={(checked) => setWasJanken(checked === true)}
+              />
+              <span className="text-sm">じゃんけんで決めた（勝率計算の対象になる）</span>
+            </label>
             <label className="flex items-center gap-2">
               <Checkbox
                 checked={hasAlbum}

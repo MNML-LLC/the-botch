@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       return validationErrorResponse(result.error)
     }
 
-    const { eventDate, eventName, payerId, amount, place, hasAlbum, memo, eventId, participantIds } = result.data
+    const { eventDate, eventName, payerId, amount, place, hasAlbum, wasJanken, memo, eventId, participantIds } = result.data
 
     const event = await prisma.otokogiEvent.create({
       data: {
@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
         amount,
         place: place ?? null,
         hasAlbum: hasAlbum ?? false,
+        wasJanken: wasJanken ?? false,
         memo: memo ?? null,
         eventId: eventId ?? null,
         participants: {

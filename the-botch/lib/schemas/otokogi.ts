@@ -18,6 +18,7 @@ export const createOtokogiSchema = z.object({
   amount: positiveInt('金額'),
   place: limitedString('場所', 100).nullable().optional(),
   hasAlbum: z.boolean({ error: 'アルバム有無は true/false で指定してください' }).optional(),
+  wasJanken: z.boolean({ error: 'じゃんけん有無は true/false で指定してください' }).optional(),
   memo: limitedString('メモ', 1000).nullable().optional(),
   eventId: idString('カレンダーイベント').nullable().optional(),
   participantIds: memberIdArray('参加メンバー').min(1, {

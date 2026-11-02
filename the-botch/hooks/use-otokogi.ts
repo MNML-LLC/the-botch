@@ -35,6 +35,7 @@ export type OtokogiEvent = {
   place: string | null;
   memo: string | null;
   hasAlbum: boolean;
+  wasJanken: boolean;
   payer: Member;
   participants: { member: Member }[];
 };
@@ -66,6 +67,7 @@ export type OtokogiCreateInput = {
   amount: number;
   place: string | null;
   hasAlbum: boolean;
+  wasJanken: boolean;
   memo: string | null;
   eventId: string | null;
   participantIds: string[];
@@ -78,6 +80,7 @@ export type OtokogiUpdateInput = Partial<{
   amount: number;
   place: string | null;
   hasAlbum: boolean;
+  wasJanken: boolean;
   memo: string | null;
   participantIds: string[];
 }>;
@@ -277,6 +280,7 @@ export function useCreateOtokogi(
       queryClient.invalidateQueries({ queryKey: ['otokogi-ranking'] });
       queryClient.invalidateQueries({ queryKey: ['otokogi-stats'] });
       queryClient.invalidateQueries({ queryKey: ['otokogi-charts'] });
+      queryClient.invalidateQueries({ queryKey: ['otokogi-member-summary'] });
       queryClient.invalidateQueries({ queryKey: ['calendar'] });
       options?.onSuccess?.(data, variables, onMutateResult, context);
     },
@@ -308,6 +312,7 @@ export function useUpdateOtokogi(
       queryClient.invalidateQueries({ queryKey: ['otokogi-ranking'] });
       queryClient.invalidateQueries({ queryKey: ['otokogi-stats'] });
       queryClient.invalidateQueries({ queryKey: ['otokogi-charts'] });
+      queryClient.invalidateQueries({ queryKey: ['otokogi-member-summary'] });
       queryClient.invalidateQueries({ queryKey: ['calendar'] });
       options?.onSuccess?.(data, variables, onMutateResult, context);
     },
@@ -335,6 +340,7 @@ export function useDeleteOtokogi(
       queryClient.invalidateQueries({ queryKey: ['otokogi-ranking'] });
       queryClient.invalidateQueries({ queryKey: ['otokogi-stats'] });
       queryClient.invalidateQueries({ queryKey: ['otokogi-charts'] });
+      queryClient.invalidateQueries({ queryKey: ['otokogi-member-summary'] });
       queryClient.invalidateQueries({ queryKey: ['calendar'] });
       options?.onSuccess?.(data, variables, onMutateResult, context);
     },
