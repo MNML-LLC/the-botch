@@ -1,5 +1,6 @@
-// 5分間のISRキャッシュ（集計値は即時性不要）
-export const revalidate = 300;
+// Prisma を各リクエストで直叩き。SSG prerender させず、ビルド時 dummy DATABASE_URL での
+// Prisma hang / snapshot null を物理的に発生させない (Issue #353)
+export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
@@ -32,11 +33,6 @@ function daysUntil(target: Date, from: Date): number {
 }
 
 async function fetchDashboardData() {
-  // ビルド時 (next build の静的 prerender) は DB を叩かない。
-  if (process.env.NEXT_PHASE === 'phase-production-build' && !process.env.E2E_CI) {
-    return null;
-  }
-
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const nextWeek = new Date(today);
@@ -148,38 +144,7 @@ async function fetchDashboardData() {
 }
 
 export default async function DashboardPage() {
-  let data: Awaited<ReturnType<typeof fetchDashboardData>> | null = null;
-
-  try {
-    data = await fetchDashboardData();
-  } catch {
-    // DB未接続時
-  }
-
-  if (!data) {
-    return (
-      <div className="grid gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-amber-600">データベース未接続のため、データを表示できません。</p>
-            <div className="mt-4 flex gap-2">
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/warikan">割り勘管理</Link>
-              </Button>
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/otokogi">男気管理</Link>
-              </Button>
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/members">メンバー管理</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  const { openWarikan, upcomingEvents, otokogiTop, summary, today } = data;
+  const { openWarikan, upcomingEvents, otokogiTop, summary, today } = await fetchDashboardData();
 
   return (
     <div className="grid gap-4">
