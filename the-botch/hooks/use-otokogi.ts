@@ -218,13 +218,28 @@ export type OtokogiChartsResponse = {
     payer: Member;
   }[];
   members: Member[];
+  anchorYear: number;
 };
 
-export function useOtokogiCharts() {
+export function useOtokogiCharts(
+  from: string | undefined,
+  to: string | undefined,
+  memberIds?: string[]
+) {
+  const memberIdsKey = memberIds ? memberIds.join(',') : undefined;
   return useQuery({
-    queryKey: ['otokogi-charts'],
+    queryKey:
+      memberIds !== undefined
+        ? ['otokogi-charts', from, to, memberIdsKey]
+        : ['otokogi-charts', from, to],
     queryFn: async () => {
-      const res = await fetch('/api/otokogi/charts');
+      const params = new URLSearchParams();
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      if (memberIds && memberIds.length > 0) {
+        params.set('memberIds', memberIds.join(','));
+      }
+      const res = await fetch(`/api/otokogi/charts?${params.toString()}`);
       if (!res.ok) throw new Error('チャートデータの取得に失敗しました');
       return res.json() as Promise<OtokogiChartsResponse>;
     },

@@ -411,9 +411,9 @@ export default function OtokogiStatsPage() {
     selectedMemberIds
   );
 
-  // 新チャート用データ（期間フィルタ非依存）
-  const { data: charts } = useOtokogiCharts();
-  const currentYear = new Date().getFullYear();
+  // 新チャート用データ（期間フィルタ対応, Issue #357）
+  const { data: charts } = useOtokogiCharts(from, to, selectedMemberIds);
+  const chartsThisYearLabel = charts?.anchorYear ?? new Date().getFullYear();
 
   return (
     <div>
@@ -479,7 +479,7 @@ export default function OtokogiStatsPage() {
         <CategoryPieSection data={stats?.categoryBreakdown} />
 
         {/* 6. 累積折れ線（今年 / 昨年 / 一昨年、固定） */}
-        <CumulativeYearlySection data={charts?.cumulativeYearly} thisYearLabel={currentYear} />
+        <CumulativeYearlySection data={charts?.cumulativeYearly} thisYearLabel={chartsThisYearLabel} />
 
         {/* 7. 比較棒グラフ（今月vs先月 / 今年vs昨年、固定） */}
         <ComparisonSection data={charts?.comparison} />
