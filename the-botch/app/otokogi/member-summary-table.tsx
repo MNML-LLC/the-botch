@@ -18,6 +18,9 @@ type MemberSummaryEntry = {
   averagePaymentAmount: number;
   maxSingleOtokogi: number;
   jankenWinRate: number | null;
+  clutchCount: number;
+  clutchTotal: number;
+  clutchRate: number;
 };
 
 type MemberSummaryData = {
@@ -114,6 +117,18 @@ function buildMetrics(hasJankenData: boolean): MetricDef[] {
     {
       label: '最高単発漢気',
       render: (m) => (m.payerCount > 0 ? formatYen(m.maxSingleOtokogi) : '—'),
+    },
+    {
+      label: '★ CLUTCH回数',
+      render: (m) => fmt.format(m.clutchCount),
+    },
+    {
+      label: '★ CLUTCH総額',
+      render: (m) => (m.clutchCount > 0 ? formatYen(m.clutchTotal) : '—'),
+    },
+    {
+      label: 'クラッチ率',
+      render: (m) => (m.payerCount > 0 ? formatPercent(m.clutchRate) : '—'),
     },
   ];
 

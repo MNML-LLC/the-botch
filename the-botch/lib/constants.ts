@@ -1,5 +1,12 @@
 import type { EventType, WarikanStatus } from '@/lib/generated/prisma/client'
 
+// 男気ルール閾値 (CEO 決定・コード強制)
+//   - MIN_OTOKOGI_AMOUNT: ¥10,000 以上を支払って初めて「男気」として成立する
+//   - CLUTCH_THRESHOLD: ¥50,000 以上の男気を「クラッチ」と呼び、特別高額として扱う
+// Issue #354
+export const MIN_OTOKOGI_AMOUNT = 10_000
+export const CLUTCH_THRESHOLD = 50_000
+
 // 割り勘イベントのステータス日本語ラベル
 export const WARIKAN_STATUS_LABELS: Record<WarikanStatus, string> = {
   ENTERING: '明細入力中',

@@ -13,6 +13,7 @@ import { Yen } from '@/components/ui/yen';
 import { formatDateBoth } from '@/lib/date-utils';
 import type { PeriodState } from '@/lib/date-utils';
 import { PeriodFilter, DEFAULT_PERIOD_STATE } from '@/components/ui/period-filter';
+import { ClutchBadge } from '@/components/otokogi/clutch-badge';
 
 function OtokogiHistorySkeleton() {
   return (
@@ -156,6 +157,7 @@ export default function OtokogiPage() {
                               📷
                             </span>
                           )}
+                          <ClutchBadge amount={event.amount} className="ml-1.5 align-middle" />
                         </p>
                         <p className="text-xs text-gray-500 mt-0.5">
                           <span className="tabular-nums">{formatDateBoth(event.eventDate)}</span> / {event.payer.name}

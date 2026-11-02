@@ -23,6 +23,7 @@ import { useMembers } from '@/hooks/use-members';
 import { useEvents } from '@/hooks/use-events';
 import { useCreateOtokogi } from '@/hooks/use-otokogi';
 import { Yen } from '@/components/ui/yen';
+import { MIN_OTOKOGI_AMOUNT } from '@/lib/constants';
 
 function OtokogiNewForm() {
   const router = useRouter();
@@ -57,6 +58,8 @@ function OtokogiNewForm() {
 
   const amountNum = Number(amount) || 0;
   const perPerson = participantIds.length > 0 ? Math.round(amountNum / participantIds.length) : 0;
+  // 男気は ¥10,000 以上から成立 (CEO ルール / Issue #354)
+  const amountBelowMin = amountNum > 0 && amountNum < MIN_OTOKOGI_AMOUNT;
 
   const createMutation = useCreateOtokogi({
     onSuccess: (data) => {
@@ -77,6 +80,7 @@ function OtokogiNewForm() {
 
   const handleSubmit = () => {
     if (!eventDate || !eventName || !payerId || !amount || participantIds.length === 0) return;
+    if (amountBelowMin) return;
     createMutation.mutate({
       eventDate,
       eventName,
@@ -183,12 +187,24 @@ function OtokogiNewForm() {
             <div className="relative mt-1">
               <span className="absolute left-3 top-2 text-gray-500">&yen;</span>
               <AmountInput
-                className="pl-7 text-right font-mono"
+                className={`pl-7 text-right font-mono ${
+                  amountBelowMin ? 'border-red-400 focus-visible:ring-red-400' : ''
+                }`}
                 placeholder="0"
                 value={amount}
                 onChange={setAmount}
+                aria-invalid={amountBelowMin}
               />
             </div>
+            {amountBelowMin ? (
+              <p className="text-xs text-red-500 mt-1">
+                男気は ¥{MIN_OTOKOGI_AMOUNT.toLocaleString()} 以上から成立します
+              </p>
+            ) : (
+              <p className="text-xs text-gray-400 mt-1">
+                ¥{MIN_OTOKOGI_AMOUNT.toLocaleString()} 以上から男気として成立します
+              </p>
+            )}
           </div>
 
           <hr className="border-gray-200" />
@@ -251,7 +267,7 @@ function OtokogiNewForm() {
             <Button
               className="flex-1 bg-slate-800 hover:bg-slate-700"
               onClick={handleSubmit}
-              disabled={createMutation.isPending || !eventDate || !eventName || !payerId || !amount || participantIds.length === 0}
+              disabled={createMutation.isPending || !eventDate || !eventName || !payerId || !amount || participantIds.length === 0 || amountBelowMin}
             >
               {createMutation.isPending ? '登録中...' : '登録する'}
             </Button>
