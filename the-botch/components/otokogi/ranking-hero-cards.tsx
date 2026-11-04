@@ -2,6 +2,7 @@ import { Yen } from '@/components/ui/yen'
 import type { OtokogiRankingEntry } from '@/hooks/use-otokogi'
 import { BadgeChip } from '@/components/otokogi/badge-chip'
 import { topBadge, type Badge } from '@/lib/otokogi-badges'
+import { TermTooltip } from '@/components/ui/term-tooltip'
 
 // メダル (rank → 絵文字)
 const MEDAL_BY_RANK: Record<1 | 2 | 3, string> = {
@@ -90,17 +91,18 @@ function HeroCard({ entry, rank, badge }: HeroCardProps) {
               支払 <span className="font-semibold text-slate-800">{entry.count}</span> 回
             </span>
             {entry.clutchCount > 0 && (
-              <span
-                className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded tabular-nums text-[10px] sm:text-[11px] font-semibold ${style.chip}`}
-                title={`¥50,000 以上のクラッチ男気を ${entry.clutchCount} 回`}
-                aria-label={`クラッチ ${entry.clutchCount} 回`}
-              >
-                ★ {entry.clutchCount} 回
-              </span>
+              <TermTooltip term="CLUTCH" bare>
+                <span
+                  className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded tabular-nums text-[10px] sm:text-[11px] font-semibold cursor-help ${style.chip}`}
+                  aria-label={`クラッチ ${entry.clutchCount} 回`}
+                >
+                  ★ {entry.clutchCount} 回
+                </span>
+              </TermTooltip>
             )}
-            <span className="tabular-nums" title="男気率 = 支払回数 ÷ 参加回数">
+            <TermTooltip term="男気率" className="tabular-nums text-[11px] sm:text-xs text-slate-600">
               男気率 <span className="font-semibold text-slate-800">{ratePercent}%</span>
-            </span>
+            </TermTooltip>
           </div>
         </div>
 

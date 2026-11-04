@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Yen } from '@/components/ui/yen';
 import { formatDateBoth, getFiscalYearRange } from '@/lib/date-utils';
 import MonthlySummaryCollapsible from './(dashboard)/monthly-summary-collapsible';
+import { TermTooltip } from '@/components/ui/term-tooltip';
 
 const EVENT_TYPE_COLORS: Record<string, string> = {
   TRIP: 'bg-blue-100 text-blue-700',
@@ -411,7 +412,9 @@ export default async function DashboardPage() {
             <CardTitle className="text-slate-800 flex items-center gap-2">
               <span aria-hidden>🏆</span>
               今期の男気 Top 3
-              <span className="text-xs text-gray-400 font-normal">（{yearLabel}）</span>
+              <span className="text-xs text-gray-400 font-normal">
+                （<TermTooltip term="年度">{yearLabel}</TermTooltip>）
+              </span>
             </CardTitle>
             <Button variant="ghost" size="sm" asChild className="text-xs text-gray-500 min-h-[44px] px-3">
               <Link href="/otokogi/stats">全部見る →</Link>
