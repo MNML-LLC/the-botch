@@ -106,14 +106,14 @@ export default function MemberProfilePage() {
             <div className={`w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold shrink-0 ${member.colorBg} ${member.colorText}`}>
               {member.initial}
             </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="font-bold text-slate-800 text-lg truncate">{member.name}</p>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start gap-2 flex-wrap">
+                <p className="font-bold text-slate-800 text-lg break-words">{member.name}</p>
                 {!member.isActive && (
                   <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">非アクティブ</span>
                 )}
               </div>
-              <p className="text-sm text-gray-500 truncate">{member.fullName}</p>
+              <p className="text-sm text-gray-500 break-words">{member.fullName}</p>
               {member.paypayId && (
                 <p className="text-xs text-red-500 font-mono mt-0.5">@{member.paypayId}</p>
               )}

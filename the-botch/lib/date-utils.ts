@@ -132,8 +132,8 @@ export function getFiscalYearRange(
   const fy = baseFy + offset
   const from = new Date(fy, 10, 1, 0, 0, 0, 0) // 11月1日
   const to = new Date(fy + 1, 9, 31, 23, 59, 59, 999) // 翌年10月31日
-  const fyShort = fy % 100
-  const label = `FY${fyShort.toString().padStart(2, '0')} (${fy}/11〜${fy + 1}/10)`
+  // CEO 判断: 「FY26」よりも「2026年度」の方がピンと来る (Issue #382)
+  const label = `${fy}年度 (11月開始)`
   return { from, to, label, fy }
 }
 

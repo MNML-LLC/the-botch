@@ -68,11 +68,11 @@ export default function MembersPage() {
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${member.colorBg} ${member.colorText}`}>
                       {member.initial}
                     </div>
-                    <div className="min-w-0">
-                      <p className="font-medium text-slate-800 truncate">{member.name}</p>
-                      <p className="text-xs text-gray-500 truncate">{member.fullName}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-slate-800 break-words">{member.name}</p>
+                      <p className="text-xs text-gray-500 break-words">{member.fullName}</p>
                       {member.paypayId && (
-                        <p className="text-xs text-red-500 font-mono mt-0.5 truncate">@{member.paypayId}</p>
+                        <p className="text-xs text-red-500 font-mono mt-0.5 break-all">@{member.paypayId}</p>
                       )}
                       {member.bankAccount && (
                         <span className="inline-block text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium mt-0.5">口座登録済</span>

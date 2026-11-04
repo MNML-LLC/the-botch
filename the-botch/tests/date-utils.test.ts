@@ -128,7 +128,7 @@ describe('getFiscalYearRange', () => {
     expect(r.to.getFullYear()).toBe(2027)
     expect(r.to.getMonth()).toBe(9) // 10月
     expect(r.to.getDate()).toBe(31)
-    expect(r.label).toBe('FY26 (2026/11〜2027/10)')
+    expect(r.label).toBe('2026年度 (11月開始)')
   })
 
   test('offset=-1 (前期): 2026-11-01 → FY25 (2025/11〜2026/10)', () => {
@@ -148,7 +148,7 @@ describe('getFiscalYearRange', () => {
   test('境界 10/31 は前年 FY に属する (offset=0)', () => {
     const r = getFiscalYearRange(new Date(2026, 9, 31), 0)
     expect(r.fy).toBe(2025)
-    expect(r.label).toBe('FY25 (2025/11〜2026/10)')
+    expect(r.label).toBe('2025年度 (11月開始)')
   })
 
   test('境界 11/1 は当年 FY に属する (offset=0)', () => {
