@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
       shouldHavePaidRows,
       maxSingleOtokogiRows,
       jankenParticipationStats,
-      jankenLostStats,
+      jankenPayerStats,
       jankenEventCount,
       clutchStats,
     ] = await Promise.all([
@@ -160,6 +160,10 @@ export async function GET(request: NextRequest) {
         where: { otokogiEvent: jankenEventWhere },
         _count: true,
       }),
+      // Issue #396: CEO ルール「勝った人が奢る」に合わせて、
+      // janken で payer になった = じゃんけんに勝った、と解釈する。
+      // 旧実装は (participation - payerCount) / participation を勝率と呼んでいたが、
+      // それは "払わなかった率" (= 負けた率) だった。
       prisma.otokogiEvent.groupBy({
         by: ['payerId'],
         where: jankenEventWhere,
@@ -187,7 +191,9 @@ export async function GET(request: NextRequest) {
     const jankenParticipationMap = new Map(
       jankenParticipationStats.map((s) => [s.memberId, s._count])
     )
-    const jankenLostMap = new Map(jankenLostStats.map((s) => [s.payerId, s._count]))
+    // Issue #396: janken で payer になった回数 = じゃんけんに勝った回数
+    // (CEO ルール「勝った人が奢る」)
+    const jankenPayerMap = new Map(jankenPayerStats.map((s) => [s.payerId, s._count]))
     const clutchMap = new Map(
       clutchStats.map((s) => [s.payerId, { count: s._count, total: s._sum.amount ?? 0 }])
     )
@@ -200,9 +206,11 @@ export async function GET(request: NextRequest) {
       const shouldHavePaid = shouldHavePaidMap.get(member.id) ?? 0
 
       const jankenParticipated = jankenParticipationMap.get(member.id) ?? 0
-      const jankenLost = jankenLostMap.get(member.id) ?? 0
+      // Issue #396: 勝率 = 勝って payer になった回数 / 参加回数
+      // (CEO ルール「勝った人が奢る」)。旧実装は補集合 (払わなかった率) を返していた。
+      const jankenWon = jankenPayerMap.get(member.id) ?? 0
       const jankenWinRate =
-        jankenParticipated > 0 ? (jankenParticipated - jankenLost) / jankenParticipated : null
+        jankenParticipated > 0 ? jankenWon / jankenParticipated : null
 
       const clutch = clutchMap.get(member.id)
 

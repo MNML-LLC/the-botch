@@ -179,10 +179,10 @@ export default function MemberProfilePage() {
             </div>
           </div>
 
-          {/* 称号バッジ (Issue #368) */}
+          {/* 称号バッジ 通算 (Issue #368) */}
           {badges.length > 0 && (
             <div className="mt-4 border-t border-gray-100 pt-3">
-              <p className="text-xs text-gray-500 mb-2">称号 ({badges.length})</p>
+              <p className="text-xs text-gray-500 mb-2">称号 (通算 · {badges.length})</p>
               <div className="flex flex-wrap gap-1.5">
                 {badges.map((badge) => (
                   <BadgeChip key={badge.id} badge={badge} size="sm" />

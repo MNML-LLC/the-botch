@@ -396,6 +396,8 @@ type BadgeMemberSummaryResponse = {
     payerCount: number;
     // Issue #393: MVP を actualPaid ベースに変更したため必須化
     actualPaid: number;
+    // Issue #396: 裏男気王 (フェアシェア超過分) 判定用
+    otokogiAmount: number;
     averagePaymentAmount: number;
     clutchCount: number;
     jankenWinRate: number | null;
@@ -403,10 +405,19 @@ type BadgeMemberSummaryResponse = {
   }[];
 };
 
+// Issue #396: 期間が FY と一致する場合は "FY<YY>" ラベルに寄せる (CEO 原則)。
+function matchesFiscalYear(from: Date, to: Date): number | null {
+  // FY は 11/1 00:00 〜 翌年 10/31 23:59:59.999
+  if (from.getMonth() !== 10 || from.getDate() !== 1) return null;
+  if (to.getMonth() !== 9 || to.getDate() !== 31) return null;
+  if (to.getFullYear() !== from.getFullYear() + 1) return null;
+  return from.getFullYear();
+}
+
 // 期間から MVP ラベル用の文字列を決める
 // - current-fy / last-fy: "FYxx"
 // - current-month: "YYYY/M月"
-// - custom: "YYYY/M–YYYY/M"
+// - custom: FY 範囲と一致すれば "FYxx"、それ以外は "YYYY/M–YYYY/M"
 // - all: "通算"
 function badgePeriodLabel(period: PeriodState, ref: Date = new Date()): string {
   switch (period.period) {
@@ -422,6 +433,10 @@ function badgePeriodLabel(period: PeriodState, ref: Date = new Date()): string {
       return `${ref.getFullYear()}/${ref.getMonth() + 1}月`;
     case 'custom': {
       const r = getPeriodRange('custom', ref, { from: period.from, to: period.to });
+      if (r.from && r.to) {
+        const fy = matchesFiscalYear(r.from, r.to);
+        if (fy !== null) return `FY${(fy % 100).toString().padStart(2, '0')}`;
+      }
       const from = r.from
         ? `${r.from.getFullYear()}/${r.from.getMonth() + 1}`
         : '';
