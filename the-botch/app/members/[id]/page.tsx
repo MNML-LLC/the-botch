@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Swords, Wallet } from 'lucide-react';
 import { useMemberDetail, type MemberProfileWarikanEvent } from '@/hooks/use-members';
-import { useOtokogiBadges } from '@/hooks/use-otokogi';
+import { useOtokogiBadges, useFyBadges } from '@/hooks/use-otokogi';
 import { WARIKAN_STATUS_LABELS } from '@/lib/constants';
 import { Yen } from '@/components/ui/yen';
 import { formatDateBoth } from '@/lib/date-utils';
@@ -63,6 +63,8 @@ export default function MemberProfilePage() {
   // 称号は通算 (全期間) で表示する (期間フィルタ UI が無い画面のため)
   const { badgesByMember } = useOtokogiBadges({ period: 'all' });
   const memberBadges = badgesByMember.get(id);
+  // Issue #393: FY (会計年度) ごとの称号履歴
+  const { data: fyBadgesData, isLoading: fyBadgesLoading } = useFyBadges();
 
   if (isPending) {
     return (
@@ -92,6 +94,25 @@ export default function MemberProfilePage() {
   const warikanEvents = member.warikanParticipations.map((p) => p.warikanEvent);
   const { stats } = member;
   const badges = memberBadges ?? [];
+
+  // Issue #393: FY ごとの称号履歴を、このメンバーが参加した / 支払った FY に絞って表示
+  const memberFyRows = (fyBadgesData?.fiscalYears ?? [])
+    .map((fy) => {
+      const agg = fy.aggregates.find((a) => a.memberId === id);
+      const badgeRow = fy.badges.find((b) => b.memberId === id);
+      return {
+        fy: fy.fy,
+        shortLabel: fy.shortLabel,
+        from: fy.from,
+        to: fy.to,
+        eventCount: fy.eventCount,
+        payerCount: agg?.payerCount ?? 0,
+        actualPaid: agg?.actualPaid ?? 0,
+        shadowOtokogi: agg?.shadowOtokogi ?? 0,
+        badges: badgeRow?.badges ?? [],
+      };
+    })
+    .filter((row) => row.payerCount > 0 || row.badges.length > 0);
 
   return (
     <div>
@@ -167,6 +188,58 @@ export default function MemberProfilePage() {
                   <BadgeChip key={badge.id} badge={badge} size="sm" />
                 ))}
               </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 称号履歴 (FY ごと, Issue #393) */}
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle className="text-slate-800 text-base">称号履歴 (年度別)</CardTitle>
+          <p className="text-xs text-gray-500 mt-0.5">
+            会計年度 (11 月〜翌 10 月) ごとに独立計算した称号。全データから遡及適用。
+          </p>
+        </CardHeader>
+        <CardContent>
+          {fyBadgesLoading ? (
+            <p className="text-sm text-gray-500">読み込み中...</p>
+          ) : memberFyRows.length === 0 ? (
+            <p className="text-sm text-gray-500">このメンバーの称号履歴はまだありません</p>
+          ) : (
+            <div className="space-y-3">
+              {memberFyRows.map((row) => (
+                <div
+                  key={row.fy}
+                  className="rounded-md border border-gray-200 p-3"
+                >
+                  <div className="flex items-baseline justify-between gap-2 flex-wrap mb-2">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-sm font-bold text-slate-800">
+                        {row.shortLabel}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        ({new Date(row.from).getFullYear()}/11 〜 {new Date(row.to).getFullYear()}/10)
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {row.payerCount} 回 /
+                      <Yen value={row.actualPaid} size="sm" className="ml-1 font-semibold text-slate-700" />
+                    </div>
+                  </div>
+                  {row.badges.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {row.badges.map((badge) => (
+                        <BadgeChip key={badge.id} badge={badge} size="xs" />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-gray-400">
+                      この年度の称号獲得なし
+                    </p>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </CardContent>

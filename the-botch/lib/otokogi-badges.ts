@@ -15,6 +15,7 @@ import { CLUTCH_THRESHOLD } from '@/lib/constants'
 
 export type BadgeKind =
   | 'mvp'
+  | 'shadow-otokogi-king'
   | 'count-king'
   | 'clutch-master'
   | 'streak-king'
@@ -46,6 +47,7 @@ export const BADGE_JANKEN_GAMES_MIN = 10
 // MVP (総額) と 男気量産王 (回数) を primary として並べる (Issue #393)
 export const BADGE_PRIORITY: BadgeKind[] = [
   'mvp',
+  'shadow-otokogi-king',
   'count-king',
   'streak-king',
   'clutch-master',

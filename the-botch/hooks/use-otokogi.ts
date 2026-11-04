@@ -312,6 +312,7 @@ export function useCreateOtokogi(
       queryClient.invalidateQueries({ queryKey: ['otokogi-stats'] });
       queryClient.invalidateQueries({ queryKey: ['otokogi-charts'] });
       queryClient.invalidateQueries({ queryKey: ['otokogi-member-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['otokogi-fy-badges'] });
       queryClient.invalidateQueries({ queryKey: ['calendar'] });
       options?.onSuccess?.(data, variables, onMutateResult, context);
     },
@@ -344,6 +345,7 @@ export function useUpdateOtokogi(
       queryClient.invalidateQueries({ queryKey: ['otokogi-stats'] });
       queryClient.invalidateQueries({ queryKey: ['otokogi-charts'] });
       queryClient.invalidateQueries({ queryKey: ['otokogi-member-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['otokogi-fy-badges'] });
       queryClient.invalidateQueries({ queryKey: ['calendar'] });
       options?.onSuccess?.(data, variables, onMutateResult, context);
     },
@@ -372,6 +374,7 @@ export function useDeleteOtokogi(
       queryClient.invalidateQueries({ queryKey: ['otokogi-stats'] });
       queryClient.invalidateQueries({ queryKey: ['otokogi-charts'] });
       queryClient.invalidateQueries({ queryKey: ['otokogi-member-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['otokogi-fy-badges'] });
       queryClient.invalidateQueries({ queryKey: ['calendar'] });
       options?.onSuccess?.(data, variables, onMutateResult, context);
     },
@@ -499,4 +502,57 @@ function toIso(d: Date): string {
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
+}
+
+// ===== FY (会計年度) ベースの男気バッジ (Issue #393) =====
+//
+// 全データを走査して FY ごとに独立計算したバッジ履歴を返す。
+// タイムライン表示 (メンバー詳細ページの "称号履歴") で使用する。
+
+export type FyAggregateEntry = {
+  memberId: string;
+  payerCount: number;
+  actualPaid: number;
+  shouldHavePaid: number;
+  shadowOtokogi: number;
+  averagePaymentAmount: number;
+  maxStreak: number;
+};
+
+export type FyBadgesEntry = {
+  fy: number;
+  shortLabel: string;
+  from: string;
+  to: string;
+  eventCount: number;
+  totalAmount: number;
+  aggregates: FyAggregateEntry[];
+  badges: {
+    memberId: string;
+    badges: Badge[];
+  }[];
+};
+
+export type FyBadgesResponse = {
+  fiscalYears: FyBadgesEntry[];
+  members: {
+    id: string;
+    name: string;
+    initial: string;
+    colorBg: string;
+    colorText: string;
+  }[];
+};
+
+export function useFyBadges() {
+  return useQuery({
+    queryKey: ['otokogi-fy-badges'],
+    queryFn: async () => {
+      const res = await fetch('/api/otokogi/fy-badges');
+      if (!res.ok) throw new Error('FY バッジの取得に失敗しました');
+      return res.json() as Promise<FyBadgesResponse>;
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
 }

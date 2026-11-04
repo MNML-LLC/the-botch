@@ -7,6 +7,7 @@ import {
 } from 'recharts';
 import { useMembers } from '@/hooks/use-members';
 import {
+  useFyBadges,
   useOtokogiBadges,
   useOtokogiCharts,
   useOtokogiMemberSummary,
@@ -366,9 +367,9 @@ function BadgesSection({ period, members }: { period: PeriodState; members: Memb
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-slate-800">称号一覧</CardTitle>
+        <CardTitle className="text-slate-800">称号一覧 (期間)</CardTitle>
         <p className="text-xs text-gray-500 mt-0.5">
-          期間内の支払総額 / 支払回数 / 連勝 / クラッチ / 気前度 / じゃんけんから自動判定
+          選択中の期間で自動判定。年度別の履歴は下の「年度別バッジ履歴」を参照。
         </p>
       </CardHeader>
       <CardContent>
@@ -393,6 +394,78 @@ function BadgesSection({ period, members }: { period: PeriodState; members: Memb
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Issue #393: FY (会計年度) ごとに全データから遡及計算したバッジ履歴を表示
+function FyBadgesSection({ members }: { members: Member[] }) {
+  const { data, isLoading } = useFyBadges();
+
+  const memberById = useMemo(
+    () => new Map(members.map((m) => [m.id, m])),
+    [members],
+  );
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-slate-800">年度別バッジ履歴</CardTitle>
+        <p className="text-xs text-gray-500 mt-0.5">
+          全データを走査し、会計年度 (11 月〜翌 10 月) ごとに独立計算したバッジ。
+        </p>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <p className="text-sm text-gray-500">読み込み中...</p>
+        ) : !data || data.fiscalYears.length === 0 ? (
+          <p className="text-sm text-gray-500">バッジを獲得した年度はまだありません</p>
+        ) : (
+          <div className="space-y-4">
+            {data.fiscalYears.map((fy) => {
+              const rows = fy.badges
+                .map((entry) => {
+                  const member = memberById.get(entry.memberId);
+                  if (!member) return null;
+                  return { member, badges: entry.badges };
+                })
+                .filter((r): r is { member: Member; badges: typeof fy.badges[number]['badges'] } => r !== null);
+
+              if (rows.length === 0) return null;
+
+              return (
+                <div key={fy.fy} className="border-l-2 border-amber-200 pl-3">
+                  <div className="flex items-baseline gap-2 mb-2 flex-wrap">
+                    <span className="text-sm font-bold text-slate-800">
+                      {fy.shortLabel}
+                    </span>
+                    <span className="text-[11px] text-gray-500">
+                      ({new Date(fy.from).getFullYear()}/11 〜 {new Date(fy.to).getFullYear()}/10 · {fy.eventCount}件)
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {rows.map(({ member, badges }) => (
+                      <div key={member.id} className="flex items-start gap-2">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${member.colorBg} ${member.colorText}`}>
+                          {member.initial}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-slate-800 mb-0.5">{member.name}</p>
+                          <div className="flex flex-wrap gap-1">
+                            {badges.map((badge) => (
+                              <BadgeChip key={badge.id} badge={badge} size="xs" />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </CardContent>
@@ -578,8 +651,10 @@ export function StatsContent({ period }: { period: PeriodState }) {
         <CategoryPieSection data={stats?.categoryBreakdown} />
         {/* 7. 直近 3 ヶ月の男気トップ */}
         <TopRecentSection data={charts?.topRecent} />
-        {/* 8. 称号表示 */}
+        {/* 8. 称号表示 (期間フィルタ) */}
         <BadgesSection period={period} members={members} />
+        {/* 8b. Issue #393: FY (会計年度) ごとのバッジ履歴 */}
+        <FyBadgesSection members={members} />
         {/* 9. 補足: 年比較の累積 (全員合計) */}
         <CumulativeYearlySection data={charts?.cumulativeYearly} thisYearLabel={chartsThisYearLabel} />
       </div>
