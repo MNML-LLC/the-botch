@@ -23,8 +23,18 @@ import {
   TopRecentSection,
 } from './stats/charts';
 import { Yen } from '@/components/ui/yen';
-import { getPeriodRange, type PeriodState } from '@/lib/date-utils';
+import {
+  getPeriodRange,
+  getFiscalYearRange,
+  getCurrentMonthRange,
+  type PeriodState,
+} from '@/lib/date-utils';
 import { TermTooltip } from '@/components/ui/term-tooltip';
+import {
+  computeInsights,
+  type Insight,
+  type InsightsContext,
+} from '@/lib/otokogi-insights';
 
 type Member = {
   id: string;
@@ -52,6 +62,7 @@ type StatsData = {
   categoryBreakdown: { category: OtokogiCategory; amount: number; count: number }[];
   cumulativeRace: { month: string; [memberId: string]: string | number }[];
   streaks: StreakEntry[];
+  records: { label: string; value: number | string; detail?: string }[];
 };
 
 type MemberSummaryEntry = {
@@ -77,7 +88,12 @@ type MemberSummaryResponse = {
   hasJankenData: boolean;
 };
 
-type StreakEntry = { id: string; maxStreak: number };
+type StreakEntry = {
+  id: string;
+  name: string;
+  maxStreak: number;
+  currentStreak: number;
+};
 
 const fmt = new Intl.NumberFormat('ja-JP');
 
@@ -109,6 +125,51 @@ function computeDateRange(period: PeriodState): { from?: string; to?: string } {
     to: period.to,
   });
   return { from: toIsoDate(r.from), to: toIsoDate(r.to) };
+}
+
+/**
+ * 「前期」の日付範囲を導出する。
+ * - current-month → 先月 (月初〜月末)
+ * - current-fy → 前期 (last-fy)
+ * - last-fy → 前々期 (offset=-2)
+ * - all → null (比較対象なし)
+ * - custom → 同じ日数幅だけ遡った範囲
+ */
+function computePreviousRange(
+  period: PeriodState,
+  now: Date = new Date(),
+): { from?: string; to?: string } | null {
+  switch (period.period) {
+    case 'current-month': {
+      const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const r = getCurrentMonthRange(
+        new Date(prev.getFullYear(), prev.getMonth(), 28, 23, 59, 59, 999),
+      );
+      // 月末を取り直す (28 日以降なので翌月初日 -1 ms で真の月末)
+      const trueEnd = new Date(prev.getFullYear(), prev.getMonth() + 1, 0, 23, 59, 59, 999);
+      return { from: toIsoDate(r.from), to: toIsoDate(trueEnd) };
+    }
+    case 'current-fy': {
+      const r = getFiscalYearRange(now, -1);
+      return { from: toIsoDate(r.from), to: toIsoDate(r.to) };
+    }
+    case 'last-fy': {
+      const r = getFiscalYearRange(now, -2);
+      return { from: toIsoDate(r.from), to: toIsoDate(r.to) };
+    }
+    case 'all':
+      return null;
+    case 'custom': {
+      if (!period.from || !period.to) return null;
+      const from = new Date(period.from);
+      const to = new Date(period.to);
+      const ms = to.getTime() - from.getTime();
+      if (!(ms > 0)) return null;
+      const prevTo = new Date(from.getTime() - 1);
+      const prevFrom = new Date(prevTo.getTime() - ms);
+      return { from: toIsoDate(prevFrom), to: toIsoDate(prevTo) };
+    }
+  }
 }
 
 function MemberChipFilter({
@@ -177,14 +238,10 @@ type ReactValue = string | number | React.ReactNode;
 
 type BalanceMetric = {
   label: React.ReactNode;
-  // メンバー行 + 補助データ (streaks など) から 1 セルの表示値を返す
   render: (m: MemberSummaryEntry, extra: { maxStreak: number }) => ReactValue;
-  // 値のフォーマット特性 (符号付き強調するかなど)
   signed?: boolean;
 };
 
-// Issue #393: じゃんけん勝率列は記録なしでも常に表示 (hasJankenData 引数は不要)
-// Issue #391 C: じゃんけん勝率 / 男気率 / ストリーク を含む全指標を 1 表に集約
 function buildBalanceMetrics(): BalanceMetric[] {
   const metrics: BalanceMetric[] = [
     { label: '参加回数', render: (m) => fmt.format(m.participationCount) },
@@ -220,7 +277,6 @@ function buildBalanceMetrics(): BalanceMetric[] {
       render: (m) => (m.clutchCount > 0 ? formatYen(m.clutchTotal) : '—'),
     },
   ];
-  // Issue #393: 記録なしでも列は残す。jankenWinRate=null なら "—" を描画
   metrics.push({
     label: <TermTooltip term="じゃんけん勝率">じゃんけん勝率</TermTooltip>,
     render: (m) =>
@@ -232,22 +288,14 @@ function buildBalanceMetrics(): BalanceMetric[] {
 }
 
 function MemberBalanceSection({
-  from,
-  to,
-  memberIds,
+  data,
+  isFetching,
   streaks,
 }: {
-  from?: string;
-  to?: string;
-  memberIds: string[];
+  data?: MemberSummaryResponse;
+  isFetching: boolean;
   streaks: StreakEntry[];
 }) {
-  const { data, isFetching } = useOtokogiMemberSummary<MemberSummaryResponse>(
-    from,
-    to,
-    memberIds
-  );
-
   const members = data?.members ?? [];
   const metrics = buildBalanceMetrics();
   const hasJankenData = data?.hasJankenData ?? false;
@@ -299,7 +347,6 @@ function MemberBalanceSection({
                       const extra = { maxStreak: streakByMemberId.get(m.memberId) ?? 0 };
                       const value = metric.render(m, extra);
                       if (metric.signed) {
-                        // 漢気金額: 正=緑, 負=赤
                         const raw = m.otokogiAmount;
                         return (
                           <td
@@ -401,7 +448,6 @@ function BadgesSection({ period, members }: { period: PeriodState; members: Memb
   );
 }
 
-// Issue #393: FY (会計年度) ごとに全データから遡及計算したバッジ履歴を表示
 function FyBadgesSection({ members }: { members: Member[] }) {
   const { data, isLoading } = useFyBadges();
 
@@ -576,15 +622,604 @@ function RankingSection({ data }: { data?: OtokogiByMember[] }) {
   );
 }
 
-/**
- * /otokogi 内の統計タブ、および /otokogi/stats (backward-compat redirect 先) で
- * 共通利用する統計コンテンツ。親から period を受け取り、メンバー絞り込みは
- * コンポーネント内部で管理する。
- */
+// =============================================================
+// Issue #404: Layer 1 — Headline KPIs
+// =============================================================
+
+function pctChange(cur: number, prev: number): { delta: number; label: string; up: boolean | null } {
+  if (prev === 0) {
+    if (cur === 0) return { delta: 0, label: '—', up: null };
+    return { delta: 0, label: '前期 0', up: null };
+  }
+  const delta = (cur - prev) / prev;
+  const up = delta > 0;
+  return {
+    delta,
+    label: `${delta >= 0 ? '+' : ''}${Math.round(delta * 100)}%`,
+    up: delta === 0 ? null : up,
+  };
+}
+
+function diffChange(cur: number, prev: number): { label: string; up: boolean | null } {
+  const diff = cur - prev;
+  if (diff === 0) return { label: '±0', up: null };
+  return { label: `${diff > 0 ? '+' : ''}${diff}`, up: diff > 0 };
+}
+
+function HeadlineKpis({
+  cur,
+  prev,
+  hasPrev,
+  loading,
+}: {
+  cur: { totalAmount: number; totalCount: number; clutchCount: number };
+  prev: { totalAmount: number; totalCount: number; clutchCount: number } | null;
+  hasPrev: boolean;
+  loading: boolean;
+}) {
+  const amountChange = prev ? pctChange(cur.totalAmount, prev.totalAmount) : null;
+  const countChange = prev ? diffChange(cur.totalCount, prev.totalCount) : null;
+  const clutchChange = prev ? diffChange(cur.clutchCount, prev.clutchCount) : null;
+
+  const changeColor = (up: boolean | null) =>
+    up === true
+      ? 'text-emerald-600'
+      : up === false
+        ? 'text-rose-500'
+        : 'text-gray-400';
+
+  return (
+    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+      <div className="rounded-lg border bg-white p-3 min-w-0">
+        <p className="text-[10px] text-gray-500 mb-1">期間総額</p>
+        <Yen
+          value={cur.totalAmount}
+          size="sm"
+          className="font-bold text-slate-800 tabular-nums block tracking-tight"
+        />
+        <p className="text-[10px] mt-1 min-h-[14px]">
+          {!hasPrev ? (
+            <span className="text-gray-400">前期比なし</span>
+          ) : loading ? (
+            <span className="text-gray-400">...</span>
+          ) : amountChange ? (
+            <span className={changeColor(amountChange.up)}>
+              前期比 {amountChange.label}
+            </span>
+          ) : null}
+        </p>
+      </div>
+      <div className="rounded-lg border bg-white p-3 min-w-0">
+        <p className="text-[10px] text-gray-500 mb-1">男気発動回数</p>
+        <p className="text-xl font-bold text-slate-800 tabular-nums">
+          {cur.totalCount}
+          <span className="text-xs text-gray-500 ml-0.5">回</span>
+        </p>
+        <p className="text-[10px] mt-1 min-h-[14px]">
+          {!hasPrev ? (
+            <span className="text-gray-400">前期比なし</span>
+          ) : loading ? (
+            <span className="text-gray-400">...</span>
+          ) : countChange ? (
+            <span className={changeColor(countChange.up)}>
+              前期比 {countChange.label}
+            </span>
+          ) : null}
+        </p>
+      </div>
+      <div className="rounded-lg border bg-white p-3 min-w-0">
+        <p className="text-[10px] text-gray-500 mb-1">
+          <TermTooltip term="CLUTCH">★ CLUTCH</TermTooltip> 発動回数
+        </p>
+        <p className="text-xl font-bold text-slate-800 tabular-nums">
+          {cur.clutchCount}
+          <span className="text-xs text-gray-500 ml-0.5">回</span>
+        </p>
+        <p className="text-[10px] mt-1 min-h-[14px]">
+          {!hasPrev ? (
+            <span className="text-gray-400">前期比なし</span>
+          ) : loading ? (
+            <span className="text-gray-400">...</span>
+          ) : clutchChange ? (
+            <span className={changeColor(clutchChange.up)}>
+              前期比 {clutchChange.label}
+            </span>
+          ) : null}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================
+// Issue #404: Layer 2 — 称号 Top (Primary バッジ)
+// =============================================================
+
+type PrimaryBadge = {
+  kind: 'mvp' | 'shadow-otokogi-king' | 'count-king';
+  icon: string;
+  label: string;
+  hint: string;
+  color: string;
+  member: MemberSummaryEntry | null;
+  valueText: string;
+};
+
+function pickPrimaryBadges(summary: MemberSummaryEntry[] | undefined): PrimaryBadge[] {
+  const list = summary ?? [];
+  const sortBy = <T,>(arr: T[], key: (x: T) => number) =>
+    [...arr].sort((a, b) => key(b) - key(a));
+
+  const topMvp = sortBy(list.filter((m) => m.actualPaid > 0), (m) => m.actualPaid)[0] ?? null;
+  const topShadow = sortBy(list.filter((m) => m.otokogiAmount > 0), (m) => m.otokogiAmount)[0] ?? null;
+  const topCount = sortBy(list.filter((m) => m.payerCount > 0), (m) => m.payerCount)[0] ?? null;
+
+  return [
+    {
+      kind: 'mvp',
+      icon: '💎',
+      label: 'MVP',
+      hint: '支払総額 1 位',
+      color: 'from-amber-50 to-amber-100 border-amber-200',
+      member: topMvp,
+      valueText: topMvp ? formatYen(topMvp.actualPaid) : '—',
+    },
+    {
+      kind: 'shadow-otokogi-king',
+      icon: '🏆',
+      label: '裏男気王',
+      hint: 'フェアシェア超過 1 位',
+      color: 'from-orange-50 to-orange-100 border-orange-200',
+      member: topShadow,
+      valueText: topShadow ? `${topShadow.otokogiAmount >= 0 ? '+' : ''}${formatYen(topShadow.otokogiAmount)}` : '—',
+    },
+    {
+      kind: 'count-king',
+      icon: '🎖️',
+      label: '量産王',
+      hint: '支払回数 1 位',
+      color: 'from-emerald-50 to-emerald-100 border-emerald-200',
+      member: topCount,
+      valueText: topCount ? `${topCount.payerCount} 回` : '—',
+    },
+  ];
+}
+
+function PrimaryBadgesSection({ summary }: { summary?: MemberSummaryResponse }) {
+  const badges = useMemo(() => pickPrimaryBadges(summary?.members), [summary]);
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-slate-800">称号 Top</CardTitle>
+        <p className="text-xs text-gray-500 mt-0.5">
+          期間内の 3 大称号。左から 💎 MVP (総額) · 🏆 裏男気王 (超過) · 🎖️ 量産王 (回数)。
+        </p>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+          {badges.map((b) => (
+            <div
+              key={b.kind}
+              className={`rounded-lg border bg-gradient-to-br ${b.color} p-3 min-w-0`}
+            >
+              <div className="flex items-baseline gap-2 mb-2">
+                <span className="text-xl leading-none">{b.icon}</span>
+                <span className="text-sm font-bold text-slate-800">{b.label}</span>
+                <span className="text-[10px] text-gray-500 ml-auto">{b.hint}</span>
+              </div>
+              {b.member ? (
+                <>
+                  <p className="text-sm font-medium text-slate-800 break-words line-clamp-2">
+                    {b.member.memberName}
+                  </p>
+                  <p className="text-base font-bold text-slate-800 tabular-nums mt-0.5">
+                    {b.valueText}
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-gray-400">該当者なし</p>
+              )}
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// =============================================================
+// Issue #404: Layer 5 — 記録 (Records)
+// =============================================================
+
+function RecordsSection({
+  records,
+  streaks,
+  maxParticipationCount,
+  topJanken,
+}: {
+  records?: { label: string; value: number | string; detail?: string }[];
+  streaks: StreakEntry[];
+  maxParticipationCount: number | null;
+  topJanken: { name: string; rate: number; games: number } | null;
+}) {
+  const sortedStreaks = [...streaks].sort((a, b) => b.maxStreak - a.maxStreak);
+  const topStreak = sortedStreaks[0]?.maxStreak > 0 ? sortedStreaks[0] : null;
+
+  const highlights: { icon: string; label: string; value: string; detail?: string }[] = [];
+  const maxRecord = records?.find((r) => r.label === '最高額');
+  if (maxRecord && typeof maxRecord.value === 'number') {
+    highlights.push({
+      icon: '💰',
+      label: '最高額男気 (単発)',
+      value: formatYen(maxRecord.value),
+      detail: maxRecord.detail,
+    });
+  }
+  if (topStreak) {
+    highlights.push({
+      icon: '🔥',
+      label: '最長ストリーク',
+      value: `${topStreak.maxStreak} 連勝`,
+      detail: topStreak.name,
+    });
+  }
+  const maxParticipants = records?.find((r) => r.label === '最多参加人数');
+  if (maxParticipants && typeof maxParticipants.value === 'number') {
+    highlights.push({
+      icon: '👥',
+      label: '最多参加会',
+      value: `${maxParticipants.value} 人`,
+      detail: maxParticipants.detail,
+    });
+  }
+  if (maxParticipationCount !== null && maxParticipationCount > 0) {
+    highlights.push({
+      icon: '📅',
+      label: '最大参加数 (メンバー)',
+      value: `${maxParticipationCount} 回`,
+    });
+  }
+  if (topJanken) {
+    highlights.push({
+      icon: '✊',
+      label: 'じゃんけん最高勝率',
+      value: `${Math.round(topJanken.rate * 100)}%`,
+      detail: `${topJanken.name} (${topJanken.games} 戦)`,
+    });
+  }
+  const maxDay = records?.find((r) => r.label === '1日最多回数');
+  if (maxDay && typeof maxDay.value === 'number') {
+    highlights.push({
+      icon: '🗓️',
+      label: '1 日最多回数',
+      value: `${maxDay.value} 回`,
+      detail: maxDay.detail,
+    });
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-slate-800">記録 (期間内の名場面)</CardTitle>
+        <p className="text-xs text-gray-500 mt-0.5">
+          期間内に残った最高記録。カードの右端が記録値。
+        </p>
+      </CardHeader>
+      <CardContent>
+        {highlights.length === 0 ? (
+          <p className="text-sm text-gray-500">記録に残るデータがありません</p>
+        ) : (
+          <ul className="divide-y divide-gray-100">
+            {highlights.map((h, i) => (
+              <li key={i} className="flex items-center gap-2 py-2 min-w-0">
+                <span className="text-lg shrink-0">{h.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-slate-800">{h.label}</p>
+                  {h.detail && (
+                    <p className="text-[11px] text-gray-500 break-words line-clamp-2">
+                      {h.detail}
+                    </p>
+                  )}
+                </div>
+                <span className="text-sm font-bold text-slate-800 tabular-nums shrink-0">
+                  {h.value}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// =============================================================
+// Issue #404: Layer 6 — Auto-Insights (★ 分析の核)
+// =============================================================
+
+const INSIGHT_DEFAULT_LIMIT = 4;
+
+function AutoInsightsSection({
+  insights,
+  members,
+  loading,
+}: {
+  insights: Insight[];
+  members: Member[];
+  loading: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const memberById = useMemo(
+    () => new Map(members.map((m) => [m.id, m])),
+    [members],
+  );
+  const displayed = expanded ? insights : insights.slice(0, INSIGHT_DEFAULT_LIMIT);
+
+  return (
+    <Card className="border-amber-200 bg-amber-50/40">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-slate-800 flex items-center gap-2">
+            <span className="text-amber-700">★ 自動洞察</span>
+            {insights.length > 0 && (
+              <span className="text-xs font-normal text-gray-500">
+                ({insights.length} 件)
+              </span>
+            )}
+          </CardTitle>
+        </div>
+        <p className="text-xs text-gray-500 mt-0.5">
+          期間データから自動検出した「何が言えるか」を優先度順に表示。
+        </p>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <p className="text-sm text-gray-500">読み込み中...</p>
+        ) : insights.length === 0 ? (
+          <p className="text-sm text-gray-500">
+            この期間で特筆すべき洞察はありません。より広い期間で試してください。
+          </p>
+        ) : (
+          <>
+            <ul className="space-y-2">
+              {displayed.map((ins) => {
+                const member = ins.memberId ? memberById.get(ins.memberId) : null;
+                return (
+                  <li
+                    key={ins.id}
+                    className="flex items-start gap-2 bg-white rounded-md p-2 border border-amber-100"
+                  >
+                    <span className="text-lg shrink-0 leading-none pt-0.5">
+                      {ins.icon}
+                    </span>
+                    {member && (
+                      <div
+                        className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${member.colorBg} ${member.colorText}`}
+                        title={member.name}
+                      >
+                        {member.initial}
+                      </div>
+                    )}
+                    <p className="text-xs text-slate-800 leading-snug flex-1 min-w-0 break-words">
+                      {ins.text}
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+            {insights.length > INSIGHT_DEFAULT_LIMIT && (
+              <button
+                type="button"
+                className="mt-2 text-xs text-amber-700 hover:text-amber-800 font-medium"
+                onClick={() => setExpanded((v) => !v)}
+              >
+                {expanded ? '▲ 閉じる' : `▼ もっと見る (+${insights.length - INSIGHT_DEFAULT_LIMIT})`}
+              </button>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// =============================================================
+// Issue #404: Layer 7 — 比較分析 (折りたたみ)
+// =============================================================
+
+function ComparisonSection({
+  curSummary,
+  prevSummary,
+  curMemberSummary,
+  prevMemberSummary,
+  periodLabel,
+  prevPeriodLabel,
+}: {
+  curSummary: { totalAmount: number; totalCount: number; clutchCount: number } | null;
+  prevSummary: { totalAmount: number; totalCount: number; clutchCount: number } | null;
+  curMemberSummary?: MemberSummaryResponse;
+  prevMemberSummary?: MemberSummaryResponse;
+  periodLabel: string;
+  prevPeriodLabel: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const memberPairs = useMemo(() => {
+    if (!curMemberSummary || !prevMemberSummary) return [];
+    const prevMap = new Map(prevMemberSummary.members.map((m) => [m.memberId, m]));
+    return curMemberSummary.members
+      .map((cur) => {
+        const prev = prevMap.get(cur.memberId);
+        return {
+          cur,
+          prev,
+          diff: cur.actualPaid - (prev?.actualPaid ?? 0),
+        };
+      })
+      .sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff))
+      .slice(0, 5);
+  }, [curMemberSummary, prevMemberSummary]);
+
+  if (!prevSummary) return null;
+
+  const diffCell = (cur: number, prev: number, isCurrency: boolean) => {
+    const delta = cur - prev;
+    if (delta === 0) return <span className="text-gray-400">±0</span>;
+    const up = delta > 0;
+    return (
+      <span className={up ? 'text-emerald-600' : 'text-rose-500'}>
+        {up ? '+' : ''}
+        {isCurrency ? formatYen(delta) : delta}
+      </span>
+    );
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="w-full text-left flex items-center justify-between"
+        >
+          <div>
+            <CardTitle className="text-slate-800">
+              比較分析 ({periodLabel} vs {prevPeriodLabel})
+            </CardTitle>
+            <p className="text-xs text-gray-500 mt-0.5">
+              期間差分と変動の大きいメンバーを表示。
+            </p>
+          </div>
+          <span className="text-xs text-gray-500">{open ? '▲' : '▼'}</span>
+        </button>
+      </CardHeader>
+      {open && (
+        <CardContent>
+          <div className="space-y-3">
+            <table className="text-xs w-full border-collapse">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left p-1.5 text-gray-500 font-medium">指標</th>
+                  <th className="text-right p-1.5 text-gray-500 font-medium">{periodLabel}</th>
+                  <th className="text-right p-1.5 text-gray-500 font-medium">{prevPeriodLabel}</th>
+                  <th className="text-right p-1.5 text-gray-500 font-medium">差分</th>
+                </tr>
+              </thead>
+              <tbody>
+                {curSummary && (
+                  <>
+                    <tr className="border-b border-gray-100">
+                      <td className="p-1.5 text-slate-800">総額</td>
+                      <td className="p-1.5 text-right tabular-nums text-slate-800">
+                        {formatYen(curSummary.totalAmount)}
+                      </td>
+                      <td className="p-1.5 text-right tabular-nums text-gray-500">
+                        {formatYen(prevSummary.totalAmount)}
+                      </td>
+                      <td className="p-1.5 text-right tabular-nums font-semibold">
+                        {diffCell(curSummary.totalAmount, prevSummary.totalAmount, true)}
+                      </td>
+                    </tr>
+                    <tr className="border-b border-gray-100">
+                      <td className="p-1.5 text-slate-800">発動回数</td>
+                      <td className="p-1.5 text-right tabular-nums text-slate-800">
+                        {curSummary.totalCount} 回
+                      </td>
+                      <td className="p-1.5 text-right tabular-nums text-gray-500">
+                        {prevSummary.totalCount} 回
+                      </td>
+                      <td className="p-1.5 text-right tabular-nums font-semibold">
+                        {diffCell(curSummary.totalCount, prevSummary.totalCount, false)} 回
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="p-1.5 text-slate-800">★ CLUTCH</td>
+                      <td className="p-1.5 text-right tabular-nums text-slate-800">
+                        {curSummary.clutchCount} 回
+                      </td>
+                      <td className="p-1.5 text-right tabular-nums text-gray-500">
+                        {prevSummary.clutchCount} 回
+                      </td>
+                      <td className="p-1.5 text-right tabular-nums font-semibold">
+                        {diffCell(curSummary.clutchCount, prevSummary.clutchCount, false)} 回
+                      </td>
+                    </tr>
+                  </>
+                )}
+              </tbody>
+            </table>
+            {memberPairs.length > 0 && (
+              <div>
+                <p className="text-[11px] text-gray-500 mb-1 px-1">変動の大きいメンバー Top5 (実際払った額)</p>
+                <ul className="space-y-1">
+                  {memberPairs.map(({ cur, prev, diff }) => (
+                    <li
+                      key={cur.memberId}
+                      className="flex items-center gap-2 text-xs px-1 min-w-0"
+                    >
+                      <span className="flex-1 text-slate-800 truncate">{cur.memberName}</span>
+                      <span className="tabular-nums text-gray-500 shrink-0">
+                        {formatYen(prev?.actualPaid ?? 0)} → {formatYen(cur.actualPaid)}
+                      </span>
+                      <span
+                        className={`tabular-nums font-semibold shrink-0 w-20 text-right ${
+                          diff > 0 ? 'text-emerald-600' : diff < 0 ? 'text-rose-500' : 'text-gray-400'
+                        }`}
+                      >
+                        {diff >= 0 ? '+' : ''}
+                        {formatYen(diff)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+// =============================================================
+// Issue #404: 統計タブ本体 — 7 層構造
+// =============================================================
+
+function periodLabel(period: PeriodState): string {
+  switch (period.period) {
+    case 'current-month':
+      return '今月';
+    case 'current-fy':
+      return '今期';
+    case 'last-fy':
+      return '前期';
+    case 'all':
+      return '全期間';
+    case 'custom':
+      return `${period.from ?? ''} 〜 ${period.to ?? ''}`.trim() || 'カスタム';
+  }
+}
+
+function previousPeriodLabel(period: PeriodState): string {
+  switch (period.period) {
+    case 'current-month':
+      return '先月';
+    case 'current-fy':
+      return '前期';
+    case 'last-fy':
+      return '前々期';
+    case 'all':
+      return '—';
+    case 'custom':
+      return '同期間前';
+  }
+}
+
 export function StatsContent({ period }: { period: PeriodState }) {
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
 
   const { from, to } = useMemo(() => computeDateRange(period), [period]);
+  const prevRange = useMemo(() => computePreviousRange(period), [period]);
 
   const { data: membersData } = useMembers({ staleTime: 5 * 60 * 1000 });
   const members: Member[] = membersData ?? [];
@@ -598,6 +1233,112 @@ export function StatsContent({ period }: { period: PeriodState }) {
   const { data: charts } = useOtokogiCharts(from, to, selectedMemberIds);
   const chartsThisYearLabel = charts?.anchorYear ?? new Date().getFullYear();
 
+  const { data: memberSummary, isFetching: summaryFetching } =
+    useOtokogiMemberSummary<MemberSummaryResponse>(from, to, selectedMemberIds);
+
+  // 前期間 (Headline / Comparison 用)
+  const { data: prevStats, isFetching: prevStatsFetching } =
+    useOtokogiStatsMain<StatsData>(prevRange?.from, prevRange?.to, selectedMemberIds);
+  const { data: prevMemberSummary } = useOtokogiMemberSummary<MemberSummaryResponse>(
+    prevRange?.from,
+    prevRange?.to,
+    selectedMemberIds,
+  );
+
+  // 現期間の clutch 合計 (member-summary から導出)
+  const curClutchCount = useMemo(
+    () =>
+      (memberSummary?.members ?? []).reduce((s, m) => s + m.clutchCount, 0),
+    [memberSummary],
+  );
+  const prevClutchCount = useMemo(
+    () =>
+      (prevMemberSummary?.members ?? []).reduce((s, m) => s + m.clutchCount, 0),
+    [prevMemberSummary],
+  );
+
+  const curHeadline = useMemo(
+    () => ({
+      totalAmount: stats?.totalAmount ?? 0,
+      totalCount: stats?.totalCount ?? 0,
+      clutchCount: curClutchCount,
+    }),
+    [stats?.totalAmount, stats?.totalCount, curClutchCount],
+  );
+  const prevHeadline = useMemo(
+    () =>
+      prevRange
+        ? {
+            totalAmount: prevStats?.totalAmount ?? 0,
+            totalCount: prevStats?.totalCount ?? 0,
+            clutchCount: prevClutchCount,
+          }
+        : null,
+    [prevRange, prevStats?.totalAmount, prevStats?.totalCount, prevClutchCount],
+  );
+
+  // Auto-Insights 用 context
+  const insights = useMemo(() => {
+    if (!stats || !memberSummary) return [];
+    const ctx: InsightsContext = {
+      summary: {
+        totalCount: curHeadline.totalCount,
+        totalAmount: curHeadline.totalAmount,
+        clutchCount: curHeadline.clutchCount,
+      },
+      memberSummaries: memberSummary.members.map((m) => ({
+        memberId: m.memberId,
+        memberName: m.memberName,
+        participationCount: m.participationCount,
+        payerCount: m.payerCount,
+        actualPaid: m.actualPaid,
+        shouldHavePaid: m.shouldHavePaid,
+        otokogiAmount: m.otokogiAmount,
+        averagePaymentAmount: m.averagePaymentAmount,
+        maxSingleOtokogi: m.maxSingleOtokogi,
+        clutchCount: m.clutchCount,
+        jankenWinRate: m.jankenWinRate,
+        jankenParticipationCount: m.jankenParticipationCount,
+      })),
+      streaks: stats.streaks ?? [],
+      monthlyTrend: stats.monthlyTrend ?? [],
+      categoryBreakdown: (stats.categoryBreakdown ?? []).map((c) => ({
+        category: c.category,
+        amount: c.amount,
+        count: c.count,
+      })),
+      previous: prevHeadline,
+      periodLabel: periodLabel(period),
+    };
+    return computeInsights(ctx);
+  }, [stats, memberSummary, curHeadline, prevHeadline, period]);
+
+  // 記録用: じゃんけん最高勝率 (10 戦以上)
+  const topJanken = useMemo(() => {
+    const list = (memberSummary?.members ?? []).filter(
+      (m) => m.jankenWinRate !== null && m.jankenParticipationCount >= 10,
+    );
+    const sorted = list.sort((a, b) => (b.jankenWinRate ?? 0) - (a.jankenWinRate ?? 0));
+    const top = sorted[0];
+    if (!top || top.jankenWinRate === null) return null;
+    return {
+      name: top.memberName,
+      rate: top.jankenWinRate,
+      games: top.jankenParticipationCount,
+    };
+  }, [memberSummary]);
+
+  // 記録用: 最大参加数メンバー
+  const maxParticipationMember = useMemo(() => {
+    const list = memberSummary?.members ?? [];
+    if (list.length === 0) return null;
+    const sorted = [...list].sort((a, b) => b.participationCount - a.participationCount);
+    const top = sorted[0];
+    return top && top.participationCount > 0 ? top.participationCount : null;
+  }, [memberSummary]);
+
+  const insightsLoading = statsFetching || summaryFetching;
+
   return (
     <div>
       <MemberChipFilter
@@ -606,57 +1347,66 @@ export function StatsContent({ period }: { period: PeriodState }) {
         members={members}
       />
 
-      {stats && (
-        <div className="flex gap-3 py-3 text-center">
-          <div className="flex-1">
-            <p className="text-lg font-bold text-slate-800">{stats.totalCount}</p>
-            <p className="text-[10px] text-gray-500">総回数</p>
-          </div>
-          <div className="flex-1 min-w-0">
-            <Yen value={stats.totalAmount} size="sm" className="font-bold text-slate-800 tabular-nums block tracking-tight" />
-            <p className="text-[10px] text-gray-500">累計金額</p>
-          </div>
-          <div className="flex-1 min-w-0">
-            <Yen value={stats.averageAmount} size="sm" className="font-bold text-slate-800 tabular-nums block tracking-tight" />
-            <p className="text-[10px] text-gray-500">平均金額</p>
-          </div>
-        </div>
-      )}
-      {!stats && statsFetching && (
-        <p className="text-sm text-gray-500 py-4">読み込み中...</p>
-      )}
+      {/* Layer 1: Headline KPIs */}
+      <div className="py-2">
+        <HeadlineKpis
+          cur={curHeadline}
+          prev={prevHeadline}
+          hasPrev={prevRange !== null}
+          loading={prevStatsFetching}
+        />
+      </div>
 
-      {/*
-        Issue #391: CEO 推奨構成に沿って並び替え。
-        - 前月比較 / 前年度比較 (ComparisonSection) は削除 (B5)。
-        - 月次推移 と 累積レース は連続配置して "違い" を目で確認できるようにする (B2)。
-      */}
-      <div className="space-y-4">
-        {/* 1. Top-3 ランキング */}
+      <div className="space-y-4 mt-3">
+        {/* Layer 6: Auto-Insights (★ 分析の核 — 早めに出す) */}
+        <AutoInsightsSection
+          insights={insights}
+          members={members}
+          loading={insightsLoading}
+        />
+
+        {/* Layer 2: 称号 Top (Primary バッジ) */}
+        <PrimaryBadgesSection summary={memberSummary} />
+
+        {/* Layer 2b: バッジ一覧 (期間) + FY 履歴 */}
+        <BadgesSection period={period} members={members} />
+        <FyBadgesSection members={members} />
+
+        {/* Layer 3: 時系列 — 月次推移 + 累積レース */}
+        <MonthlyTrendSection data={stats?.monthlyTrend} />
+        <CumulativeRaceSection data={stats?.cumulativeRace} members={members} />
+
+        {/* Layer 4: 分布 — カテゴリ円 + ヒートマップ */}
+        <CategoryPieSection data={stats?.categoryBreakdown} />
+        <MonthMemberHeatmapSection data={charts?.monthMemberHeatmap} />
+
+        {/* Layer 5: 記録 (名場面) */}
+        <RecordsSection
+          records={stats?.records}
+          streaks={stats?.streaks ?? []}
+          maxParticipationCount={maxParticipationMember}
+          topJanken={topJanken}
+        />
+
+        {/* 補助: ランキング + メンバー別収支 (既存の詳細) */}
         <RankingSection data={stats?.otokogiByMember} />
-        {/* 2. メンバー別収支表 (全指標集約) */}
         <MemberBalanceSection
-          from={from}
-          to={to}
-          memberIds={selectedMemberIds}
+          data={memberSummary}
+          isFetching={summaryFetching}
           streaks={stats?.streaks ?? []}
         />
-        {/* 3. 月別男気額の推移 */}
-        <MonthlyTrendSection data={stats?.monthlyTrend} />
-        {/* 4. メンバー別 累積男気額レース — 月次推移との違いを隣接配置で見せる */}
-        <CumulativeRaceSection data={stats?.cumulativeRace} members={members} />
-        {/* 5. 月 × メンバー ヒートマップ */}
-        <MonthMemberHeatmapSection data={charts?.monthMemberHeatmap} />
-        {/* 6. カテゴリ別円グラフ (3 分類) */}
-        <CategoryPieSection data={stats?.categoryBreakdown} />
-        {/* 7. 直近 3 ヶ月の男気トップ */}
         <TopRecentSection data={charts?.topRecent} />
-        {/* 8. 称号表示 (期間フィルタ) */}
-        <BadgesSection period={period} members={members} />
-        {/* 8b. Issue #393: FY (会計年度) ごとのバッジ履歴 */}
-        <FyBadgesSection members={members} />
-        {/* 9. 補足: 年比較の累積 (全員合計) */}
         <CumulativeYearlySection data={charts?.cumulativeYearly} thisYearLabel={chartsThisYearLabel} />
+
+        {/* Layer 7: 比較分析 (折りたたみ) */}
+        <ComparisonSection
+          curSummary={stats ? curHeadline : null}
+          prevSummary={prevHeadline}
+          curMemberSummary={memberSummary}
+          prevMemberSummary={prevMemberSummary}
+          periodLabel={periodLabel(period)}
+          prevPeriodLabel={previousPeriodLabel(period)}
+        />
       </div>
     </div>
   );
