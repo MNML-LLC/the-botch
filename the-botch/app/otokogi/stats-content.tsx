@@ -19,7 +19,6 @@ import {
   CategoryPieSection,
   CumulativeYearlySection,
   CumulativeRaceSection,
-  ComparisonSection,
   TopRecentSection,
 } from './stats/charts';
 import { Yen } from '@/components/ui/yen';
@@ -51,6 +50,7 @@ type StatsData = {
   averageAmount: number;
   categoryBreakdown: { category: OtokogiCategory; amount: number; count: number }[];
   cumulativeRace: { month: string; [memberId: string]: string | number }[];
+  streaks: StreakEntry[];
 };
 
 type MemberSummaryEntry = {
@@ -65,10 +65,18 @@ type MemberSummaryEntry = {
   averagePaymentAmount: number;
   maxSingleOtokogi: number;
   jankenWinRate: number | null;
+  jankenParticipationCount: number;
   clutchCount: number;
   clutchTotal: number;
   clutchRate: number;
 };
+
+type MemberSummaryResponse = {
+  members: MemberSummaryEntry[];
+  hasJankenData: boolean;
+};
+
+type StreakEntry = { id: string; maxStreak: number };
 
 const fmt = new Intl.NumberFormat('ja-JP');
 
@@ -160,55 +168,92 @@ function MemberChipFilter({
   );
 }
 
+function formatPercent(value: number): string {
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+type ReactValue = string | number | React.ReactNode;
+
 type BalanceMetric = {
   label: React.ReactNode;
-  key: keyof MemberSummaryEntry;
-  format: (v: number) => string;
+  // メンバー行 + 補助データ (streaks など) から 1 セルの表示値を返す
+  render: (m: MemberSummaryEntry, extra: { maxStreak: number }) => ReactValue;
+  // 値のフォーマット特性 (符号付き強調するかなど)
+  signed?: boolean;
 };
 
-const BALANCE_METRICS: BalanceMetric[] = [
-  { label: '参加回数', key: 'participationCount', format: (v) => fmt.format(v) },
-  { label: '支払回数', key: 'payerCount', format: (v) => fmt.format(v) },
-  { label: '実際払った額', key: 'actualPaid', format: formatYen },
-  { label: '本来払うべき額', key: 'shouldHavePaid', format: formatYen },
-  {
-    label: <TermTooltip term="男気">漢気金額</TermTooltip>,
-    key: 'otokogiAmount',
-    format: formatYen,
-  },
-  {
-    label: <TermTooltip term="気前度">平均支払単価</TermTooltip>,
-    key: 'averagePaymentAmount',
-    format: formatYen,
-  },
-  {
-    label: <TermTooltip term="CLUTCH">★ CLUTCH回数</TermTooltip>,
-    key: 'clutchCount',
-    format: (v) => fmt.format(v),
-  },
-  {
-    label: <TermTooltip term="CLUTCH">★ CLUTCH総額</TermTooltip>,
-    key: 'clutchTotal',
-    format: formatYen,
-  },
-];
+// Issue #391 C: じゃんけん勝率 / 男気率 / ストリーク を含む全指標を 1 表に集約
+function buildBalanceMetrics(hasJankenData: boolean): BalanceMetric[] {
+  const metrics: BalanceMetric[] = [
+    { label: '参加回数', render: (m) => fmt.format(m.participationCount) },
+    { label: '支払回数', render: (m) => fmt.format(m.payerCount) },
+    {
+      label: <TermTooltip term="男気率">男気率</TermTooltip>,
+      render: (m) =>
+        m.participationCount > 0
+          ? `${Math.round((m.payerCount / m.participationCount) * 100)}%`
+          : '—',
+    },
+    { label: '実際払った額', render: (m) => formatYen(m.actualPaid) },
+    { label: '本来払うべき額', render: (m) => formatYen(m.shouldHavePaid) },
+    {
+      label: <TermTooltip term="男気">漢気金額</TermTooltip>,
+      render: (m) => formatYen(m.otokogiAmount),
+      signed: true,
+    },
+    {
+      label: <TermTooltip term="気前度">平均支払単価</TermTooltip>,
+      render: (m) => (m.payerCount > 0 ? formatYen(m.averagePaymentAmount) : '—'),
+    },
+    {
+      label: <TermTooltip term="ストリーク">最大連続男気</TermTooltip>,
+      render: (_m, extra) => (extra.maxStreak > 0 ? `${extra.maxStreak} 連勝` : '—'),
+    },
+    {
+      label: <TermTooltip term="CLUTCH">★ CLUTCH回数</TermTooltip>,
+      render: (m) => fmt.format(m.clutchCount),
+    },
+    {
+      label: <TermTooltip term="CLUTCH">★ CLUTCH総額</TermTooltip>,
+      render: (m) => (m.clutchCount > 0 ? formatYen(m.clutchTotal) : '—'),
+    },
+  ];
+  if (hasJankenData) {
+    metrics.push({
+      label: <TermTooltip term="じゃんけん勝率">じゃんけん勝率</TermTooltip>,
+      render: (m) =>
+        m.jankenWinRate !== null
+          ? `${formatPercent(m.jankenWinRate)} (${m.jankenParticipationCount}戦)`
+          : '—',
+    });
+  }
+  return metrics;
+}
 
 function MemberBalanceSection({
   from,
   to,
   memberIds,
+  streaks,
 }: {
   from?: string;
   to?: string;
   memberIds: string[];
+  streaks: StreakEntry[];
 }) {
-  const { data, isFetching } = useOtokogiMemberSummary<{ members: MemberSummaryEntry[] }>(
+  const { data, isFetching } = useOtokogiMemberSummary<MemberSummaryResponse>(
     from,
     to,
     memberIds
   );
 
   const members = data?.members ?? [];
+  const metrics = buildBalanceMetrics(data?.hasJankenData ?? false);
+  const streakByMemberId = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const s of streaks) map.set(s.id, s.maxStreak);
+    return map;
+  }, [streaks]);
 
   return (
     <Card>
@@ -217,6 +262,9 @@ function MemberBalanceSection({
           <CardTitle className="text-slate-800">メンバー別収支</CardTitle>
           {isFetching && <span className="text-xs text-gray-400">更新中...</span>}
         </div>
+        <p className="text-xs text-gray-500 mt-0.5">
+          期間内の全指標を 1 表に集約。指標名ホバーで意味を表示。
+        </p>
       </CardHeader>
       <CardContent>
         {members.length === 0 && !isFetching ? (
@@ -226,35 +274,57 @@ function MemberBalanceSection({
             <table className="text-xs w-full border-collapse min-w-max">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="sticky left-0 z-10 bg-white text-left p-2 font-medium text-gray-500 whitespace-nowrap min-w-[110px]">
+                  <th className="sticky left-0 z-10 bg-white text-left p-2 font-medium text-gray-500 whitespace-nowrap min-w-[120px]">
                     指標
                   </th>
                   {members.map((m) => (
-                    <th key={m.memberId} className="p-2 text-center font-medium text-slate-800 whitespace-nowrap min-w-[76px]">
+                    <th
+                      key={m.memberId}
+                      className="p-2 text-center font-medium text-slate-800 whitespace-nowrap min-w-[80px]"
+                    >
                       {m.memberName}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {BALANCE_METRICS.map((metric) => (
-                  <tr key={metric.key} className="border-b border-gray-100 last:border-0">
+                {metrics.map((metric, i) => (
+                  <tr key={i} className="border-b border-gray-100 last:border-0">
                     <td className="sticky left-0 z-10 bg-white p-2 text-gray-600 whitespace-nowrap font-medium">
                       {metric.label}
                     </td>
                     {members.map((m) => {
-                      const raw = m[metric.key] as number;
-                      const isOtokogi = metric.key === 'otokogiAmount';
-                      return (
-                        <td key={m.memberId} className="p-2 text-center whitespace-nowrap">
-                          {isOtokogi ? (
-                            <span className={raw > 0 ? 'font-semibold text-green-600' : raw < 0 ? 'font-semibold text-red-500' : 'text-gray-500'}>
+                      const extra = { maxStreak: streakByMemberId.get(m.memberId) ?? 0 };
+                      const value = metric.render(m, extra);
+                      if (metric.signed) {
+                        // 漢気金額: 正=緑, 負=赤
+                        const raw = m.otokogiAmount;
+                        return (
+                          <td
+                            key={m.memberId}
+                            className="p-2 text-center whitespace-nowrap"
+                          >
+                            <span
+                              className={
+                                raw > 0
+                                  ? 'font-semibold text-green-600'
+                                  : raw < 0
+                                    ? 'font-semibold text-red-500'
+                                    : 'text-gray-500'
+                              }
+                            >
                               {raw >= 0 ? '+' : ''}
-                              {metric.format(raw)}
+                              {value}
                             </span>
-                          ) : (
-                            <span className="text-slate-800">{metric.format(raw)}</span>
-                          )}
+                          </td>
+                        );
+                      }
+                      return (
+                        <td
+                          key={m.memberId}
+                          className="p-2 text-center whitespace-nowrap text-slate-800"
+                        >
+                          {value}
                         </td>
                       );
                     })}
@@ -330,7 +400,10 @@ function MonthlyTrendSection({ data }: { data?: { month: string; amount: number 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-slate-800">月別推移</CardTitle>
+        <CardTitle className="text-slate-800">月別男気額の推移 (期間内 · 全員合計)</CardTitle>
+        <p className="text-xs text-gray-500 mt-0.5">
+          各月の支払総額。「どの月に多く払ったか」を見るための棒グラフ。
+        </p>
       </CardHeader>
       <CardContent>
         <div className="w-full h-48 sm:h-64">
@@ -383,7 +456,9 @@ function RankingSection({ data }: { data?: OtokogiByMember[] }) {
     <Card>
       <CardHeader>
         <CardTitle className="text-slate-800">漢気ランキング</CardTitle>
-        <p className="text-xs text-gray-500 mt-0.5">支払額 × (参加人数−1) ÷ 参加人数 の累計</p>
+        <p className="text-xs text-gray-500 mt-0.5">
+          実際払った額 − 本来払うべき額 の累計 (期間内, 下の収支表と同値)
+        </p>
       </CardHeader>
       <CardContent>
         <div className="w-full" style={{ height: chartHeight }}>
@@ -472,17 +547,35 @@ export function StatsContent({ period }: { period: PeriodState }) {
         <p className="text-sm text-gray-500 py-4">読み込み中...</p>
       )}
 
+      {/*
+        Issue #391: CEO 推奨構成に沿って並び替え。
+        - 前月比較 / 前年度比較 (ComparisonSection) は削除 (B5)。
+        - 月次推移 と 累積レース は連続配置して "違い" を目で確認できるようにする (B2)。
+      */}
       <div className="space-y-4">
-        <BadgesSection period={period} members={members} />
-        <MemberBalanceSection from={from} to={to} memberIds={selectedMemberIds} />
-        <MonthlyTrendSection data={stats?.monthlyTrend} />
+        {/* 1. Top-3 ランキング */}
         <RankingSection data={stats?.otokogiByMember} />
-        <MonthMemberHeatmapSection data={charts?.monthMemberHeatmap} />
-        <CategoryPieSection data={stats?.categoryBreakdown} />
-        <CumulativeYearlySection data={charts?.cumulativeYearly} thisYearLabel={chartsThisYearLabel} />
+        {/* 2. メンバー別収支表 (全指標集約) */}
+        <MemberBalanceSection
+          from={from}
+          to={to}
+          memberIds={selectedMemberIds}
+          streaks={stats?.streaks ?? []}
+        />
+        {/* 3. 月別男気額の推移 */}
+        <MonthlyTrendSection data={stats?.monthlyTrend} />
+        {/* 4. メンバー別 累積男気額レース — 月次推移との違いを隣接配置で見せる */}
         <CumulativeRaceSection data={stats?.cumulativeRace} members={members} />
-        <ComparisonSection data={charts?.comparison} />
+        {/* 5. 月 × メンバー ヒートマップ */}
+        <MonthMemberHeatmapSection data={charts?.monthMemberHeatmap} />
+        {/* 6. カテゴリ別円グラフ (3 分類) */}
+        <CategoryPieSection data={stats?.categoryBreakdown} />
+        {/* 7. 直近 3 ヶ月の男気トップ */}
         <TopRecentSection data={charts?.topRecent} />
+        {/* 8. 称号表示 */}
+        <BadgesSection period={period} members={members} />
+        {/* 9. 補足: 年比較の累積 (全員合計) */}
+        <CumulativeYearlySection data={charts?.cumulativeYearly} thisYearLabel={chartsThisYearLabel} />
       </div>
     </div>
   );

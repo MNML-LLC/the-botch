@@ -49,7 +49,7 @@ describe('computeBadges', () => {
       const mvp = badges.find((b) => b.kind === 'mvp')
       expect(mvp).toBeDefined()
       expect(mvp?.id).toBe('mvp-FY26')
-      expect(mvp?.label).toBe('FY26 MVP')
+      expect(mvp?.label).toBe('FY26 MVP (総額)')
     })
 
     test('2 位以下のメンバーには MVP は付与されない', () => {
@@ -85,7 +85,7 @@ describe('computeBadges', () => {
       })
       const mvp = computeBadges('a', ctx).find((b) => b.kind === 'mvp')
       expect(mvp?.id).toBe('mvp-2026')
-      expect(mvp?.label).toBe('2026 MVP')
+      expect(mvp?.label).toBe('2026 MVP (総額)')
     })
   })
 

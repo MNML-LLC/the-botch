@@ -13,7 +13,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   BarChart, Bar,
 } from 'recharts';
-import { CATEGORY_LABELS, CATEGORY_COLORS, type OtokogiCategory } from '@/lib/otokogi-category';
+import type { OtokogiCategory } from '@/lib/otokogi-category';
 import type { OtokogiChartsResponse } from '@/hooks/use-otokogi';
 import { Yen } from '@/components/ui/yen';
 
@@ -177,7 +177,7 @@ export function HeatmapSection({ data }: { data?: OtokogiChartsResponse['heatmap
 
 // ============================================================
 // A2. 月 × メンバー ヒートマップ (Issue #366, design review Phase 2)
-// log スケール + Tailwind amber-100 〜 amber-900 の 9 段階離散色
+// Issue #391 B3: log スケール → 線形スケール + 固定しきい値バケット + 凡例
 // ============================================================
 
 // Tailwind amber-100 〜 amber-900 の実色 (background) と、
@@ -190,22 +190,27 @@ const AMBER_SCALE: { bg: string; text: string }[] = [
   { bg: '#f59e0b', text: '#1f2937' }, // amber-500
   { bg: '#d97706', text: '#ffffff' }, // amber-600
   { bg: '#b45309', text: '#ffffff' }, // amber-700
-  { bg: '#92400e', text: '#ffffff' }, // amber-800
-  { bg: '#78350f', text: '#ffffff' }, // amber-900
 ];
 const EMPTY_CELL = { bg: 'rgb(248, 250, 252)', text: 'rgb(203, 213, 225)' };
 
-// amount と maxAmount から log 正規化で 0〜8 のバケットを返す。
-// amount=0 は -1 (空セル扱い)。
-function logBucket(amount: number, maxAmount: number): number {
-  if (amount <= 0 || maxAmount <= 0) return -1;
-  // log(x+1) / log(max+1) ∈ (0, 1]
-  const ratio = Math.log(amount + 1) / Math.log(maxAmount + 1);
-  const idx = Math.min(
-    AMBER_SCALE.length - 1,
-    Math.max(0, Math.floor(ratio * AMBER_SCALE.length)),
-  );
-  return idx;
+// Issue #391 B3: ¥0 / 〜¥20k / 〜¥50k / 〜¥100k / 〜¥200k / 〜¥500k / ¥500k+
+// 固定しきい値で分類することで、期間を切り替えても色の意味が変わらない。
+const HEATMAP_THRESHOLDS: { max: number; label: string }[] = [
+  { max: 20_000, label: '¥20k' },
+  { max: 50_000, label: '¥50k' },
+  { max: 100_000, label: '¥100k' },
+  { max: 200_000, label: '¥200k' },
+  { max: 500_000, label: '¥500k' },
+  { max: Infinity, label: '¥500k+' },
+];
+
+// 固定しきい値で 0〜6 のバケットを返す。amount=0 は -1 (空セル扱い)。
+function linearBucket(amount: number): number {
+  if (amount <= 0) return -1;
+  for (let i = 0; i < HEATMAP_THRESHOLDS.length; i++) {
+    if (amount <= HEATMAP_THRESHOLDS[i].max) return i;
+  }
+  return HEATMAP_THRESHOLDS.length - 1;
 }
 
 export function MonthMemberHeatmapSection({
@@ -237,7 +242,7 @@ export function MonthMemberHeatmapSection({
       <CardHeader>
         <CardTitle className="text-slate-800">月 × メンバー ヒートマップ</CardTitle>
         <p className="text-xs text-gray-500 mt-0.5">
-          期間内の月ごとのメンバー別支払額（log スケール, 濃いほど多い）
+          期間内の月ごとのメンバー別支払額（固定しきい値, 濃いほど多い）
         </p>
       </CardHeader>
       <CardContent>
@@ -273,7 +278,7 @@ export function MonthMemberHeatmapSection({
                     </td>
                     {data.months.map((m) => {
                       const amount = cellMap.get(`${m}:${member.id}`) ?? 0;
-                      const bucket = logBucket(amount, data.maxAmount);
+                      const bucket = linearBucket(amount);
                       const { bg, text } = bucket < 0 ? EMPTY_CELL : AMBER_SCALE[bucket];
                       return (
                         <td
@@ -300,25 +305,21 @@ export function MonthMemberHeatmapSection({
                 ))}
               </tbody>
             </table>
-            {/* 凡例: amber の 9 段階 (log スケール) */}
-            <div className="flex items-center gap-2 mt-3 pl-1">
-              <span className="text-[10px] text-gray-500">少</span>
-              <div className="flex gap-0.5">
-                {AMBER_SCALE.map((c, i) => (
+            {/* 凡例: 固定しきい値バケット (Issue #391 B3) */}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-3 pl-1">
+              <span className="text-[10px] text-gray-500">¥0</span>
+              {HEATMAP_THRESHOLDS.map((t, i) => (
+                <div key={i} className="flex items-center gap-1">
                   <span
-                    key={i}
-                    className="inline-block w-4 h-3 rounded-sm"
-                    style={{ backgroundColor: c.bg }}
+                    className="inline-block w-5 h-3 rounded-sm"
+                    style={{ backgroundColor: AMBER_SCALE[i].bg }}
                   />
-                ))}
-              </div>
-              <span className="text-[10px] text-gray-500">多</span>
-              <span className="text-[10px] text-gray-400 ml-auto">
-                最大 {formatYen(data.maxAmount)}
-              </span>
+                  <span className="text-[10px] text-gray-500">～{t.label}</span>
+                </div>
+              ))}
             </div>
             <p className="text-[10px] text-gray-400 mt-1 pl-1">
-              横スクロールで全月表示 / セル hover で詳細金額 / log スケールで桁差を可視化
+              横スクロールで全月表示 / セル hover で詳細金額
             </p>
           </div>
         )}
@@ -329,12 +330,52 @@ export function MonthMemberHeatmapSection({
 
 // ============================================================
 // B. 円グラフ（イベント種別別の支払分布）
+// Issue #391 B4: 4 分類 (TRIP/HANGOUT/ACTIVITY/OTHER) → UI は 3 分類に簡素化。
+// ACTIVITY は "その他" にマージして表示する（分類ロジックは据え置き）。
 // ============================================================
 type CategoryEntry = { category: OtokogiCategory; amount: number; count: number };
 
+type SimplifiedCategory = 'TRIP' | 'HANGOUT' | 'OTHER';
+
+const SIMPLIFIED_LABELS: Record<SimplifiedCategory, string> = {
+  TRIP: '旅行',
+  HANGOUT: '飲み',
+  OTHER: 'その他',
+};
+
+const SIMPLIFIED_COLORS: Record<SimplifiedCategory, string> = {
+  TRIP: '#0057b7',
+  HANGOUT: '#d95c5c',
+  OTHER: '#94a3b8',
+};
+
+function toSimplifiedCategory(c: OtokogiCategory): SimplifiedCategory {
+  if (c === 'TRIP') return 'TRIP';
+  if (c === 'HANGOUT') return 'HANGOUT';
+  return 'OTHER'; // ACTIVITY + OTHER → OTHER
+}
+
 export function CategoryPieSection({ data }: { data?: CategoryEntry[] }) {
   if (!data) return null;
-  const filtered = data.filter((c) => c.amount > 0);
+
+  // 4 分類を 3 分類に畳み込む
+  const merged = new Map<SimplifiedCategory, { amount: number; count: number }>([
+    ['TRIP', { amount: 0, count: 0 }],
+    ['HANGOUT', { amount: 0, count: 0 }],
+    ['OTHER', { amount: 0, count: 0 }],
+  ]);
+  for (const c of data) {
+    const sc = toSimplifiedCategory(c.category);
+    const bucket = merged.get(sc)!;
+    bucket.amount += c.amount;
+    bucket.count += c.count;
+  }
+  const simplified = Array.from(merged.entries()).map(([category, v]) => ({
+    category,
+    amount: v.amount,
+    count: v.count,
+  }));
+  const filtered = simplified.filter((c) => c.amount > 0);
   const total = filtered.reduce((sum, c) => sum + c.amount, 0);
 
   return (
@@ -342,8 +383,13 @@ export function CategoryPieSection({ data }: { data?: CategoryEntry[] }) {
       <CardHeader>
         <CardTitle className="text-slate-800">カテゴリ別支払分布</CardTitle>
         <p className="text-xs text-gray-500 mt-0.5">
-          イベント名・場所・金額から自動分類（旅行 / 飲み会 / アクティビティ / その他）
+          イベント名・場所・金額から 3 分類（旅行 / 飲み / その他）で自動分類。
         </p>
+        <ul className="text-[10px] text-gray-400 mt-1 space-y-0.5 list-disc pl-4">
+          <li>旅行 = キーワード (旅行/合宿/温泉/宿泊/地名 等) もしくは単発 ¥10k+</li>
+          <li>飲み = キーワード (飲み/居酒屋/焼肉/寿司/宴会 等) もしくは単発 ¥3k〜¥10k</li>
+          <li>その他 = それ以外 (アクティビティ・小額を含む)</li>
+        </ul>
       </CardHeader>
       <CardContent>
         {filtered.length === 0 ? (
@@ -365,17 +411,22 @@ export function CategoryPieSection({ data }: { data?: CategoryEntry[] }) {
                     stroke="#fff"
                   >
                     {filtered.map((entry) => (
-                      <Cell key={entry.category} fill={CATEGORY_COLORS[entry.category]} />
+                      <Cell
+                        key={entry.category}
+                        fill={SIMPLIFIED_COLORS[entry.category as SimplifiedCategory]}
+                      />
                     ))}
                   </Pie>
                   <Tooltip
                     formatter={(value, name) => {
-                      const label = CATEGORY_LABELS[name as OtokogiCategory] ?? String(name);
+                      const label = SIMPLIFIED_LABELS[name as SimplifiedCategory] ?? String(name);
                       return [formatYen(Number(value)), label];
                     }}
                   />
                   <Legend
-                    formatter={(name) => CATEGORY_LABELS[name as OtokogiCategory] ?? String(name)}
+                    formatter={(name) =>
+                      SIMPLIFIED_LABELS[name as SimplifiedCategory] ?? String(name)
+                    }
                     wrapperStyle={{ fontSize: 11 }}
                   />
                 </PieChart>
@@ -388,10 +439,12 @@ export function CategoryPieSection({ data }: { data?: CategoryEntry[] }) {
                   <div key={c.category} className="flex items-center gap-2 text-xs">
                     <span
                       className="inline-block w-3 h-3 rounded-sm shrink-0"
-                      style={{ backgroundColor: CATEGORY_COLORS[c.category] }}
+                      style={{
+                        backgroundColor: SIMPLIFIED_COLORS[c.category as SimplifiedCategory],
+                      }}
                     />
                     <span className="flex-1 text-slate-800">
-                      {CATEGORY_LABELS[c.category]}
+                      {SIMPLIFIED_LABELS[c.category as SimplifiedCategory]}
                     </span>
                     <span className="text-slate-700 tabular-nums">{formatYen(c.amount)}</span>
                     <span className="text-gray-400 w-10 text-right tabular-nums">{pct}%</span>
@@ -428,8 +481,10 @@ export function CumulativeYearlySection({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-slate-800">年次累積推移</CardTitle>
-        <p className="text-xs text-gray-500 mt-0.5">今年 / 昨年 / 一昨年の 1 月からの累積支払額</p>
+        <CardTitle className="text-slate-800">年次累積推移 (全体 · 年比較)</CardTitle>
+        <p className="text-xs text-gray-500 mt-0.5">
+          今年 / 昨年 / 一昨年の 1 月からの累積総額。ペース比較用。
+        </p>
       </CardHeader>
       <CardContent>
         {!hasAny ? (
@@ -677,9 +732,9 @@ export function CumulativeRaceSection({
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-slate-800">累積レース</CardTitle>
+          <CardTitle className="text-slate-800">メンバー別 累積男気額レース (期間内)</CardTitle>
           <p className="text-xs text-gray-500 mt-0.5">
-            メンバー別の累積男気額の時系列推移（誰がいつ抜いたか）
+            メンバーごとの累積男気額を月単位で描画。誰がいつ抜いたかが見える。
           </p>
         </CardHeader>
         <CardContent>
@@ -703,9 +758,9 @@ export function CumulativeRaceSection({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-slate-800">累積レース</CardTitle>
+        <CardTitle className="text-slate-800">メンバー別 累積男気額レース (期間内)</CardTitle>
         <p className="text-xs text-gray-500 mt-0.5">
-          メンバー別の累積男気額の時系列推移（誰がいつ抜いたか）
+          メンバーごとの累積男気額を月単位で描画。誰がいつ抜いたかが見える。
         </p>
       </CardHeader>
       <CardContent>
@@ -792,24 +847,29 @@ export function TopRecentSection({ data }: { data?: OtokogiChartsResponse['topRe
         {data.length === 0 ? (
           <p className="text-sm text-gray-500">直近 3ヶ月に男気イベントがありません</p>
         ) : (
+          // Issue #391 A2: 375px でも金額がカード幅をはみ出さないよう min-w-0 / overflow-hidden /
+          // モバイルで Yen を xl に落とすようレスポンシブ化。
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {data.map((entry, i) => (
               <div
                 key={entry.id}
-                className={`rounded-lg border p-3 ${bgTints[i] ?? bgTints[2]}`}
+                className={`rounded-lg border p-3 min-w-0 overflow-hidden ${bgTints[i] ?? bgTints[2]}`}
               >
                 <div className="flex items-start justify-between mb-2">
                   <span className="text-lg font-bold text-slate-500">{ranks[i] ?? ''}</span>
                   <Avatar member={entry.payer} size="md" />
                 </div>
-                <Yen value={entry.amount} className="text-2xl font-extrabold text-slate-800 block" />
+                <Yen
+                  value={entry.amount}
+                  className="text-xl sm:text-2xl font-extrabold text-slate-800 block break-all tracking-tight"
+                />
                 <p className="text-sm font-medium text-slate-700 mt-1 break-words line-clamp-2 leading-tight">
                   {entry.payer.name}
                 </p>
                 <p className="text-xs text-gray-600 mt-1 break-words line-clamp-2" title={entry.eventName}>
                   {entry.eventName}
                 </p>
-                <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500 mt-1">
+                <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500 mt-1 min-w-0">
                   <span className="tabular-nums shrink-0">{entry.eventDate}</span>
                   {entry.place && <span className="truncate min-w-0">@{entry.place}</span>}
                 </div>
