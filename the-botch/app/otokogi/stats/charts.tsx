@@ -662,6 +662,118 @@ export function ComparisonSection({ data }: { data?: ComparisonProp }) {
 }
 
 // ============================================================
+// F. 累積レース（メンバー別の累積男気額を時系列で競争表示）
+// ============================================================
+type CumulativeRaceRow = { month: string; [memberId: string]: string | number };
+
+export function CumulativeRaceSection({
+  data,
+  members,
+}: {
+  data?: CumulativeRaceRow[];
+  members: MinimalMember[];
+}) {
+  if (!data || data.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-slate-800">累積レース</CardTitle>
+          <p className="text-xs text-gray-500 mt-0.5">
+            メンバー別の累積男気額の時系列推移（誰がいつ抜いたか）
+          </p>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-gray-500">データがありません</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // 最終月でプラスの累積を持つメンバー = 期間内に 1 回以上支払ったメンバー
+  const lastRow = data[data.length - 1];
+  const activeMembers = members
+    .filter((m) => {
+      const v = lastRow[m.id];
+      return typeof v === 'number' && v > 0;
+    })
+    .sort((a, b) => Number(lastRow[b.id] ?? 0) - Number(lastRow[a.id] ?? 0));
+
+  const nameLookup = new Map(members.map((m) => [m.id, m.name]));
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-slate-800">累積レース</CardTitle>
+        <p className="text-xs text-gray-500 mt-0.5">
+          メンバー別の累積男気額の時系列推移（誰がいつ抜いたか）
+        </p>
+      </CardHeader>
+      <CardContent>
+        {activeMembers.length === 0 ? (
+          <p className="text-sm text-gray-500">データがありません</p>
+        ) : (
+          <>
+            <div className="w-full h-64 sm:h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={data} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis
+                    dataKey="month"
+                    tickFormatter={shortMonthLabel}
+                    tick={{ fontSize: 10 }}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis
+                    tickFormatter={formatYenShort}
+                    tick={{ fontSize: 10 }}
+                    width={46}
+                  />
+                  <Tooltip
+                    formatter={(value, name) => {
+                      const label = nameLookup.get(String(name)) ?? String(name);
+                      return [formatYen(Number(value)), label];
+                    }}
+                    labelFormatter={(label) => {
+                      const [y, m] = String(label).split('-');
+                      return `${y}年${parseInt(m)}月`;
+                    }}
+                    itemSorter={(item) => -Number(item.value ?? 0)}
+                  />
+                  {activeMembers.map((m, i) => (
+                    <Line
+                      key={m.id}
+                      type="monotone"
+                      dataKey={m.id}
+                      name={m.id}
+                      stroke={colorForIndex(i)}
+                      strokeWidth={2}
+                      dot={{ r: 2 }}
+                      activeDot={{ r: 4 }}
+                      isAnimationActive={false}
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
+              {activeMembers.map((m, i) => (
+                <div key={m.id} className="flex items-center gap-1.5 text-[11px] text-gray-700">
+                  <span
+                    className="inline-block w-3 h-3 rounded-sm"
+                    style={{ backgroundColor: colorForIndex(i) }}
+                  />
+                  <span className="text-slate-800">{m.name}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================================
 // E. Top 3 カード（直近 3ヶ月 最高額）
 // ============================================================
 export function TopRecentSection({ data }: { data?: OtokogiChartsResponse['topRecent'] }) {
