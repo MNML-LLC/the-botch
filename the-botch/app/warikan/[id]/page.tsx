@@ -377,9 +377,15 @@ export default function WarikanDetailPage() {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <Link href="/warikan" className="text-gray-500 hover:text-gray-700">← 戻る</Link>
-          <h2 className="text-xl font-bold text-slate-800">精算詳細</h2>
+          <h2 className="text-xl font-bold text-slate-800">精算詳細（幹事ビュー）</h2>
         </div>
         <div className="flex items-center gap-3">
+          <Link
+            href={`/warikan/${id}/my-task`}
+            className="text-xs text-blue-500 hover:text-blue-700 hover:underline"
+          >
+            あなたが送る →
+          </Link>
           <a
             href={`/api/warikan/${id}/export`}
             className="text-xs text-slate-600 hover:text-slate-900 hover:underline"
@@ -407,6 +413,24 @@ export default function WarikanDetailPage() {
       </div>
 
       <div className="space-y-4">
+        {/* 参加者向け「あなたが送る」ビュー導線 */}
+        {isPaying && (
+          <Link
+            href={`/warikan/${id}/my-task`}
+            className="block rounded-lg border border-emerald-200 bg-emerald-50 p-3 hover:bg-emerald-100"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-medium text-emerald-800">あなたが送る（参加者ビュー）</p>
+                <p className="text-xs text-emerald-700">
+                  自分の送金・受取タスクをカード単位で確認できます
+                </p>
+              </div>
+              <span className="text-emerald-700">→</span>
+            </div>
+          </Link>
+        )}
+
         {/* イベント情報 */}
         <Card>
           <CardContent className="pt-5">
