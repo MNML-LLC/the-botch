@@ -754,6 +754,15 @@ test.describe('9. レスポンシブ・モバイル表示', () => {
   test('男気統計グラフが表示される', async ({ page }) => {
     await page.goto('/otokogi/stats')
 
+    // デフォルトは「今期」だが、seed データが FY ロールオーバー前で終わっている場合は
+    // チャートが描画されない。時刻に依存しないよう「全期間」に切り替えてから検証する。
+    const viewportWidth = page.viewportSize()?.width ?? 1280
+    if (viewportWidth < 640) {
+      // モバイルではフィルタがアコーディオンに隠れているので先に展開
+      await page.getByRole('button', { name: /^フィルタ/ }).click()
+    }
+    await page.getByRole('tab', { name: '全期間' }).click()
+
     // rechartsのSVGが描画されているか
     const svgElements = page.locator('svg.recharts-surface')
     await expect(svgElements.first()).toBeVisible({ timeout: 10000 })
