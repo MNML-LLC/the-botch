@@ -384,7 +384,6 @@ export function useDeleteOtokogi(
 // メンバー別の保有バッジを計算する。期間フィルタ連動 (period=all もサポート)。
 
 type BadgeStatsResponse = {
-  otokogiByMember: { id: string; otokogiAmount: number }[];
   streaks: { id: string; maxStreak: number }[];
 };
 
@@ -392,6 +391,7 @@ type BadgeMemberSummaryResponse = {
   members: {
     memberId: string;
     payerCount: number;
+    actualPaid: number;
     averagePaymentAmount: number;
     clutchCount: number;
     jankenWinRate: number | null;
@@ -475,12 +475,10 @@ export function useOtokogiBadges(period: PeriodState) {
     if (!statsQuery.data || !summaryQuery.data) return map;
     const ctx: BadgeContext = {
       periodLabel: badgePeriodLabel(period),
-      otokogiByMember: statsQuery.data.otokogiByMember ?? [],
       streaks: statsQuery.data.streaks ?? [],
       memberSummaries: summaryQuery.data.members ?? [],
     };
     const ids = new Set<string>();
-    for (const m of ctx.otokogiByMember) ids.add(m.id);
     for (const m of ctx.memberSummaries) ids.add(m.memberId);
     for (const id of ids) {
       map.set(id, computeBadges(id, ctx));

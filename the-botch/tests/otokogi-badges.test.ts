@@ -18,7 +18,6 @@ import {
 function makeCtx(overrides: Partial<BadgeContext>): BadgeContext {
   return {
     periodLabel: 'FY26',
-    otokogiByMember: [],
     streaks: [],
     memberSummaries: [],
     ...overrides,
@@ -29,6 +28,7 @@ function emptySummary(memberId: string) {
   return {
     memberId,
     payerCount: 0,
+    actualPaid: 0,
     averagePaymentAmount: 0,
     clutchCount: 0,
     jankenWinRate: null,
@@ -36,13 +36,19 @@ function emptySummary(memberId: string) {
   }
 }
 
+// MVP 判定用の便利ヘルパー: actualPaid だけ指定したサマリを作る (Issue #393)
+function summaryWithPaid(memberId: string, actualPaid: number) {
+  return { ...emptySummary(memberId), actualPaid }
+}
+
 describe('computeBadges', () => {
-  describe('MVP (男気額 1 位)', () => {
-    test('男気額 1 位のメンバーに MVP が付与される', () => {
+  // Issue #393: MVP 判定は actualPaid (合計支払額) ベース (旧: otokogiAmount = 超過分)
+  describe('MVP (支払総額 1 位 / Issue #393)', () => {
+    test('支払総額 1 位のメンバーに MVP が付与される', () => {
       const ctx = makeCtx({
-        otokogiByMember: [
-          { id: 'a', otokogiAmount: 100_000 },
-          { id: 'b', otokogiAmount: 50_000 },
+        memberSummaries: [
+          summaryWithPaid('a', 100_000),
+          summaryWithPaid('b', 50_000),
         ],
       })
       const badges = computeBadges('a', ctx)
@@ -50,30 +56,33 @@ describe('computeBadges', () => {
       expect(mvp).toBeDefined()
       expect(mvp?.id).toBe('mvp-FY26')
       expect(mvp?.label).toBe('FY26 MVP (総額)')
+      // description に actualPaid 値が含まれる
+      expect(mvp?.description).toContain('¥100,000')
+      expect(mvp?.description).toContain('合計額 1 位')
     })
 
     test('2 位以下のメンバーには MVP は付与されない', () => {
       const ctx = makeCtx({
-        otokogiByMember: [
-          { id: 'a', otokogiAmount: 100_000 },
-          { id: 'b', otokogiAmount: 50_000 },
+        memberSummaries: [
+          summaryWithPaid('a', 100_000),
+          summaryWithPaid('b', 50_000),
         ],
       })
       const badges = computeBadges('b', ctx)
       expect(badges.find((b) => b.kind === 'mvp')).toBeUndefined()
     })
 
-    test('男気額が 0 円しかない期間では MVP は付与されない', () => {
+    test('支払総額が 0 円しかない期間では MVP は付与されない', () => {
       const ctx = makeCtx({
-        otokogiByMember: [
-          { id: 'a', otokogiAmount: 0 },
-          { id: 'b', otokogiAmount: 0 },
+        memberSummaries: [
+          summaryWithPaid('a', 0),
+          summaryWithPaid('b', 0),
         ],
       })
       expect(computeBadges('a', ctx).find((b) => b.kind === 'mvp')).toBeUndefined()
     })
 
-    test('otokogiByMember が空の場合は付与されない', () => {
+    test('memberSummaries が空の場合は付与されない', () => {
       const ctx = makeCtx({})
       expect(computeBadges('a', ctx).find((b) => b.kind === 'mvp')).toBeUndefined()
     })
@@ -81,11 +90,26 @@ describe('computeBadges', () => {
     test('periodLabel がラベル・ID に埋め込まれる', () => {
       const ctx = makeCtx({
         periodLabel: '2026',
-        otokogiByMember: [{ id: 'a', otokogiAmount: 10 }],
+        memberSummaries: [summaryWithPaid('a', 10)],
       })
       const mvp = computeBadges('a', ctx).find((b) => b.kind === 'mvp')
       expect(mvp?.id).toBe('mvp-2026')
       expect(mvp?.label).toBe('2026 MVP (総額)')
+    })
+
+    // Issue #393 回帰防止: 旧仕様では「少ない回数で大きく払った人」が MVP になりやすかった。
+    // 新仕様では純粋な合計額 1 位になることを確認する。
+    test('「少ない参加で高額 1 回」より「多数の支払いの合計」を優先する', () => {
+      const ctx = makeCtx({
+        memberSummaries: [
+          // a: 1 回だけだが 100k を単独で払った (旧仕様では MVP になりやすい)
+          { ...emptySummary('a'), payerCount: 1, actualPaid: 100_000 },
+          // b: 複数回払った合計で 200k (新仕様の総額 1 位)
+          { ...emptySummary('b'), payerCount: 5, actualPaid: 200_000 },
+        ],
+      })
+      expect(computeBadges('b', ctx).find((bg) => bg.kind === 'mvp')).toBeDefined()
+      expect(computeBadges('a', ctx).find((bg) => bg.kind === 'mvp')).toBeUndefined()
     })
   })
 
@@ -228,15 +252,12 @@ describe('computeBadges', () => {
   describe('複合シナリオ', () => {
     test('1 人のメンバーが複数の称号を保有できる', () => {
       const ctx = makeCtx({
-        otokogiByMember: [
-          { id: 'a', otokogiAmount: 500_000 },
-          { id: 'b', otokogiAmount: 100_000 },
-        ],
         streaks: [{ id: 'a', maxStreak: 6 }],
         memberSummaries: [
           {
             memberId: 'a',
             payerCount: 10,
+            actualPaid: 500_000,
             averagePaymentAmount: 50_000,
             clutchCount: 7,
             jankenWinRate: 0.8,
@@ -245,6 +266,7 @@ describe('computeBadges', () => {
           {
             memberId: 'b',
             payerCount: 5,
+            actualPaid: 100_000,
             averagePaymentAmount: 20_000,
             clutchCount: 1,
             jankenWinRate: 0.3,
@@ -266,12 +288,12 @@ describe('computeBadges', () => {
 
     test('返り値は BADGE_PRIORITY 順にソートされている', () => {
       const ctx = makeCtx({
-        otokogiByMember: [{ id: 'a', otokogiAmount: 100 }],
         streaks: [{ id: 'a', maxStreak: 10 }],
         memberSummaries: [
           {
             memberId: 'a',
             payerCount: 5,
+            actualPaid: 100,
             averagePaymentAmount: 10_000,
             clutchCount: 10,
             jankenWinRate: 1.0,
@@ -291,8 +313,7 @@ describe('computeBadges', () => {
 
     test('何の条件も満たさないメンバーは空配列', () => {
       const ctx = makeCtx({
-        otokogiByMember: [{ id: 'a', otokogiAmount: 10 }],
-        memberSummaries: [emptySummary('b')],
+        memberSummaries: [summaryWithPaid('a', 10), emptySummary('b')],
       })
       expect(computeBadges('b', ctx)).toEqual([])
     })
@@ -306,8 +327,8 @@ describe('topBadge', () => {
 
   test('優先度順に 1 つ目を返す (MVP > streak-king)', () => {
     const ctx = makeCtx({
-      otokogiByMember: [{ id: 'a', otokogiAmount: 100 }],
       streaks: [{ id: 'a', maxStreak: 10 }],
+      memberSummaries: [summaryWithPaid('a', 100)],
     })
     const badges = computeBadges('a', ctx)
     expect(topBadge(badges)?.kind).toBe('mvp')
@@ -320,6 +341,7 @@ describe('topBadge', () => {
         {
           memberId: 'a',
           payerCount: 5,
+          actualPaid: 0,
           averagePaymentAmount: 10_000,
           clutchCount: 10,
           jankenWinRate: null,
@@ -337,6 +359,7 @@ describe('topBadge', () => {
         {
           memberId: 'a',
           payerCount: 0,
+          actualPaid: 0,
           averagePaymentAmount: 0,
           clutchCount: 5,
           jankenWinRate: null,

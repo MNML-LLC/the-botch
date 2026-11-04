@@ -4,7 +4,7 @@
 // /api/otokogi/member-summary が返す集計値を合成して各メンバーの称号を判定する。
 //
 // 称号カテゴリ:
-//   - MVP            : 期間内の男気額 (otokogiAmount) 1 位
+//   - MVP            : 期間内の支払総額 (actualPaid) 1 位 (Issue #393)
 //   - クラッチマスター : CLUTCH 5 回以上
 //   - ストリーク王    : 連続男気 (maxStreak) 5 回以上
 //   - 気前度の帝王    : 平均支払単価 (averagePaymentAmount) 1 位
@@ -51,11 +51,6 @@ export const BADGE_PRIORITY: BadgeKind[] = [
 
 // --- 入力型 (呼び出し側 API の最小サブセット) ---
 
-export type BadgeOtokogiByMember = {
-  id: string
-  otokogiAmount: number
-}
-
 export type BadgeStreakEntry = {
   id: string
   maxStreak: number
@@ -64,6 +59,8 @@ export type BadgeStreakEntry = {
 export type BadgeMemberSummary = {
   memberId: string
   payerCount: number
+  // 期間内でそのメンバーが payer として支払った男気の合計 (OtokogiEvent.amount の合計)
+  actualPaid: number
   averagePaymentAmount: number
   clutchCount: number
   jankenWinRate: number | null
@@ -73,7 +70,6 @@ export type BadgeMemberSummary = {
 export type BadgeContext = {
   // "FY26" や "2026" など、MVP ラベルに埋め込む期間名
   periodLabel: string
-  otokogiByMember: BadgeOtokogiByMember[]
   streaks: BadgeStreakEntry[]
   memberSummaries: BadgeMemberSummary[]
 }
@@ -86,19 +82,21 @@ export type BadgeContext = {
 export function computeBadges(memberId: string, ctx: BadgeContext): Badge[] {
   const badges: Badge[] = []
 
-  // 1. MVP: 期間内の男気額 (otokogiAmount) 1 位 (0 円は除外)
-  const topOtokogi = ctx.otokogiByMember.reduce<BadgeOtokogiByMember | null>(
-    (top, m) => (top === null || m.otokogiAmount > top.otokogiAmount ? m : top),
+  // 1. MVP: 期間内の支払総額 (actualPaid) 1 位 (0 円は除外) — Issue #393
+  // 旧: otokogiAmount (フェアシェア超過分) で判定していたが、CEO 指示により
+  // シンプルな合計支払額ベースに変更。
+  const topPayer = ctx.memberSummaries.reduce<BadgeMemberSummary | null>(
+    (top, m) => (top === null || m.actualPaid > top.actualPaid ? m : top),
     null,
   )
-  if (topOtokogi && topOtokogi.id === memberId && topOtokogi.otokogiAmount > 0) {
+  if (topPayer && topPayer.memberId === memberId && topPayer.actualPaid > 0) {
     badges.push({
       kind: 'mvp',
       id: `mvp-${ctx.periodLabel}`,
       label: `${ctx.periodLabel} MVP (総額)`,
       icon: '🏆',
       color: 'bg-amber-100 text-amber-800',
-      description: `${ctx.periodLabel} の男気額 "合計" 1 位 (¥${topOtokogi.otokogiAmount.toLocaleString()})。ガッツリ出した総大将。`,
+      description: `${ctx.periodLabel} に支払った男気の合計額 1 位 (¥${topPayer.actualPaid.toLocaleString()})。ガッツリ出した総大将。`,
     })
   }
 
