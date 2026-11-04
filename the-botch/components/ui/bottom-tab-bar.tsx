@@ -22,9 +22,13 @@ const TABS: Tab[] = [
   { key: 'menu', name: 'メニュー', href: '/menu', icon: MenuIcon },
 ];
 
-export default function BottomNav() {
+type BottomTabBarProps = {
+  className?: string;
+};
+
+export function BottomTabBar({ className }: BottomTabBarProps) {
   const pathname = usePathname();
-  const [modalOpen, setModalOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const isActive = (href?: string): boolean => {
     if (!href) return false;
@@ -35,10 +39,14 @@ export default function BottomNav() {
   return (
     <>
       <nav
-        className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 z-40 shadow-[0_-1px_3px_rgba(0,0,0,0.05)]"
+        className={cn(
+          'fixed bottom-0 inset-x-0 z-40 border-t border-gray-200 bg-white/90 backdrop-blur-sm shadow-[0_-1px_3px_rgba(0,0,0,0.05)]',
+          'pb-[env(safe-area-inset-bottom)]',
+          className,
+        )}
         aria-label="メインナビゲーション"
       >
-        <ul className="grid grid-cols-4 h-14 max-w-lg mx-auto">
+        <ul className="grid grid-cols-4 max-w-lg mx-auto">
           {TABS.map((tab) => {
             const Icon = tab.icon;
             const active = isActive(tab.href);
@@ -49,11 +57,11 @@ export default function BottomNav() {
                 <li key={tab.key}>
                   <button
                     type="button"
-                    onClick={() => setModalOpen(true)}
-                    className="w-full h-full flex flex-col items-center justify-center gap-0.5 text-gray-500"
+                    onClick={() => setSheetOpen(true)}
+                    className="w-full min-h-[56px] flex flex-col items-center justify-center gap-0.5 text-gray-500"
                     aria-label="作成"
                   >
-                    <span className="flex items-center justify-center w-9 h-9 rounded-full bg-amber-500 text-white shadow-sm">
+                    <span className="flex items-center justify-center w-9 h-9 rounded-full bg-amber-700 text-white shadow-sm">
                       <Icon className="h-5 w-5" />
                     </span>
                     <span className="text-[10px] text-gray-500">{tab.name}</span>
@@ -67,14 +75,14 @@ export default function BottomNav() {
                 <Link
                   href={tab.href!}
                   className={cn(
-                    'flex flex-col items-center justify-center h-full gap-1 text-[10px] transition',
+                    'flex flex-col items-center justify-center min-h-[56px] gap-1 text-[10px] transition',
                     active
-                      ? 'text-amber-600'
-                      : 'text-gray-500 hover:text-slate-700'
+                      ? 'text-amber-700 font-medium'
+                      : 'text-gray-500 hover:text-slate-900',
                   )}
                   aria-current={active ? 'page' : undefined}
                 >
-                  <Icon className="h-5 w-5" />
+                  <Icon className={cn('h-5 w-5', active && 'stroke-[2.25]')} />
                   <span>{tab.name}</span>
                 </Link>
               </li>
@@ -83,7 +91,7 @@ export default function BottomNav() {
         </ul>
       </nav>
 
-      <CreateSheet open={modalOpen} onClose={() => setModalOpen(false)} />
+      <CreateSheet open={sheetOpen} onClose={() => setSheetOpen(false)} />
     </>
   );
 }
