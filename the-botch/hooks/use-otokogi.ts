@@ -199,6 +199,12 @@ export type OtokogiChartsResponse = {
     members: Member[];
     cells: { month: string; memberId: string; amount: number }[];
   };
+  monthMemberHeatmap: {
+    months: string[];
+    members: Member[];
+    cells: { month: string; memberId: string; amount: number }[];
+    maxAmount: number;
+  };
   cumulativeYearly: {
     month: number;
     thisYear: number | null;
