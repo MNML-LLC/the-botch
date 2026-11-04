@@ -182,8 +182,9 @@ type BalanceMetric = {
   signed?: boolean;
 };
 
+// Issue #393: じゃんけん勝率列は記録なしでも常に表示 (hasJankenData 引数は不要)
 // Issue #391 C: じゃんけん勝率 / 男気率 / ストリーク を含む全指標を 1 表に集約
-function buildBalanceMetrics(hasJankenData: boolean): BalanceMetric[] {
+function buildBalanceMetrics(): BalanceMetric[] {
   const metrics: BalanceMetric[] = [
     { label: '参加回数', render: (m) => fmt.format(m.participationCount) },
     { label: '支払回数', render: (m) => fmt.format(m.payerCount) },
@@ -218,15 +219,14 @@ function buildBalanceMetrics(hasJankenData: boolean): BalanceMetric[] {
       render: (m) => (m.clutchCount > 0 ? formatYen(m.clutchTotal) : '—'),
     },
   ];
-  if (hasJankenData) {
-    metrics.push({
-      label: <TermTooltip term="じゃんけん勝率">じゃんけん勝率</TermTooltip>,
-      render: (m) =>
-        m.jankenWinRate !== null
-          ? `${formatPercent(m.jankenWinRate)} (${m.jankenParticipationCount}戦)`
-          : '—',
-    });
-  }
+  // Issue #393: 記録なしでも列は残す。jankenWinRate=null なら "—" を描画
+  metrics.push({
+    label: <TermTooltip term="じゃんけん勝率">じゃんけん勝率</TermTooltip>,
+    render: (m) =>
+      m.jankenWinRate !== null
+        ? `${formatPercent(m.jankenWinRate)} (${m.jankenParticipationCount}戦)`
+        : '—',
+  });
   return metrics;
 }
 
@@ -248,7 +248,8 @@ function MemberBalanceSection({
   );
 
   const members = data?.members ?? [];
-  const metrics = buildBalanceMetrics(data?.hasJankenData ?? false);
+  const metrics = buildBalanceMetrics();
+  const hasJankenData = data?.hasJankenData ?? false;
   const streakByMemberId = useMemo(() => {
     const map = new Map<string, number>();
     for (const s of streaks) map.set(s.id, s.maxStreak);
@@ -332,6 +333,11 @@ function MemberBalanceSection({
                 ))}
               </tbody>
             </table>
+            {!hasJankenData && members.length > 0 && (
+              <p className="text-[11px] text-gray-400 mt-2 px-2">
+                ※ じゃんけん勝率: 現在じゃんけん記録なし。新規男気追加時に「じゃんけんで決めた」を選ぶと勝率が計算されます。
+              </p>
+            )}
           </div>
         )}
       </CardContent>
@@ -362,7 +368,7 @@ function BadgesSection({ period, members }: { period: PeriodState; members: Memb
       <CardHeader>
         <CardTitle className="text-slate-800">称号一覧</CardTitle>
         <p className="text-xs text-gray-500 mt-0.5">
-          期間内の男気額 / 連勝 / クラッチ / 気前度 / じゃんけんから自動判定
+          期間内の支払総額 / 支払回数 / 連勝 / クラッチ / 気前度 / じゃんけんから自動判定
         </p>
       </CardHeader>
       <CardContent>
