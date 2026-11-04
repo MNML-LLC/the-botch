@@ -7,13 +7,13 @@ import { test, expect } from '@playwright/test'
 // =============================================================================
 
 test.describe('男気統計 - 追加チャート（モバイル）', () => {
-  test('ヒートマップ / カテゴリ別 / 年次累積 / Top3 のセクションが表示される', async ({ page }) => {
+  test('ヒートマップ / カテゴリ別 / 累積推移 / Top3 のセクションが表示される', async ({ page }) => {
     await page.goto('/otokogi/stats')
 
     // 画面上に 4 セクションのタイトルが現れること
-    await expect(page.getByText('ヒートマップ')).toBeVisible({ timeout: 15000 })
+    await expect(page.getByText('月 × メンバー ヒートマップ')).toBeVisible({ timeout: 15000 })
     await expect(page.getByText('カテゴリ別支払分布')).toBeVisible({ timeout: 15000 })
-    await expect(page.getByText('年次累積推移')).toBeVisible({ timeout: 15000 })
-    await expect(page.getByText('直近 3ヶ月の男気')).toBeVisible({ timeout: 15000 })
+    await expect(page.getByText('累積推移 (期間内 · 全員合計)')).toBeVisible({ timeout: 15000 })
+    await expect(page.getByText('直近 3ヶ月の男気 Top 3')).toBeVisible({ timeout: 15000 })
   })
 })
