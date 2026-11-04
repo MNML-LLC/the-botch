@@ -1,0 +1,489 @@
+"use client";
+
+import { useMemo, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList, Cell,
+} from 'recharts';
+import { useMembers } from '@/hooks/use-members';
+import {
+  useOtokogiBadges,
+  useOtokogiCharts,
+  useOtokogiMemberSummary,
+  useOtokogiStatsMain,
+} from '@/hooks/use-otokogi';
+import type { OtokogiCategory } from '@/lib/otokogi-category';
+import { BadgeChip } from '@/components/otokogi/badge-chip';
+import {
+  MonthMemberHeatmapSection,
+  CategoryPieSection,
+  CumulativeYearlySection,
+  CumulativeRaceSection,
+  ComparisonSection,
+  TopRecentSection,
+} from './stats/charts';
+import { Yen } from '@/components/ui/yen';
+import { getPeriodRange, type PeriodState } from '@/lib/date-utils';
+import { TermTooltip } from '@/components/ui/term-tooltip';
+
+type Member = {
+  id: string;
+  name: string;
+  initial: string;
+  colorBg: string;
+  colorText: string;
+};
+
+type OtokogiByMember = {
+  id: string;
+  name: string;
+  initial: string;
+  colorBg: string;
+  colorText: string;
+  otokogiAmount: number;
+};
+
+type StatsData = {
+  monthlyTrend: { month: string; amount: number }[];
+  otokogiByMember: OtokogiByMember[];
+  totalCount: number;
+  totalAmount: number;
+  averageAmount: number;
+  categoryBreakdown: { category: OtokogiCategory; amount: number; count: number }[];
+  cumulativeRace: { month: string; [memberId: string]: string | number }[];
+};
+
+type MemberSummaryEntry = {
+  memberId: string;
+  memberName: string;
+  participationCount: number;
+  payerCount: number;
+  payerRate: number;
+  actualPaid: number;
+  shouldHavePaid: number;
+  otokogiAmount: number;
+  averagePaymentAmount: number;
+  maxSingleOtokogi: number;
+  jankenWinRate: number | null;
+  clutchCount: number;
+  clutchTotal: number;
+  clutchRate: number;
+};
+
+const fmt = new Intl.NumberFormat('ja-JP');
+
+function formatYen(value: number): string {
+  return `¥${fmt.format(Math.round(value))}`;
+}
+
+function formatYenShort(value: number): string {
+  if (value >= 10000) return `${Math.round(value / 10000)}万`;
+  return `¥${value.toLocaleString()}`;
+}
+
+function shortMonth(month: string): string {
+  const [, m] = month.split('-');
+  return `${parseInt(m)}月`;
+}
+
+function toIsoDate(d: Date | null | undefined): string | undefined {
+  if (!d) return undefined;
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function computeDateRange(period: PeriodState): { from?: string; to?: string } {
+  const r = getPeriodRange(period.period, new Date(), {
+    from: period.from,
+    to: period.to,
+  });
+  return { from: toIsoDate(r.from), to: toIsoDate(r.to) };
+}
+
+function MemberChipFilter({
+  selectedMemberIds,
+  setSelectedMemberIds,
+  members,
+}: {
+  selectedMemberIds: string[];
+  setSelectedMemberIds: (ids: string[]) => void;
+  members: Member[];
+}) {
+  const toggleMember = (id: string) => {
+    setSelectedMemberIds(
+      selectedMemberIds.includes(id)
+        ? selectedMemberIds.filter((m) => m !== id)
+        : [...selectedMemberIds, id],
+    );
+  };
+
+  if (members.length === 0) return null;
+
+  return (
+    <div className="flex gap-1 flex-wrap items-center mb-4">
+      {members.map((member) => {
+        const selected = selectedMemberIds.includes(member.id);
+        return (
+          <button
+            key={member.id}
+            type="button"
+            onClick={() => toggleMember(member.id)}
+            className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border transition ${
+              selected
+                ? 'bg-slate-800 text-white border-slate-800'
+                : 'bg-white text-gray-600 border-gray-300 hover:border-slate-400'
+            }`}
+          >
+            <div
+              className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 ${
+                selected ? 'bg-white/20' : `${member.colorBg} ${member.colorText}`
+              }`}
+            >
+              {member.initial}
+            </div>
+            {member.name}
+          </button>
+        );
+      })}
+      {selectedMemberIds.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setSelectedMemberIds([])}
+          className="px-2 py-0.5 text-xs text-gray-400 hover:text-gray-600 rounded-full border border-transparent hover:border-gray-200"
+        >
+          クリア
+        </button>
+      )}
+    </div>
+  );
+}
+
+type BalanceMetric = {
+  label: React.ReactNode;
+  key: keyof MemberSummaryEntry;
+  format: (v: number) => string;
+};
+
+const BALANCE_METRICS: BalanceMetric[] = [
+  { label: '参加回数', key: 'participationCount', format: (v) => fmt.format(v) },
+  { label: '支払回数', key: 'payerCount', format: (v) => fmt.format(v) },
+  { label: '実際払った額', key: 'actualPaid', format: formatYen },
+  { label: '本来払うべき額', key: 'shouldHavePaid', format: formatYen },
+  {
+    label: <TermTooltip term="男気">漢気金額</TermTooltip>,
+    key: 'otokogiAmount',
+    format: formatYen,
+  },
+  {
+    label: <TermTooltip term="気前度">平均支払単価</TermTooltip>,
+    key: 'averagePaymentAmount',
+    format: formatYen,
+  },
+  {
+    label: <TermTooltip term="CLUTCH">★ CLUTCH回数</TermTooltip>,
+    key: 'clutchCount',
+    format: (v) => fmt.format(v),
+  },
+  {
+    label: <TermTooltip term="CLUTCH">★ CLUTCH総額</TermTooltip>,
+    key: 'clutchTotal',
+    format: formatYen,
+  },
+];
+
+function MemberBalanceSection({
+  from,
+  to,
+  memberIds,
+}: {
+  from?: string;
+  to?: string;
+  memberIds: string[];
+}) {
+  const { data, isFetching } = useOtokogiMemberSummary<{ members: MemberSummaryEntry[] }>(
+    from,
+    to,
+    memberIds
+  );
+
+  const members = data?.members ?? [];
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-slate-800">メンバー別収支</CardTitle>
+          {isFetching && <span className="text-xs text-gray-400">更新中...</span>}
+        </div>
+      </CardHeader>
+      <CardContent>
+        {members.length === 0 && !isFetching ? (
+          <p className="text-sm text-gray-500">データがありません</p>
+        ) : (
+          <div className="overflow-x-auto -mx-2">
+            <table className="text-xs w-full border-collapse min-w-max">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="sticky left-0 z-10 bg-white text-left p-2 font-medium text-gray-500 whitespace-nowrap min-w-[110px]">
+                    指標
+                  </th>
+                  {members.map((m) => (
+                    <th key={m.memberId} className="p-2 text-center font-medium text-slate-800 whitespace-nowrap min-w-[76px]">
+                      {m.memberName}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {BALANCE_METRICS.map((metric) => (
+                  <tr key={metric.key} className="border-b border-gray-100 last:border-0">
+                    <td className="sticky left-0 z-10 bg-white p-2 text-gray-600 whitespace-nowrap font-medium">
+                      {metric.label}
+                    </td>
+                    {members.map((m) => {
+                      const raw = m[metric.key] as number;
+                      const isOtokogi = metric.key === 'otokogiAmount';
+                      return (
+                        <td key={m.memberId} className="p-2 text-center whitespace-nowrap">
+                          {isOtokogi ? (
+                            <span className={raw > 0 ? 'font-semibold text-green-600' : raw < 0 ? 'font-semibold text-red-500' : 'text-gray-500'}>
+                              {raw >= 0 ? '+' : ''}
+                              {metric.format(raw)}
+                            </span>
+                          ) : (
+                            <span className="text-slate-800">{metric.format(raw)}</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function BadgesSection({ period, members }: { period: PeriodState; members: Member[] }) {
+  const { badgesByMember, isLoading } = useOtokogiBadges(period);
+
+  const memberById = useMemo(
+    () => new Map(members.map((m) => [m.id, m])),
+    [members],
+  );
+
+  const entries = useMemo(() => {
+    const list: { member: Member; badges: ReturnType<typeof badgesByMember.get> }[] = [];
+    for (const [memberId, badges] of badgesByMember.entries()) {
+      if (!badges || badges.length === 0) continue;
+      const member = memberById.get(memberId);
+      if (member) list.push({ member, badges });
+    }
+    return list.sort((a, b) => (b.badges?.length ?? 0) - (a.badges?.length ?? 0));
+  }, [badgesByMember, memberById]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-slate-800">称号一覧</CardTitle>
+        <p className="text-xs text-gray-500 mt-0.5">
+          期間内の男気額 / 連勝 / クラッチ / 気前度 / じゃんけんから自動判定
+        </p>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <p className="text-sm text-gray-500">読み込み中...</p>
+        ) : entries.length === 0 ? (
+          <p className="text-sm text-gray-500">この期間に称号を獲得したメンバーはいません</p>
+        ) : (
+          <div className="space-y-3">
+            {entries.map(({ member, badges }) => (
+              <div key={member.id} className="flex items-start gap-3">
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${member.colorBg} ${member.colorText}`}>
+                  {member.initial}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-800 mb-1">{member.name}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {badges?.map((badge) => (
+                      <BadgeChip key={badge.id} badge={badge} size="xs" />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function MonthlyTrendSection({ data }: { data?: { month: string; amount: number }[] }) {
+  if (!data || data.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-slate-800">月別推移</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="w-full h-48 sm:h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
+              <XAxis
+                dataKey="month"
+                tickFormatter={shortMonth}
+                tick={{ fontSize: 10 }}
+                interval="preserveStartEnd"
+              />
+              <YAxis
+                tickFormatter={formatYenShort}
+                tick={{ fontSize: 10 }}
+                width={40}
+              />
+              <Tooltip
+                formatter={(value) => [`¥${Number(value).toLocaleString()}`, '支払額']}
+                labelFormatter={(label) => {
+                  const [y, m] = String(label).split('-');
+                  return `${y}年${parseInt(m)}月`;
+                }}
+              />
+              <Bar dataKey="amount" fill="#d97706" radius={[2, 2, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function RankingSection({ data }: { data?: OtokogiByMember[] }) {
+  if (!data || data.length === 0) return null;
+
+  const chartData = data
+    .filter((m) => m.otokogiAmount > 0)
+    .map((m, i) => ({
+      name: m.name,
+      amount: m.otokogiAmount,
+      fill: i === 0 ? '#d97706' : i === 1 ? '#94a3b8' : i === 2 ? '#c2410c' : '#94a3b8',
+    }));
+
+  if (chartData.length === 0) return null;
+
+  const barHeight = 36;
+  const chartHeight = Math.max(chartData.length * barHeight + 20, 120);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-slate-800">漢気ランキング</CardTitle>
+        <p className="text-xs text-gray-500 mt-0.5">支払額 × (参加人数−1) ÷ 参加人数 の累計</p>
+      </CardHeader>
+      <CardContent>
+        <div className="w-full" style={{ height: chartHeight }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={chartData}
+              layout="vertical"
+              margin={{ top: 4, right: 60, left: 4, bottom: 4 }}
+            >
+              <XAxis type="number" tickFormatter={formatYenShort} tick={{ fontSize: 10 }} />
+              <YAxis
+                dataKey="name"
+                type="category"
+                tick={{ fontSize: 11 }}
+                width={48}
+              />
+              <Tooltip
+                formatter={(value) => [`¥${Number(value).toLocaleString()}`, '漢気金額']}
+              />
+              <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
+                {chartData.map((entry, i) => (
+                  <Cell key={i} fill={entry.fill} />
+                ))}
+                <LabelList
+                  dataKey="amount"
+                  position="right"
+                  formatter={(v) => (typeof v === 'number' ? formatYenShort(v) : '')}
+                  style={{ fontSize: 10, fill: '#64748b' }}
+                />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * /otokogi 内の統計タブ、および /otokogi/stats (backward-compat redirect 先) で
+ * 共通利用する統計コンテンツ。親から period を受け取り、メンバー絞り込みは
+ * コンポーネント内部で管理する。
+ */
+export function StatsContent({ period }: { period: PeriodState }) {
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+
+  const { from, to } = useMemo(() => computeDateRange(period), [period]);
+
+  const { data: membersData } = useMembers({ staleTime: 5 * 60 * 1000 });
+  const members: Member[] = membersData ?? [];
+
+  const { data: stats, isFetching: statsFetching } = useOtokogiStatsMain<StatsData>(
+    from,
+    to,
+    selectedMemberIds,
+  );
+
+  const { data: charts } = useOtokogiCharts(from, to, selectedMemberIds);
+  const chartsThisYearLabel = charts?.anchorYear ?? new Date().getFullYear();
+
+  return (
+    <div>
+      <MemberChipFilter
+        selectedMemberIds={selectedMemberIds}
+        setSelectedMemberIds={setSelectedMemberIds}
+        members={members}
+      />
+
+      {stats && (
+        <div className="flex gap-3 py-3 text-center">
+          <div className="flex-1">
+            <p className="text-lg font-bold text-slate-800">{stats.totalCount}</p>
+            <p className="text-[10px] text-gray-500">総回数</p>
+          </div>
+          <div className="flex-1 min-w-0">
+            <Yen value={stats.totalAmount} size="sm" className="font-bold text-slate-800 tabular-nums block tracking-tight" />
+            <p className="text-[10px] text-gray-500">累計金額</p>
+          </div>
+          <div className="flex-1 min-w-0">
+            <Yen value={stats.averageAmount} size="sm" className="font-bold text-slate-800 tabular-nums block tracking-tight" />
+            <p className="text-[10px] text-gray-500">平均金額</p>
+          </div>
+        </div>
+      )}
+      {!stats && statsFetching && (
+        <p className="text-sm text-gray-500 py-4">読み込み中...</p>
+      )}
+
+      <div className="space-y-4">
+        <BadgesSection period={period} members={members} />
+        <MemberBalanceSection from={from} to={to} memberIds={selectedMemberIds} />
+        <MonthlyTrendSection data={stats?.monthlyTrend} />
+        <RankingSection data={stats?.otokogiByMember} />
+        <MonthMemberHeatmapSection data={charts?.monthMemberHeatmap} />
+        <CategoryPieSection data={stats?.categoryBreakdown} />
+        <CumulativeYearlySection data={charts?.cumulativeYearly} thisYearLabel={chartsThisYearLabel} />
+        <CumulativeRaceSection data={stats?.cumulativeRace} members={members} />
+        <ComparisonSection data={charts?.comparison} />
+        <TopRecentSection data={charts?.topRecent} />
+      </div>
+    </div>
+  );
+}

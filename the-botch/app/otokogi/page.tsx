@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from 'react';
+import { Suspense, useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,6 +20,7 @@ import { RankingHeroCards } from '@/components/otokogi/ranking-hero-cards';
 import { BadgeChip } from '@/components/otokogi/badge-chip';
 import { topBadge } from '@/lib/otokogi-badges';
 import { TermTooltip } from '@/components/ui/term-tooltip';
+import { StatsContent } from './stats-content';
 
 function OtokogiHistorySkeleton() {
   return (
@@ -86,10 +88,38 @@ function OtokogiRankingSkeleton() {
   );
 }
 
-type Tab = 'history' | 'ranking';
+type Tab = 'history' | 'ranking' | 'stats';
 
-export default function OtokogiPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('history');
+const TABS: { key: Tab; label: string }[] = [
+  { key: 'history', label: '履歴' },
+  { key: 'ranking', label: 'ランキング' },
+  { key: 'stats', label: '統計' },
+];
+
+function parseTab(raw: string | null): Tab {
+  if (raw === 'ranking' || raw === 'stats' || raw === 'history') return raw;
+  return 'history';
+}
+
+function OtokogiPageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeTab = useMemo(() => parseTab(searchParams.get('tab')), [searchParams]);
+
+  const setActiveTab = useCallback(
+    (tab: Tab) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (tab === 'history') {
+        params.delete('tab');
+      } else {
+        params.set('tab', tab);
+      }
+      const query = params.toString();
+      router.replace(`/otokogi${query ? `?${query}` : ''}`, { scroll: false });
+    },
+    [router, searchParams],
+  );
+
   const [period, setPeriod] = useState<PeriodState>(DEFAULT_PERIOD_STATE);
   const prefersReducedMotion = useReducedMotion();
 
@@ -109,8 +139,6 @@ export default function OtokogiPage() {
   // Issue #368: ランキングカードに top バッジ (1 個) を表示
   const { badgesByMember } = useOtokogiBadges(period);
 
-  const loading = activeTab === 'history' ? eventsLoading : rankingLoading;
-
   useScrollRestoration(!eventsLoading);
 
 
@@ -125,10 +153,7 @@ export default function OtokogiPage() {
 
       {/* タブ */}
       <div className="flex gap-1 mb-4 bg-gray-100 rounded-lg p-1">
-        {[
-          { key: 'history' as Tab, label: '履歴' },
-          { key: 'ranking' as Tab, label: 'ランキング' },
-        ].map((tab) => (
+        {TABS.map((tab) => (
           <button
             key={tab.key}
             className={`flex-1 py-2 text-sm font-medium rounded-md transition ${
@@ -139,15 +164,9 @@ export default function OtokogiPage() {
             {tab.label}
           </button>
         ))}
-        <Link
-          href="/otokogi/stats"
-          className="flex-1 py-2 text-sm font-medium rounded-md transition text-gray-600 hover:text-gray-900 text-center"
-        >
-          統計
-        </Link>
       </div>
 
-      {/* 期間フィルタ */}
+      {/* 期間フィルタ（3 tab 共通） */}
       <div className="mb-4">
         <PeriodFilter value={period} onChange={setPeriod} accent="otokogi" />
       </div>
@@ -241,7 +260,7 @@ export default function OtokogiPage() {
             <CardTitle className="text-slate-800">支払額ランキング</CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {rankingLoading ? (
               <OtokogiRankingSkeleton />
             ) : rankingData.length === 0 ? (
               <EmptyState
@@ -316,6 +335,16 @@ export default function OtokogiPage() {
         </Card>
       )}
 
+      {/* 統計タブ (Issue #389: /otokogi/stats を統合) */}
+      {activeTab === 'stats' && <StatsContent period={period} />}
     </div>
+  );
+}
+
+export default function OtokogiPage() {
+  return (
+    <Suspense fallback={<OtokogiHistorySkeleton />}>
+      <OtokogiPageInner />
+    </Suspense>
   );
 }

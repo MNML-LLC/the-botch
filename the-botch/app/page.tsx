@@ -417,7 +417,7 @@ export default async function DashboardPage() {
               </span>
             </CardTitle>
             <Button variant="ghost" size="sm" asChild className="text-xs text-gray-500 min-h-[44px] px-3">
-              <Link href="/otokogi/stats">全部見る →</Link>
+              <Link href="/otokogi?tab=stats">全部見る →</Link>
             </Button>
           </div>
         </CardHeader>
