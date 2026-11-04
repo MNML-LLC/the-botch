@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -87,6 +88,7 @@ type Tab = 'history' | 'ranking';
 export default function OtokogiPage() {
   const [activeTab, setActiveTab] = useState<Tab>('history');
   const [period, setPeriod] = useState<PeriodState>(DEFAULT_PERIOD_STATE);
+  const prefersReducedMotion = useReducedMotion();
 
   const {
     data: eventsData,
@@ -247,30 +249,44 @@ export default function OtokogiPage() {
                 {/* Top-3 ヒーローカード (金 / 銀 / 銅) */}
                 <RankingHeroCards top3={rankingData.slice(0, 3)} />
 
-                {/* 4 位以降 — 従来の行一覧 */}
+                {/* 4 位以降 — spring motion で順位変動をアニメーション */}
                 {rankingData.length > 3 && (
                   <div className="space-y-3 pt-1">
-                    {rankingData.slice(3).map((member) => (
-                      <div key={member.memberId} className="flex items-center gap-2 sm:gap-3">
-                        <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold shrink-0 bg-gray-50 text-gray-500 tabular-nums">
-                          {member.rank}
-                        </span>
-                        <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${member.colorBg} ${member.colorText}`}>
-                          {member.initial}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-slate-800 truncate">{member.name}</p>
-                          <p className="text-xs text-gray-500 tabular-nums">
-                            {member.count}回
-                            {member.clutchCount > 0 && <span className="ml-1">· ★ {member.clutchCount}</span>}
-                            {member.participationCount > 0 && (
-                              <span className="ml-1">· 男気率 {Math.round(member.otokogiRate * 100)}%</span>
-                            )}
-                          </p>
-                        </div>
-                        <Yen value={member.totalPaid} className="font-bold text-sm sm:text-base text-slate-800 shrink-0" />
-                      </div>
-                    ))}
+                    <AnimatePresence initial={false}>
+                      {rankingData.slice(3).map((member) => (
+                        <motion.div
+                          key={member.memberId}
+                          layout={prefersReducedMotion ? false : 'position'}
+                          initial={prefersReducedMotion ? false : { opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={
+                            prefersReducedMotion
+                              ? { duration: 0 }
+                              : { type: 'spring', stiffness: 320, damping: 32, mass: 0.9 }
+                          }
+                          className="flex items-center gap-2 sm:gap-3"
+                        >
+                          <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold shrink-0 bg-gray-50 text-gray-500 tabular-nums">
+                            {member.rank}
+                          </span>
+                          <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${member.colorBg} ${member.colorText}`}>
+                            {member.initial}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-slate-800 truncate">{member.name}</p>
+                            <p className="text-xs text-gray-500 tabular-nums">
+                              {member.count}回
+                              {member.clutchCount > 0 && <span className="ml-1">· ★ {member.clutchCount}</span>}
+                              {member.participationCount > 0 && (
+                                <span className="ml-1">· 男気率 {Math.round(member.otokogiRate * 100)}%</span>
+                              )}
+                            </p>
+                          </div>
+                          <Yen value={member.totalPaid} className="font-bold text-sm sm:text-base text-slate-800 shrink-0" />
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
                   </div>
                 )}
               </div>
