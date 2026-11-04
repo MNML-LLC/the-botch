@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,10 +9,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Swords, Wallet } from 'lucide-react';
 import { useMemberDetail, type MemberProfileWarikanEvent } from '@/hooks/use-members';
-import { useOtokogiBadges } from '@/hooks/use-otokogi';
+import { useOtokogiBadges, useOtokogiBadgesFyTimeline } from '@/hooks/use-otokogi';
 import { WARIKAN_STATUS_LABELS } from '@/lib/constants';
 import { Yen } from '@/components/ui/yen';
-import { formatDateBoth } from '@/lib/date-utils';
+import { formatDateBoth, getFiscalYearRange } from '@/lib/date-utils';
 import { BadgeChip } from '@/components/otokogi/badge-chip';
 
 function warikanDisplayDate(event: MemberProfileWarikanEvent) {
@@ -53,6 +54,57 @@ function ProfileSkeleton() {
       <Skeleton className="h-40 rounded-md" />
       <Skeleton className="h-40 rounded-md" />
     </div>
+  );
+}
+
+// Issue #393: FY ベースのバッジ履歴で遡る最古の年。これ以前はデータが乏しい想定。
+const OLDEST_BADGE_FY = 2023;
+
+function computeTimelineFys(): number[] {
+  const current = getFiscalYearRange(new Date(), 0).fy;
+  const fys: number[] = [];
+  for (let fy = current; fy >= OLDEST_BADGE_FY; fy--) fys.push(fy);
+  return fys;
+}
+
+function FyBadgeTimeline({ memberId }: { memberId: string }) {
+  const fys = useMemo(() => computeTimelineFys(), []);
+  const { data, isLoading } = useOtokogiBadgesFyTimeline(memberId, fys);
+
+  if (isLoading) {
+    return <p className="text-sm text-gray-500">読み込み中...</p>;
+  }
+  if (!data || data.length === 0) {
+    return <p className="text-sm text-gray-500">FY 別の称号はまだありません</p>;
+  }
+
+  // 1 件もバッジが無い FY は折りたたんで表示 (CEO 原則: 非参加ペナルティなし)
+  const nonEmpty = data.filter((row) => row.badges.length > 0);
+  if (nonEmpty.length === 0) {
+    return <p className="text-sm text-gray-500">FY 別の称号はまだありません</p>;
+  }
+
+  return (
+    <ol className="space-y-3">
+      {nonEmpty.map(({ fy, badges }) => {
+        const fyShort = (fy % 100).toString().padStart(2, '0');
+        return (
+          <li key={fy} className="flex gap-3 items-start">
+            <div className="shrink-0 w-14 text-xs font-semibold text-slate-700 pt-0.5 tabular-nums">
+              FY{fyShort}
+              <span className="block text-[10px] font-normal text-gray-400">
+                {fy}/11〜{fy + 1}/10
+              </span>
+            </div>
+            <div className="flex-1 min-w-0 flex flex-wrap gap-1.5">
+              {badges.map((b) => (
+                <BadgeChip key={b.id} badge={b} size="xs" />
+              ))}
+            </div>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -158,10 +210,10 @@ export default function MemberProfilePage() {
             </div>
           </div>
 
-          {/* 称号バッジ (Issue #368) */}
+          {/* 称号バッジ (通算) (Issue #368) */}
           {badges.length > 0 && (
             <div className="mt-4 border-t border-gray-100 pt-3">
-              <p className="text-xs text-gray-500 mb-2">称号 ({badges.length})</p>
+              <p className="text-xs text-gray-500 mb-2">通算の称号 ({badges.length})</p>
               <div className="flex flex-wrap gap-1.5">
                 {badges.map((badge) => (
                   <BadgeChip key={badge.id} badge={badge} size="sm" />
@@ -169,6 +221,19 @@ export default function MemberProfilePage() {
               </div>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* FY 別バッジ履歴 (Issue #393) */}
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle className="text-slate-800 text-base">FY 別の称号</CardTitle>
+          <p className="text-xs text-gray-500 mt-0.5">
+            各会計年度 (11 月〜翌 10 月) の期間内データだけで独立に計算した称号。
+          </p>
+        </CardHeader>
+        <CardContent>
+          <FyBadgeTimeline memberId={id} />
         </CardContent>
       </Card>
 

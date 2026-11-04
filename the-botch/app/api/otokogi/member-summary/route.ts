@@ -130,7 +130,11 @@ export async function GET(request: NextRequest) {
       shouldHavePaidRows,
       maxSingleOtokogiRows,
       jankenParticipationStats,
-      jankenLostStats,
+      // Issue #393: 「勝った人が奢る」ルールのため、janken 対象イベントの payer 集計 =
+      // そのメンバーが「じゃんけんで勝って奢った回数」。旧実装は変数名が jankenLost となっており
+      // formula も (participation - lost) / participation = 「負けなかった率」を計算していたが、
+      // CEO ルール下では意味が逆転しているため jankenPayer として扱う。
+      jankenPayerStats,
       jankenEventCount,
       clutchStats,
     ] = await Promise.all([
@@ -187,7 +191,7 @@ export async function GET(request: NextRequest) {
     const jankenParticipationMap = new Map(
       jankenParticipationStats.map((s) => [s.memberId, s._count])
     )
-    const jankenLostMap = new Map(jankenLostStats.map((s) => [s.payerId, s._count]))
+    const jankenPayerMap = new Map(jankenPayerStats.map((s) => [s.payerId, s._count]))
     const clutchMap = new Map(
       clutchStats.map((s) => [s.payerId, { count: s._count, total: s._sum.amount ?? 0 }])
     )
@@ -200,9 +204,11 @@ export async function GET(request: NextRequest) {
       const shouldHavePaid = shouldHavePaidMap.get(member.id) ?? 0
 
       const jankenParticipated = jankenParticipationMap.get(member.id) ?? 0
-      const jankenLost = jankenLostMap.get(member.id) ?? 0
+      // Issue #393: 「勝った人が奢る」ルールに合わせて、勝率 = 奢った率 (= payer / 参加)
+      // 旧式: (participation - lost) / participation — 「負けなかった率」(勝つ=奢るルール下で意味逆転)
+      const jankenPayerCount = jankenPayerMap.get(member.id) ?? 0
       const jankenWinRate =
-        jankenParticipated > 0 ? (jankenParticipated - jankenLost) / jankenParticipated : null
+        jankenParticipated > 0 ? jankenPayerCount / jankenParticipated : null
 
       const clutch = clutchMap.get(member.id)
 

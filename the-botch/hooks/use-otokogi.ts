@@ -393,6 +393,9 @@ type BadgeMemberSummaryResponse = {
     payerCount: number;
     // Issue #393: MVP を actualPaid ベースに変更したため必須化
     actualPaid: number;
+    // Issue #393: 裏男気王 (shadow-otokogi-king) 判定用。期間内の
+    // "actualPaid - shouldHavePaid" (= フェアシェア超過分) をそのまま持つ。
+    otokogiAmount: number;
     averagePaymentAmount: number;
     clutchCount: number;
     jankenWinRate: number | null;
@@ -492,6 +495,57 @@ export function useOtokogiBadges(period: PeriodState) {
     isLoading: statsQuery.isLoading || summaryQuery.isLoading,
     isError: statsQuery.isError || summaryQuery.isError,
   };
+}
+
+// FY ごとに独立してバッジを計算するためのフック (Issue #393)
+//
+// - 各 FY で /api/otokogi/stats + /api/otokogi/member-summary を期間フィルタ付きで呼び、
+//   そのレンジ内のデータだけで computeBadges する。
+// - fys は [2023, 2024, 2025, 2026] のような FY 年 (= 開始カレンダー年) の配列。
+// - 返り値は FY 年 → Badge[] の Map。
+//
+// React hooks ルールのため、呼び出し側は固定の `fys` を渡すこと。
+// (実際の UI では MIN_FY..currentFy を 1 回決めて渡す構成が標準。)
+export function useOtokogiBadgesFyTimeline(memberId: string, fys: number[]) {
+  const key = fys.join(',');
+
+  const queryFn = useCallback(async () => {
+    type FyBadgeResult = { fy: number; badges: Badge[] };
+
+    const results: FyBadgeResult[] = await Promise.all(
+      fys.map(async (fy) => {
+        const from = `${fy}-11-01`;
+        const to = `${fy + 1}-10-31`;
+        const params = new URLSearchParams({ from, to });
+        const [statsRes, summaryRes] = await Promise.all([
+          fetch(`/api/otokogi/stats?${params.toString()}`),
+          fetch(`/api/otokogi/member-summary?${params.toString()}`),
+        ]);
+        if (!statsRes.ok || !summaryRes.ok) {
+          throw new Error(`FY${fy} のバッジ計算用データ取得に失敗しました`);
+        }
+        const stats = (await statsRes.json()) as BadgeStatsResponse;
+        const summary = (await summaryRes.json()) as BadgeMemberSummaryResponse;
+
+        const fyShort = fy % 100;
+        const ctx: BadgeContext = {
+          periodLabel: `FY${fyShort.toString().padStart(2, '0')}`,
+          streaks: stats.streaks ?? [],
+          memberSummaries: summary.members ?? [],
+        };
+        return { fy, badges: computeBadges(memberId, ctx) };
+      }),
+    );
+    return results;
+  }, [memberId, fys]);
+
+  return useQuery({
+    queryKey: ['otokogi-badges-fy-timeline', memberId, key],
+    queryFn,
+    staleTime: 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    enabled: !!memberId && fys.length > 0,
+  });
 }
 
 function toIso(d: Date): string {

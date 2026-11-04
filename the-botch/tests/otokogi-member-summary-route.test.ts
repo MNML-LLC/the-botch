@@ -2,6 +2,13 @@
  * /api/otokogi/member-summary GET の単体テスト（じゃんけん勝率計算 重点）
  *
  * 実行: npx vitest run tests/otokogi-member-summary-route.test.ts
+ *
+ * Issue #393: 「勝った人が奢る」ルールに合わせて、勝率 formula を反転。
+ *   - 旧式: (participation - payerInJanken) / participation = 「負けなかった率」
+ *   - 新式: payerInJanken / participation = 「勝って奢った率」
+ *   変数名 `jankenLostStats` は route 内で `jankenPayerStats` にリネーム済み。
+ *   ここでは mock セット名として旧名 (jankenLostStats) を残しても
+ *   セマンティクスは「janken 対象イベントの payer 集計 = 勝ってた回数」。
  */
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createRequest, parseResponse } from './helpers'
@@ -40,11 +47,11 @@ let consoleErrorSpy: ReturnType<typeof vi.spyOn>
  *
  * ルート内の順序（member-summary/route.ts 参照）:
  *   otokogiEvent.groupBy:
- *     1) payerStats           (全体の payer 集計)
- *     2) jankenLostStats      (janken 対象のみ)
- *     3) clutchStats          (¥50,000 以上の payer 集計、Issue #354)
+ *     1) payerStats            (全体の payer 集計)
+ *     2) jankenPayerStats      (janken 対象のみ。「勝って奢った回数」/ Issue #393)
+ *     3) clutchStats           (¥50,000 以上の payer 集計、Issue #354)
  *   otokogiParticipant.groupBy:
- *     1) participationStats   (全体の参加集計)
+ *     1) participationStats     (全体の参加集計)
  *     2) jankenParticipationStats (janken 対象のみ)
  *   otokogiEvent.count:
  *     1) jankenEventCount
@@ -57,7 +64,7 @@ function setupMocks(options: {
   payerStats?: Array<{ payerId: string; _count: number; _sum: { amount: number } }>
   participationStats?: Array<{ memberId: string; _count: number }>
   jankenParticipationStats?: Array<{ memberId: string; _count: number }>
-  jankenLostStats?: Array<{ payerId: string; _count: number }>
+  jankenPayerStats?: Array<{ payerId: string; _count: number }>
   jankenEventCount?: number
   clutchStats?: Array<{ payerId: string; _count: number; _sum: { amount: number } }>
 }) {
@@ -70,7 +77,7 @@ function setupMocks(options: {
   )
   mockedEventGroupBy
     .mockResolvedValueOnce(options.payerStats ?? [])
-    .mockResolvedValueOnce(options.jankenLostStats ?? [])
+    .mockResolvedValueOnce(options.jankenPayerStats ?? [])
     .mockResolvedValueOnce(options.clutchStats ?? [])
   mockedParticipantGroupBy
     .mockResolvedValueOnce(options.participationStats ?? [])
@@ -90,7 +97,10 @@ afterEach(() => {
   consoleErrorSpy.mockRestore()
 })
 
-describe('GET /api/otokogi/member-summary — じゃんけん勝率', () => {
+describe('GET /api/otokogi/member-summary — じゃんけん勝率 (Issue #393: 勝って奢った率)', () => {
+  // 「勝った人が奢る」ルール下では、janken 参加のうち payer になった回数 = 勝った回数。
+  // jankenWinRate = jankenPayerCount / jankenParticipation。
+
   test('janken 対象イベントが 0 件なら hasJankenData=false、全員 jankenWinRate=null', async () => {
     setupMocks({ jankenEventCount: 0 })
 
@@ -108,9 +118,9 @@ describe('GET /api/otokogi/member-summary — じゃんけん勝率', () => {
   test('janken 参加 0 件のメンバーは jankenWinRate=null になる', async () => {
     setupMocks({
       jankenEventCount: 2,
-      // a は 2 回参加 / 1 回負け、b は参加なし
+      // a は 2 回参加のうち 1 回勝って奢った、b は参加なし
       jankenParticipationStats: [{ memberId: 'a', _count: 2 }],
-      jankenLostStats: [{ payerId: 'a', _count: 1 }],
+      jankenPayerStats: [{ payerId: 'a', _count: 1 }],
     })
 
     const res = await GET(createRequest('/api/otokogi/member-summary'))
@@ -122,15 +132,15 @@ describe('GET /api/otokogi/member-summary — じゃんけん勝率', () => {
     expect(data.hasJankenData).toBe(true)
     const a = data.members.find((m) => m.memberId === 'a')
     const b = data.members.find((m) => m.memberId === 'b')
-    expect(a?.jankenWinRate).toBe(0.5) // (2 - 1) / 2
+    expect(a?.jankenWinRate).toBe(0.5) // 1 / 2
     expect(b?.jankenWinRate).toBeNull()
   })
 
-  test('全勝: 参加 3 回 / 負け 0 回 → 1.0', async () => {
+  test('全勝 (毎回 payer): 参加 3 / 勝ち 3 → 1.0', async () => {
     setupMocks({
       jankenEventCount: 3,
       jankenParticipationStats: [{ memberId: 'a', _count: 3 }],
-      jankenLostStats: [], // a は 1 度も payer にならなかった
+      jankenPayerStats: [{ payerId: 'a', _count: 3 }],
     })
 
     const res = await GET(createRequest('/api/otokogi/member-summary'))
@@ -141,11 +151,11 @@ describe('GET /api/otokogi/member-summary — じゃんけん勝率', () => {
     expect(data.members.find((m) => m.memberId === 'a')?.jankenWinRate).toBe(1)
   })
 
-  test('全敗: 参加 3 回 / 負け 3 回 → 0.0', async () => {
+  test('全敗 (1 度も payer にならず): 参加 3 / 勝ち 0 → 0.0', async () => {
     setupMocks({
       jankenEventCount: 3,
       jankenParticipationStats: [{ memberId: 'a', _count: 3 }],
-      jankenLostStats: [{ payerId: 'a', _count: 3 }],
+      jankenPayerStats: [],
     })
 
     const res = await GET(createRequest('/api/otokogi/member-summary'))
@@ -156,11 +166,11 @@ describe('GET /api/otokogi/member-summary — じゃんけん勝率', () => {
     expect(data.members.find((m) => m.memberId === 'a')?.jankenWinRate).toBe(0)
   })
 
-  test('半々: 参加 4 回 / 負け 2 回 → 0.5', async () => {
+  test('半々: 参加 4 / 勝ち 2 → 0.5', async () => {
     setupMocks({
       jankenEventCount: 4,
       jankenParticipationStats: [{ memberId: 'a', _count: 4 }],
-      jankenLostStats: [{ payerId: 'a', _count: 2 }],
+      jankenPayerStats: [{ payerId: 'a', _count: 2 }],
     })
 
     const res = await GET(createRequest('/api/otokogi/member-summary'))
@@ -174,14 +184,14 @@ describe('GET /api/otokogi/member-summary — じゃんけん勝率', () => {
   test('複数メンバー同時: それぞれ独立に計算される', async () => {
     setupMocks({
       jankenEventCount: 6,
-      // a: 6回参加/0敗 (全勝), b: 6回参加/6敗 (全敗), c: 6回参加/3敗 (半々)
+      // a: 6参加/6勝 (全勝), b: 6参加/0勝 (全敗), c: 6参加/3勝 (半々)
       jankenParticipationStats: [
         { memberId: 'a', _count: 6 },
         { memberId: 'b', _count: 6 },
         { memberId: 'c', _count: 6 },
       ],
-      jankenLostStats: [
-        { payerId: 'b', _count: 6 },
+      jankenPayerStats: [
+        { payerId: 'a', _count: 6 },
         { payerId: 'c', _count: 3 },
       ],
     })
@@ -196,6 +206,25 @@ describe('GET /api/otokogi/member-summary — じゃんけん勝率', () => {
     expect(data.members.find((m) => m.memberId === 'a')?.jankenWinRate).toBe(1)
     expect(data.members.find((m) => m.memberId === 'b')?.jankenWinRate).toBe(0)
     expect(data.members.find((m) => m.memberId === 'c')?.jankenWinRate).toBe(0.5)
+  })
+
+  test('Issue #393 回帰防止: formula 反転確認 (CEO の例 — 奢り多数の人は高く出る)', async () => {
+    // ゆうき相当: 多くの janken に参加しつつ約半分で奢ってる (= 高勝率)
+    setupMocks({
+      jankenEventCount: 23,
+      jankenParticipationStats: [{ memberId: 'a', _count: 23 }],
+      jankenPayerStats: [{ payerId: 'a', _count: 10 }],
+    })
+
+    const res = await GET(createRequest('/api/otokogi/member-summary'))
+    const { data } = await parseResponse<{
+      members: Array<{ memberId: string; jankenWinRate: number | null }>
+    }>(res)
+
+    const a = data.members.find((m) => m.memberId === 'a')
+    // 10 / 23 ≒ 0.4347... (= 43.5%)。旧 formula なら 13/23 ≒ 0.5652 (= 56.5%)。
+    expect(a?.jankenWinRate).toBeCloseTo(10 / 23, 10)
+    expect(a?.jankenWinRate).toBeLessThan(0.5)
   })
 })
 

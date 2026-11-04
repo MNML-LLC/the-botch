@@ -6,16 +6,23 @@
 // 称号カテゴリ:
 //   - MVP            : 期間内の "actualPaid" (支払総額) 1 位 (Issue #393)
 //   - 男気量産王      : 期間内の payerCount (奢った件数) 1 位 (Issue #393)
+//   - 裏男気王        : 期間内の "actualPaid - shouldHavePaid" (フェアシェア超過分) 1 位 (Issue #393)
 //   - クラッチマスター : CLUTCH 5 回以上
 //   - ストリーク王    : 連続男気 (maxStreak) 5 回以上
 //   - 気前度の帝王    : 平均支払単価 (averagePaymentAmount) 1 位
 //   - じゃんけん神    : じゃんけん勝率 70% 以上 (10 試合以上)
+//
+// 期間フィルタ (CEO 原則 / Issue #393):
+//   全ての判定・計算は BadgeContext に渡された期間内のデータに閉じる。
+//   呼び出し側 (API / hooks) は期間を切り替えるたびに member-summary / stats を
+//   再フェッチし、computeBadges に渡す ctx を作り直すこと。
 
 import { CLUTCH_THRESHOLD } from '@/lib/constants'
 
 export type BadgeKind =
   | 'mvp'
   | 'count-king'
+  | 'shadow-otokogi-king'
   | 'clutch-master'
   | 'streak-king'
   | 'generosity-emperor'
@@ -43,10 +50,11 @@ export const BADGE_JANKEN_RATE_MIN = 0.7
 export const BADGE_JANKEN_GAMES_MIN = 10
 
 // 優先度順 (ランキングカードの "top バッジ 1 個" 選択用)
-// MVP (総額) と 男気量産王 (回数) を primary として並べる (Issue #393)
+// MVP (総額) → 男気量産王 (回数) → 裏男気王 (フェアシェア超過分) の 3 primary (Issue #393)
 export const BADGE_PRIORITY: BadgeKind[] = [
   'mvp',
   'count-king',
+  'shadow-otokogi-king',
   'streak-king',
   'clutch-master',
   'generosity-emperor',
@@ -65,6 +73,9 @@ export type BadgeMemberSummary = {
   payerCount: number
   // Issue #393: MVP を actualPaid ベースにするため追加
   actualPaid: number
+  // Issue #393: 裏男気王 (shadow-otokogi-king) 判定用。actualPaid - shouldHavePaid の
+  // サーバー側計算値をそのまま受け取る (フェアシェア超過分、負でも良い)。
+  otokogiAmount: number
   averagePaymentAmount: number
   clutchCount: number
   jankenWinRate: number | null
@@ -121,7 +132,24 @@ export function computeBadges(memberId: string, ctx: BadgeContext): Badge[] {
     })
   }
 
-  // 3. クラッチマスター: CLUTCH 5 回以上
+  // 3. 裏男気王: 期間内の "actualPaid - shouldHavePaid" (フェアシェア超過分) 1 位 (Issue #393)
+  //    「期待負担を超えて引き受けた隠れた真の男気」。正の値のみ対象。
+  const topShadow = ctx.memberSummaries.reduce<BadgeMemberSummary | null>(
+    (top, m) => (top === null || m.otokogiAmount > top.otokogiAmount ? m : top),
+    null,
+  )
+  if (topShadow && topShadow.memberId === memberId && topShadow.otokogiAmount > 0) {
+    badges.push({
+      kind: 'shadow-otokogi-king',
+      id: `shadow-otokogi-king-${ctx.periodLabel}`,
+      label: `${ctx.periodLabel} 裏男気王`,
+      icon: '🥷',
+      color: 'bg-purple-100 text-purple-800',
+      description: `${ctx.periodLabel} のフェアシェア超過分 1 位 (+¥${topShadow.otokogiAmount.toLocaleString()})。期待負担を超えて引き受けた隠れた真の男気。`,
+    })
+  }
+
+  // 4. クラッチマスター: CLUTCH 5 回以上
   const summary = ctx.memberSummaries.find((m) => m.memberId === memberId)
   if (summary && summary.clutchCount >= BADGE_CLUTCH_MIN) {
     badges.push({
@@ -134,7 +162,7 @@ export function computeBadges(memberId: string, ctx: BadgeContext): Badge[] {
     })
   }
 
-  // 4. ストリーク王: 連続男気 5 回以上
+  // 5. ストリーク王: 連続男気 5 回以上
   const streak = ctx.streaks.find((s) => s.id === memberId)
   if (streak && streak.maxStreak >= BADGE_STREAK_MIN) {
     badges.push({
@@ -147,7 +175,7 @@ export function computeBadges(memberId: string, ctx: BadgeContext): Badge[] {
     })
   }
 
-  // 5. 気前度の帝王: 平均支払単価が 1 位 (payerCount > 0 のみ対象)
+  // 6. 気前度の帝王: 平均支払単価が 1 位 (payerCount > 0 のみ対象)
   const activeSummaries = ctx.memberSummaries.filter((m) => m.payerCount > 0)
   if (activeSummaries.length > 0) {
     const topAvg = activeSummaries.reduce((top, m) =>
@@ -165,7 +193,7 @@ export function computeBadges(memberId: string, ctx: BadgeContext): Badge[] {
     }
   }
 
-  // 6. じゃんけん神: 10 試合以上 かつ 勝率 70% 以上
+  // 7. じゃんけん神: 10 試合以上 かつ 勝率 70% 以上
   if (
     summary &&
     summary.jankenWinRate !== null &&

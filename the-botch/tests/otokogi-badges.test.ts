@@ -31,6 +31,7 @@ function emptySummary(memberId: string): BadgeMemberSummary {
     memberId,
     payerCount: 0,
     actualPaid: 0,
+    otokogiAmount: 0,
     averagePaymentAmount: 0,
     clutchCount: 0,
     jankenWinRate: null,
@@ -153,6 +154,70 @@ describe('computeBadges', () => {
       expect(aBadges.find((x) => x.kind === 'count-king')).toBeUndefined()
       expect(bBadges.find((x) => x.kind === 'mvp')).toBeUndefined()
       expect(bBadges.find((x) => x.kind === 'count-king')).toBeDefined()
+    })
+  })
+
+  describe('裏男気王 (shadow-otokogi-king / Issue #393)', () => {
+    test('otokogiAmount (フェアシェア超過分) 1 位のメンバーに付与される', () => {
+      const ctx = makeCtx({
+        memberSummaries: [
+          summary('a', { payerCount: 3, actualPaid: 300_000, otokogiAmount: 100_000 }),
+          summary('b', { payerCount: 5, actualPaid: 100_000, otokogiAmount: -50_000 }),
+        ],
+      })
+      const badges = computeBadges('a', ctx)
+      const shadow = badges.find((b) => b.kind === 'shadow-otokogi-king')
+      expect(shadow).toBeDefined()
+      expect(shadow?.id).toBe('shadow-otokogi-king-FY26')
+      expect(shadow?.label).toBe('FY26 裏男気王')
+    })
+
+    test('2 位以下のメンバーには付与されない', () => {
+      const ctx = makeCtx({
+        memberSummaries: [
+          summary('a', { otokogiAmount: 100_000 }),
+          summary('b', { otokogiAmount: 50_000 }),
+        ],
+      })
+      expect(computeBadges('b', ctx).find((b) => b.kind === 'shadow-otokogi-king')).toBeUndefined()
+    })
+
+    test('全員 otokogiAmount <= 0 (超過分なし) では付与されない', () => {
+      const ctx = makeCtx({
+        memberSummaries: [
+          summary('a', { otokogiAmount: -100_000 }),
+          summary('b', { otokogiAmount: 0 }),
+        ],
+      })
+      expect(computeBadges('a', ctx).find((b) => b.kind === 'shadow-otokogi-king')).toBeUndefined()
+      expect(computeBadges('b', ctx).find((b) => b.kind === 'shadow-otokogi-king')).toBeUndefined()
+    })
+
+    test('MVP (actualPaid 1 位) と 裏男気王 (otokogiAmount 1 位) が別人になる', () => {
+      // a: たくさん参加して総額 1 位 だが超過は小さい (フェアシェア通り)
+      // b: 少参加だが 1 回引き受けで超過分は大きい
+      const ctx = makeCtx({
+        memberSummaries: [
+          summary('a', { payerCount: 10, actualPaid: 500_000, otokogiAmount: 20_000 }),
+          summary('b', { payerCount: 1, actualPaid: 200_000, otokogiAmount: 150_000 }),
+        ],
+      })
+      const aBadges = computeBadges('a', ctx)
+      const bBadges = computeBadges('b', ctx)
+      expect(aBadges.find((x) => x.kind === 'mvp')).toBeDefined()
+      expect(aBadges.find((x) => x.kind === 'shadow-otokogi-king')).toBeUndefined()
+      expect(bBadges.find((x) => x.kind === 'mvp')).toBeUndefined()
+      expect(bBadges.find((x) => x.kind === 'shadow-otokogi-king')).toBeDefined()
+    })
+
+    test('periodLabel がラベル・ID に埋め込まれる', () => {
+      const ctx = makeCtx({
+        periodLabel: 'FY23',
+        memberSummaries: [summary('a', { otokogiAmount: 1 })],
+      })
+      const shadow = computeBadges('a', ctx).find((b) => b.kind === 'shadow-otokogi-king')
+      expect(shadow?.id).toBe('shadow-otokogi-king-FY23')
+      expect(shadow?.label).toBe('FY23 裏男気王')
     })
   })
 
@@ -279,13 +344,14 @@ describe('computeBadges', () => {
   })
 
   describe('複合シナリオ', () => {
-    test('1 人のメンバーが複数の称号を保有できる (全 6 称号)', () => {
+    test('1 人のメンバーが複数の称号を保有できる (全 7 称号)', () => {
       const ctx = makeCtx({
         streaks: [{ id: 'a', maxStreak: 6 }],
         memberSummaries: [
           summary('a', {
             payerCount: 10,
             actualPaid: 500_000,
+            otokogiAmount: 200_000,
             averagePaymentAmount: 50_000,
             clutchCount: 7,
             jankenWinRate: 0.8,
@@ -294,6 +360,7 @@ describe('computeBadges', () => {
           summary('b', {
             payerCount: 5,
             actualPaid: 100_000,
+            otokogiAmount: -100_000,
             averagePaymentAmount: 20_000,
             clutchCount: 1,
             jankenWinRate: 0.3,
@@ -304,14 +371,15 @@ describe('computeBadges', () => {
 
       const badges = computeBadges('a', ctx)
       const kinds = badges.map((b) => b.kind)
-      // a は全 6 称号を獲得できる (MVP / count-king / streak / clutch / generosity / janken)
+      // a は全 7 称号を獲得できる (MVP / count-king / shadow / streak / clutch / generosity / janken)
       expect(kinds).toContain('mvp')
       expect(kinds).toContain('count-king')
+      expect(kinds).toContain('shadow-otokogi-king')
       expect(kinds).toContain('clutch-master')
       expect(kinds).toContain('streak-king')
       expect(kinds).toContain('generosity-emperor')
       expect(kinds).toContain('janken-god')
-      expect(badges).toHaveLength(6)
+      expect(badges).toHaveLength(7)
     })
 
     test('返り値は BADGE_PRIORITY 順にソートされている', () => {
@@ -321,6 +389,7 @@ describe('computeBadges', () => {
           summary('a', {
             payerCount: 5,
             actualPaid: 100,
+            otokogiAmount: 100,
             averagePaymentAmount: 10_000,
             clutchCount: 10,
             jankenWinRate: 1.0,
@@ -332,6 +401,7 @@ describe('computeBadges', () => {
       expect(kinds).toEqual([
         'mvp',
         'count-king',
+        'shadow-otokogi-king',
         'streak-king',
         'clutch-master',
         'generosity-emperor',
