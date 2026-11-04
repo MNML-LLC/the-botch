@@ -95,10 +95,10 @@ export function computeBadges(memberId: string, ctx: BadgeContext): Badge[] {
     badges.push({
       kind: 'mvp',
       id: `mvp-${ctx.periodLabel}`,
-      label: `${ctx.periodLabel} MVP`,
+      label: `${ctx.periodLabel} MVP (総額)`,
       icon: '🏆',
       color: 'bg-amber-100 text-amber-800',
-      description: `${ctx.periodLabel} の男気金額 1 位`,
+      description: `${ctx.periodLabel} の男気額 "合計" 1 位 (¥${topOtokogi.otokogiAmount.toLocaleString()})。ガッツリ出した総大将。`,
     })
   }
 
@@ -138,10 +138,10 @@ export function computeBadges(memberId: string, ctx: BadgeContext): Badge[] {
       badges.push({
         kind: 'generosity-emperor',
         id: 'generosity-emperor',
-        label: '気前度の帝王',
+        label: '気前度の帝王 (平均)',
         icon: '👑',
         color: 'bg-yellow-100 text-yellow-800',
-        description: `平均支払単価 ¥${topAvg.averagePaymentAmount.toLocaleString()} でトップ`,
+        description: `1 回あたりの平均 payer 額 "平均" 1 位 (¥${topAvg.averagePaymentAmount.toLocaleString()})。1 回ごとに豪快。`,
       })
     }
   }

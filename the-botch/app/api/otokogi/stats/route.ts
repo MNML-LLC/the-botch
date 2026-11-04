@@ -128,10 +128,6 @@ export async function GET(request: NextRequest) {
       ? Prisma.sql`AND payer_id IN (${Prisma.join(memberIdList)})`
       : Prisma.sql``
 
-    const payerSqlOe: Prisma.Sql = memberIdList.length > 0
-      ? Prisma.sql`AND oe.payer_id IN (${Prisma.join(memberIdList)})`
-      : Prisma.sql``
-
     const memberSqlM: Prisma.Sql = memberIdList.length > 0
       ? Prisma.sql`AND m.id IN (${Prisma.join(memberIdList)})`
       : Prisma.sql``
@@ -271,18 +267,36 @@ export async function GET(request: NextRequest) {
           LEFT JOIN monthly mp ON g.month = mp.month AND g.payer_id = mp.payer_id
           ORDER BY g.month, g.payer_id`,
 
-      // 13. 漢気額（支払者別）
+      // 13. 漢気額（メンバー別ネット）
+      // Issue #391 A1: /api/otokogi/member-summary と同じ "actualPaid - shouldHavePaid" で揃える。
+      // ランキング (RankingSection) と収支表 (MemberBalanceSection) が完全一致するよう統一する。
+      // 旧実装は "支払者としての正貢献のみ (amount*(pc-1)/pc)" しか見ておらず、
+      // 非支払会で参加者として負担した分 (-amount/pc) を無視していたため値が食い違っていた。
+      // memberIds フィルタは最終 map で絞るためここでは全メンバーで計算する。
       prisma.$queryRaw<{ payer_id: string; otokogi_amount: bigint }[]>`
-          SELECT oe.payer_id,
-            ROUND(SUM(oe.amount::float * (cnt.participant_count - 1)::float / GREATEST(cnt.participant_count, 1)::float))::bigint AS otokogi_amount
-          FROM otokogi_events oe
-          JOIN (
-            SELECT otokogi_event_id, COUNT(*) AS participant_count
-            FROM otokogi_participants
-            GROUP BY otokogi_event_id
-          ) cnt ON oe.id = cnt.otokogi_event_id
-          WHERE ${dateSqlOe} ${payerSqlOe}
-          GROUP BY oe.payer_id`,
+          WITH actual AS (
+            SELECT payer_id AS member_id, SUM(amount)::bigint AS actual_paid
+            FROM otokogi_events
+            WHERE ${dateSql}
+            GROUP BY payer_id
+          ),
+          should AS (
+            SELECT op.member_id,
+              ROUND(SUM(oe.amount::float / GREATEST(cnt.participant_count, 1)::float))::bigint AS should_have_paid
+            FROM otokogi_participants op
+            JOIN otokogi_events oe ON op.otokogi_event_id = oe.id
+            JOIN (
+              SELECT otokogi_event_id, COUNT(*) AS participant_count
+              FROM otokogi_participants
+              GROUP BY otokogi_event_id
+            ) cnt ON oe.id = cnt.otokogi_event_id
+            WHERE ${dateSqlOe}
+            GROUP BY op.member_id
+          )
+          SELECT COALESCE(a.member_id, s.member_id) AS payer_id,
+            (COALESCE(a.actual_paid, 0) - COALESCE(s.should_have_paid, 0))::bigint AS otokogi_amount
+          FROM actual a
+          FULL OUTER JOIN should s ON a.member_id = s.member_id`,
 
       // 14. カテゴリ分類用の素データ (eventName / place / amount / 関連 Event.eventType)
       prisma.otokogiEvent.findMany({

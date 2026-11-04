@@ -44,11 +44,11 @@ test.describe('1. 画面表示・遷移', () => {
       await expect(page.locator('header')).toBeVisible()
       await expect(page.getByRole('link', { name: 'The botch' })).toBeVisible()
     }
-    // 新 5 セクション (Issue #338): A 要アクション / B 承認待ち / C 来週 / D Top 3 / E サマリ
+    // 新 4 セクション (Issue #338 現行): A 要アクション / C 来週 / D Top 3 / E サマリ
+    // ※「承認待ち / 要確認」は現行ダッシュボードから削除済み
     await expect(page.locator('main').getByText('要アクション')).toBeVisible()
-    await expect(page.locator('main').getByText('承認待ち / 要確認')).toBeVisible()
     await expect(page.locator('main').getByText('来週のイベント')).toBeVisible()
-    await expect(page.locator('main').getByText('今月の男気 Top 3')).toBeVisible()
+    await expect(page.locator('main').getByText('今期の男気 Top 3')).toBeVisible()
     await expect(page.locator('main').getByText(/サマリ/)).toBeVisible()
   })
 
@@ -143,19 +143,18 @@ test.describe('1. 画面表示・遷移', () => {
   test('男気管理ページのタブ切り替え', async ({ page }) => {
     await page.goto('/otokogi')
 
-    // 履歴タブ（デフォルト）
+    // Issue #389 以降、3 タブすべて /otokogi 内のボタンタブに統合済み
     await expect(page.getByRole('button', { name: '履歴' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'ランキング' })).toBeVisible()
-    await expect(page.getByRole('link', { name: '統計' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '統計' })).toBeVisible()
 
     // ランキングタブに切り替え
     await page.getByRole('button', { name: 'ランキング' }).click()
     await expect(page.getByText('支払額ランキング')).toBeVisible()
 
-    // 統計リンクをクリック → /otokogi/stats へナビゲート
-    await page.getByRole('link', { name: '統計' }).click()
-    await page.waitForURL(/\/otokogi\/stats/)
-    await expect(page.getByText('男気統計')).toBeVisible()
+    // 統計タブに切り替え → /otokogi?tab=stats に遷移、統計コンテンツが描画
+    await page.getByRole('button', { name: '統計' }).click()
+    await page.waitForURL(/\/otokogi\?tab=stats/)
     await expect(page.getByText('総回数')).toBeVisible({ timeout: 10000 })
     await expect(page.getByText('累計金額').first()).toBeVisible({ timeout: 10000 })
   })
@@ -488,11 +487,10 @@ test.describe('4. 男気記録フロー', () => {
   })
 
   test('男気統計に反映される', async ({ page }) => {
-    // 統計ページに直接アクセス
+    // 統計ページに直接アクセス（/otokogi/stats は /otokogi?tab=stats に redirect）
     await page.goto('/otokogi/stats')
-    await expect(page.getByText('男気統計')).toBeVisible()
     await expect(page.getByText('総回数')).toBeVisible({ timeout: 10000 })
-    await expect(page.getByText('月別推移')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText(/月別.*推移/).first()).toBeVisible({ timeout: 10000 })
     await expect(page.getByText('漢気ランキング')).toBeVisible({ timeout: 10000 })
   })
 
@@ -682,10 +680,10 @@ test.describe('7. フィルター機能', () => {
   })
 
   test('男気統計 — 年度フィルター', async ({ page }) => {
-    // 統計ページに直接アクセス
+    // 統計ページに直接アクセス（/otokogi/stats は /otokogi?tab=stats に redirect）
     await page.goto('/otokogi/stats')
-    // 統計ページ描画完了を待つ（isVisible ガードで skip されないよう）
-    await expect(page.getByText('男気統計')).toBeVisible({ timeout: 10000 })
+    // 統計コンテンツ描画完了を待つ（isVisible ガードで skip されないよう）
+    await expect(page.getByText('総回数')).toBeVisible({ timeout: 10000 })
 
     // 統計専用の年度フィルター
     const yearSelect = page.locator('button[role="combobox"]')
@@ -694,8 +692,8 @@ test.describe('7. フィルター機能', () => {
       const yearOption = page.locator('[role="option"]').filter({ hasText: /2025/ })
       if (await yearOption.isVisible()) {
         await yearOption.click()
-        // 男気統計が更新される
-        await expect(page.getByText('男気統計')).toBeVisible()
+        // 統計コンテンツが更新される
+        await expect(page.getByText('総回数')).toBeVisible()
       }
     }
   })
@@ -761,7 +759,7 @@ test.describe('9. レスポンシブ・モバイル表示', () => {
     // 新トップ (Issue #338) の各セクションが表示されるかのみ検証
     await expect(page.locator('main').getByText('要アクション')).toBeVisible()
     await expect(page.locator('main').getByText('来週のイベント')).toBeVisible()
-    await expect(page.locator('main').getByText('今月の男気 Top 3')).toBeVisible()
+    await expect(page.locator('main').getByText('今期の男気 Top 3')).toBeVisible()
   })
 
   test('男気統計グラフが表示される', async ({ page }) => {
@@ -769,11 +767,7 @@ test.describe('9. レスポンシブ・モバイル表示', () => {
 
     // デフォルト期間フィルタ (current-fy, 11/1〜翌10/31) は会計年度切替直後だと
     // seed データ範囲外になり得るため、「全期間」に切り替えて確実にデータを描画させる。
-    // モバイルビューではフィルタが折りたたまれているので先に展開する。
-    const viewportWidth = page.viewportSize()?.width ?? 1280
-    if (viewportWidth < 640) {
-      await page.getByRole('button', { name: /フィルタ/ }).click()
-    }
+    // PeriodFilter はモバイルでも常時表示（折りたたみなし）なのでそのままクリック。
     await page.getByRole('tab', { name: '全期間' }).click()
 
     // rechartsのSVGが描画されているか

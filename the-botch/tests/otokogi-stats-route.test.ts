@@ -152,3 +152,55 @@ describe('GET /api/otokogi/stats — 必須フィールドのガード (Issue #3
     expect(data.categoryBreakdown.every((c) => c.amount === 0)).toBe(true)
   })
 })
+
+// Issue #391 A1: 男気ランキング (otokogiByMember) と 収支表 (member-summary) の数字一致
+describe('GET /api/otokogi/stats — otokogiByMember は member-summary と同じ net 計算 (Issue #391 A1)', () => {
+  test('otokogiAmount = actualPaid - shouldHavePaid の形で返る (raw SQL 結果を素通し)', async () => {
+    mockAggregate.mockResolvedValue({ _count: 2, _sum: { amount: 30000 } })
+    mockEventGroupBy.mockResolvedValue([])
+    mockParticipantGroupBy.mockResolvedValue([])
+    mockFindFirst.mockResolvedValue(null)
+    // メンバー 2 人
+    mockMemberFindMany.mockResolvedValue([
+      { id: 'a', name: 'A', initial: 'A', colorBg: 'bg-a', colorText: 'text-a' },
+      { id: 'b', name: 'B', initial: 'B', colorBg: 'bg-b', colorText: 'text-b' },
+    ])
+    mockEventFindMany.mockImplementation((args: { select?: Record<string, boolean> }) => {
+      if (args?.select && 'participants' in (args.select as Record<string, unknown>)) {
+        return Promise.resolve([])
+      }
+      return Promise.resolve([])
+    })
+
+    // $queryRaw は 6 回呼ばれる:
+    // 1) maxMinResult 2) monthlyTrendDb 3) heatmapDb 4) maxDayDb 5) cumulativeRaceDb 6) otokogiAmountDb
+    // A1 修正後、6) は FULL OUTER JOIN で "actualPaid - shouldHavePaid" を返す。
+    // ここでは A: net=+10000 (ガッツリ払った), B: net=-4000 (非支払会の負担のみ) を想定。
+    mockQueryRaw
+      .mockResolvedValueOnce([]) // maxMin
+      .mockResolvedValueOnce([]) // monthlyTrend
+      .mockResolvedValueOnce([]) // heatmap
+      .mockResolvedValueOnce([]) // maxDay
+      .mockResolvedValueOnce([]) // cumulativeRace
+      .mockResolvedValueOnce([
+        { payer_id: 'a', otokogi_amount: BigInt(10000) },
+        { payer_id: 'b', otokogi_amount: BigInt(-4000) },
+      ])
+
+    const req = createRequest('/api/otokogi/stats')
+    const res = await GET(req)
+    const { status, data } = await parseResponse<{
+      otokogiByMember: { id: string; otokogiAmount: number }[]
+      totalOtokogiAmount: number
+    }>(res)
+
+    expect(status).toBe(200)
+    // net 計算なので負の値もあり得る (B は非支払会でのみ参加)
+    const a = data.otokogiByMember.find((m) => m.id === 'a')
+    const b = data.otokogiByMember.find((m) => m.id === 'b')
+    expect(a?.otokogiAmount).toBe(10000)
+    expect(b?.otokogiAmount).toBe(-4000)
+    // 合計 = 10000 + (-4000) = 6000
+    expect(data.totalOtokogiAmount).toBe(6000)
+  })
+})
