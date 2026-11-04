@@ -25,7 +25,7 @@ const SECTIONS: Array<{ title: string; links: MenuLink[] }> = [
   {
     title: '統計・分析',
     links: [
-      { href: '/otokogi/stats', icon: '📊', label: '男気統計', description: 'メンバー別・月次推移' },
+      { href: '/otokogi?tab=stats', icon: '📊', label: '男気統計', description: 'メンバー別・月次推移' },
       { href: '/warikan/summary', icon: '📈', label: '割り勘サマリ', description: 'メンバー間収支' },
     ],
   },
