@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useOtokogiMemberSummary } from '@/hooks/use-otokogi';
+import { TermTooltip } from '@/components/ui/term-tooltip';
 
 type MemberSummaryEntry = {
   memberId: string;
@@ -67,34 +68,41 @@ function formatPercent(value: number): string {
 }
 
 type MetricDef = {
-  label: string;
+  key: string;
+  label: ReactNode;
   render: (m: MemberSummaryEntry) => ReactNode;
 };
 
 function buildMetrics(hasJankenData: boolean): MetricDef[] {
   const metrics: MetricDef[] = [
     {
+      key: 'participationCount',
       label: '参加回数',
       render: (m) => fmt.format(m.participationCount),
     },
     {
+      key: 'payerCount',
       label: '支払者になった回数',
       render: (m) => fmt.format(m.payerCount),
     },
     {
+      key: 'payerRate',
       label: '支払者率',
       render: (m) => formatPercent(m.payerRate),
     },
     {
+      key: 'actualPaid',
       label: '実際払った額',
       render: (m) => formatYen(m.actualPaid),
     },
     {
+      key: 'shouldHavePaid',
       label: '本来払うべき額',
       render: (m) => formatYen(m.shouldHavePaid),
     },
     {
-      label: '漢気金額',
+      key: 'otokogiAmount',
+      label: <TermTooltip term="男気">漢気金額</TermTooltip>,
       render: (m) => (
         <span
           className={
@@ -111,30 +119,36 @@ function buildMetrics(hasJankenData: boolean): MetricDef[] {
       ),
     },
     {
-      label: '平均支払単価',
+      key: 'averagePaymentAmount',
+      label: <TermTooltip term="気前度">平均支払単価</TermTooltip>,
       render: (m) => (m.payerCount > 0 ? formatYen(m.averagePaymentAmount) : '—'),
     },
     {
+      key: 'maxSingleOtokogi',
       label: '最高単発漢気',
       render: (m) => (m.payerCount > 0 ? formatYen(m.maxSingleOtokogi) : '—'),
     },
     {
-      label: '★ CLUTCH回数',
+      key: 'clutchCount',
+      label: <TermTooltip term="CLUTCH">★ CLUTCH回数</TermTooltip>,
       render: (m) => fmt.format(m.clutchCount),
     },
     {
-      label: '★ CLUTCH総額',
+      key: 'clutchTotal',
+      label: <TermTooltip term="CLUTCH">★ CLUTCH総額</TermTooltip>,
       render: (m) => (m.clutchCount > 0 ? formatYen(m.clutchTotal) : '—'),
     },
     {
-      label: 'クラッチ率',
+      key: 'clutchRate',
+      label: <TermTooltip term="CLUTCH">クラッチ率</TermTooltip>,
       render: (m) => (m.payerCount > 0 ? formatPercent(m.clutchRate) : '—'),
     },
   ];
 
   if (hasJankenData) {
     metrics.push({
-      label: 'じゃんけん勝率',
+      key: 'jankenWinRate',
+      label: <TermTooltip term="じゃんけん勝率">じゃんけん勝率</TermTooltip>,
       render: (m) => (m.jankenWinRate !== null ? formatPercent(m.jankenWinRate) : '—'),
     });
   }
@@ -228,7 +242,7 @@ export default function MemberSummaryTable() {
               </thead>
               <tbody>
                 {metrics.map((metric) => (
-                  <tr key={metric.label} className="border-b border-gray-100 last:border-0">
+                  <tr key={metric.key} className="border-b border-gray-100 last:border-0">
                     <td className="sticky left-0 z-10 bg-white p-2 text-gray-600 whitespace-nowrap font-medium">
                       {metric.label}
                     </td>

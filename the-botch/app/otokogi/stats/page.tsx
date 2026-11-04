@@ -26,6 +26,7 @@ import {
 import { Yen } from '@/components/ui/yen';
 import { PeriodFilter, DEFAULT_PERIOD_STATE } from '@/components/ui/period-filter';
 import { getPeriodRange, type PeriodState } from '@/lib/date-utils';
+import { TermTooltip } from '@/components/ui/term-tooltip';
 
 type Member = {
   id: string;
@@ -203,15 +204,37 @@ function FilterBar({
 
 // ---- メンバー別収支表 ----
 
-const BALANCE_METRICS: { label: string; key: keyof MemberSummaryEntry; format: (v: number) => string }[] = [
+type BalanceMetric = {
+  label: React.ReactNode;
+  key: keyof MemberSummaryEntry;
+  format: (v: number) => string;
+};
+
+const BALANCE_METRICS: BalanceMetric[] = [
   { label: '参加回数', key: 'participationCount', format: (v) => fmt.format(v) },
   { label: '支払回数', key: 'payerCount', format: (v) => fmt.format(v) },
   { label: '実際払った額', key: 'actualPaid', format: formatYen },
   { label: '本来払うべき額', key: 'shouldHavePaid', format: formatYen },
-  { label: '漢気金額', key: 'otokogiAmount', format: formatYen },
-  { label: '平均支払単価', key: 'averagePaymentAmount', format: formatYen },
-  { label: '★ CLUTCH回数', key: 'clutchCount', format: (v) => fmt.format(v) },
-  { label: '★ CLUTCH総額', key: 'clutchTotal', format: formatYen },
+  {
+    label: <TermTooltip term="男気">漢気金額</TermTooltip>,
+    key: 'otokogiAmount',
+    format: formatYen,
+  },
+  {
+    label: <TermTooltip term="気前度">平均支払単価</TermTooltip>,
+    key: 'averagePaymentAmount',
+    format: formatYen,
+  },
+  {
+    label: <TermTooltip term="CLUTCH">★ CLUTCH回数</TermTooltip>,
+    key: 'clutchCount',
+    format: (v) => fmt.format(v),
+  },
+  {
+    label: <TermTooltip term="CLUTCH">★ CLUTCH総額</TermTooltip>,
+    key: 'clutchTotal',
+    format: formatYen,
+  },
 ];
 
 function MemberBalanceSection({
@@ -259,7 +282,7 @@ function MemberBalanceSection({
               </thead>
               <tbody>
                 {BALANCE_METRICS.map((metric) => (
-                  <tr key={metric.label} className="border-b border-gray-100 last:border-0">
+                  <tr key={metric.key} className="border-b border-gray-100 last:border-0">
                     <td className="sticky left-0 z-10 bg-white p-2 text-gray-600 whitespace-nowrap font-medium">
                       {metric.label}
                     </td>

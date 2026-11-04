@@ -18,6 +18,7 @@ import { ClutchBadge } from '@/components/otokogi/clutch-badge';
 import { RankingHeroCards } from '@/components/otokogi/ranking-hero-cards';
 import { BadgeChip } from '@/components/otokogi/badge-chip';
 import { topBadge } from '@/lib/otokogi-badges';
+import { TermTooltip } from '@/components/ui/term-tooltip';
 
 function OtokogiHistorySkeleton() {
   return (
@@ -290,9 +291,15 @@ export default function OtokogiPage() {
                               </div>
                               <p className="text-xs text-gray-500 tabular-nums mt-0.5">
                                 {member.count}回
-                                {member.clutchCount > 0 && <span className="ml-1">· ★ {member.clutchCount}</span>}
+                                {member.clutchCount > 0 && (
+                                  <TermTooltip term="CLUTCH" className="ml-1 text-xs text-gray-500">
+                                    · ★ {member.clutchCount}
+                                  </TermTooltip>
+                                )}
                                 {member.participationCount > 0 && (
-                                  <span className="ml-1">· 男気率 {Math.round(member.otokogiRate * 100)}%</span>
+                                  <TermTooltip term="男気率" className="ml-1 text-xs text-gray-500">
+                                    · 男気率 {Math.round(member.otokogiRate * 100)}%
+                                  </TermTooltip>
                                 )}
                               </p>
                             </div>
