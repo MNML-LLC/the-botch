@@ -14,7 +14,7 @@ import {
 } from '@/hooks/use-otokogi';
 import type { OtokogiCategory } from '@/lib/otokogi-category';
 import {
-  HeatmapSection,
+  MonthMemberHeatmapSection,
   CategoryPieSection,
   CumulativeYearlySection,
   ComparisonSection,
@@ -472,8 +472,9 @@ export default function OtokogiStatsPage() {
         {/* 3. 漢気ランキング（既存） */}
         <RankingSection data={stats?.otokogiByMember} />
 
-        {/* 4. ヒートマップ（直近 12ヶ月固定） */}
-        <HeatmapSection data={charts?.heatmap} />
+        {/* 4. 月 × メンバー ヒートマップ (Issue #366, design review Phase 2)
+            log amber-100〜900 の離散スケールで桁差を可視化。期間フィルタ連動 */}
+        <MonthMemberHeatmapSection data={charts?.monthMemberHeatmap} />
 
         {/* 5. カテゴリ別支払分布 */}
         <CategoryPieSection data={stats?.categoryBreakdown} />

@@ -182,16 +182,32 @@ export async function GET(request: NextRequest) {
       row.set(e.payerId, (row.get(e.payerId) ?? 0) + e.amount)
     }
 
+    const heatmapCells = heatmapMonths.flatMap((month) =>
+      members.map((mem) => ({
+        month,
+        memberId: mem.id,
+        amount: heatmapAgg.get(month)?.get(mem.id) ?? 0,
+      }))
+    )
+
     const heatmap = {
       months: heatmapMonths,
       members,
-      cells: heatmapMonths.flatMap((month) =>
-        members.map((mem) => ({
-          month,
-          memberId: mem.id,
-          amount: heatmapAgg.get(month)?.get(mem.id) ?? 0,
-        }))
-      ),
+      cells: heatmapCells,
+    }
+
+    // ===== A2. 月 × メンバー ヒートマップ (Issue #366, design review Phase 2) =====
+    // 同じデータを log スケール用のメタ情報 (maxAmount) 付きで公開する。
+    // クライアントは maxAmount を使って log 正規化 → amber-100〜900 の 9 段階へ割り当てる。
+    const maxHeatmapAmount = heatmapCells.reduce(
+      (acc, c) => (c.amount > acc ? c.amount : acc),
+      0,
+    )
+    const monthMemberHeatmap = {
+      months: heatmapMonths,
+      members,
+      cells: heatmapCells,
+      maxAmount: maxHeatmapAmount,
     }
 
     // 累積・比較は「今/先」の基準時刻を anchor とする。
@@ -332,6 +348,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         heatmap,
+        monthMemberHeatmap,
         cumulativeYearly,
         comparison,
         topRecent: recentForTop,
