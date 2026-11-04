@@ -596,7 +596,6 @@ export function StatsContent({ period }: { period: PeriodState }) {
   );
 
   const { data: charts } = useOtokogiCharts(from, to, selectedMemberIds);
-  const chartsThisYearLabel = charts?.anchorYear ?? new Date().getFullYear();
 
   return (
     <div>
@@ -655,8 +654,8 @@ export function StatsContent({ period }: { period: PeriodState }) {
         <BadgesSection period={period} members={members} />
         {/* 8b. Issue #393: FY (会計年度) ごとのバッジ履歴 */}
         <FyBadgesSection members={members} />
-        {/* 9. 補足: 年比較の累積 (全員合計) */}
-        <CumulativeYearlySection data={charts?.cumulativeYearly} thisYearLabel={chartsThisYearLabel} />
+        {/* 9. 補足: 期間内累積 (全員合計) — Issue #400 で年比較から period 準拠へ */}
+        <CumulativeYearlySection data={charts?.cumulativeYearly} />
       </div>
     </div>
   );

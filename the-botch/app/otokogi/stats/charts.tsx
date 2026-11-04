@@ -462,27 +462,24 @@ export function CategoryPieSection({ data }: { data?: CategoryEntry[] }) {
 }
 
 // ============================================================
-// C. 累積折れ線（今年 / 昨年 / 一昨年）
+// C. 累積折れ線 (期間内月ベース, 1 本線) — Issue #400
+// 期間フィルタ内の月を軸に累積総額を描画する。anchor より未来の月は null。
 // ============================================================
 export function CumulativeYearlySection({
   data,
-  thisYearLabel,
 }: {
   data?: OtokogiChartsResponse['cumulativeYearly'];
-  thisYearLabel: number;
 }) {
   if (!data || data.length === 0) return null;
 
-  const hasAny = data.some(
-    (d) => (d.thisYear ?? 0) > 0 || d.lastYear > 0 || d.yearBefore > 0
-  );
+  const hasAny = data.some((d) => (d.cumulative ?? 0) > 0);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-slate-800">年次累積推移 (全体 · 年比較)</CardTitle>
+        <CardTitle className="text-slate-800">累積推移 (期間内 · 全員合計)</CardTitle>
         <p className="text-xs text-gray-500 mt-0.5">
-          今年 / 昨年 / 一昨年の 1 月からの累積総額。ペース比較用。
+          期間内の月ごとの累積総額。未到達の月は非表示。
         </p>
       </CardHeader>
       <CardContent>
@@ -496,7 +493,8 @@ export function CumulativeYearlySection({
                 <XAxis
                   dataKey="month"
                   tick={{ fontSize: 10 }}
-                  tickFormatter={(m) => `${m}月`}
+                  tickFormatter={shortMonthLabel}
+                  interval="preserveStartEnd"
                 />
                 <YAxis
                   tickFormatter={formatYenShort}
@@ -506,37 +504,21 @@ export function CumulativeYearlySection({
                 <Tooltip
                   formatter={(value, name) => {
                     if (value === null) return ['-', name];
-                    return [formatYen(Number(value)), name];
+                    return [formatYen(Number(value)), '累積'];
                   }}
-                  labelFormatter={(label) => `${label}月`}
+                  labelFormatter={(label) => {
+                    const [y, m] = String(label).split('-');
+                    return `${y}年${parseInt(m)}月`;
+                  }}
                 />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Line
                   type="monotone"
-                  dataKey="thisYear"
-                  name={`${thisYearLabel}年`}
+                  dataKey="cumulative"
+                  name="累積"
                   stroke="#d97706"
                   strokeWidth={2.5}
                   dot={{ r: 3 }}
                   connectNulls={false}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="lastYear"
-                  name={`${thisYearLabel - 1}年`}
-                  stroke="#0057b7"
-                  strokeWidth={2}
-                  dot={{ r: 2 }}
-                  strokeDasharray="4 2"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="yearBefore"
-                  name={`${thisYearLabel - 2}年`}
-                  stroke="#94a3b8"
-                  strokeWidth={1.5}
-                  dot={{ r: 2 }}
-                  strokeDasharray="2 2"
                 />
               </LineChart>
             </ResponsiveContainer>
