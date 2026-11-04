@@ -113,16 +113,12 @@ function FilterBar({
   selectedMemberIds,
   setSelectedMemberIds,
   members,
-  expanded,
-  setExpanded,
 }: {
   period: PeriodState;
   setPeriod: (p: PeriodState) => void;
   selectedMemberIds: string[];
   setSelectedMemberIds: (ids: string[]) => void;
   members: Member[];
-  expanded: boolean;
-  setExpanded: (v: boolean) => void;
 }) {
   const toggleMember = (id: string) => {
     setSelectedMemberIds(
@@ -132,71 +128,47 @@ function FilterBar({
     );
   };
 
-  const isDefault = period.period === 'current-fy';
-
   return (
-    <div className="sticky top-14 z-40 bg-white/95 backdrop-blur-sm border-b shadow-sm -mx-4 px-4">
-      {/* SP: アコーディオントグル */}
-      <button
-        className="sm:hidden flex items-center justify-between w-full py-2 text-sm text-gray-600"
-        onClick={() => setExpanded(!expanded)}
-        type="button"
-      >
-        <span className="font-medium">
-          フィルタ
-          {(selectedMemberIds.length > 0 || !isDefault) && (
-            <span className="ml-1.5 text-xs text-amber-600">●</span>
-          )}
-        </span>
-        <span className="text-xs text-gray-400">{expanded ? '▲' : '▼'}</span>
-      </button>
+    <div className="mb-4">
+      <PeriodFilter value={period} onChange={setPeriod} accent="otokogi" />
 
-      {/* フィルタ本体 (SP: 折りたたみ、PC: 常時表示) */}
-      <div className={`${expanded ? 'block' : 'hidden'} sm:block pb-2 sm:py-2`}>
-        <div className="sm:flex sm:items-center sm:flex-wrap sm:gap-x-4 sm:gap-y-2 space-y-2 sm:space-y-0">
-          {/* 期間プリセット */}
-          <PeriodFilter value={period} onChange={setPeriod} accent="otokogi" />
-
-          {/* メンバー絞り込み */}
-          {members.length > 0 && (
-            <div className="flex gap-1 flex-wrap items-center">
-              {members.map((member) => {
-                const selected = selectedMemberIds.includes(member.id);
-                return (
-                  <button
-                    key={member.id}
-                    type="button"
-                    onClick={() => toggleMember(member.id)}
-                    className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border transition ${
-                      selected
-                        ? 'bg-slate-800 text-white border-slate-800'
-                        : 'bg-white text-gray-600 border-gray-300 hover:border-slate-400'
-                    }`}
-                  >
-                    <div
-                      className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 ${
-                        selected ? 'bg-white/20' : `${member.colorBg} ${member.colorText}`
-                      }`}
-                    >
-                      {member.initial}
-                    </div>
-                    {member.name}
-                  </button>
-                );
-              })}
-              {selectedMemberIds.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setSelectedMemberIds([])}
-                  className="px-2 py-0.5 text-xs text-gray-400 hover:text-gray-600 rounded-full border border-transparent hover:border-gray-200"
+      {members.length > 0 && (
+        <div className="flex gap-1 flex-wrap items-center mt-2">
+          {members.map((member) => {
+            const selected = selectedMemberIds.includes(member.id);
+            return (
+              <button
+                key={member.id}
+                type="button"
+                onClick={() => toggleMember(member.id)}
+                className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border transition ${
+                  selected
+                    ? 'bg-slate-800 text-white border-slate-800'
+                    : 'bg-white text-gray-600 border-gray-300 hover:border-slate-400'
+                }`}
+              >
+                <div
+                  className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 ${
+                    selected ? 'bg-white/20' : `${member.colorBg} ${member.colorText}`
+                  }`}
                 >
-                  クリア
-                </button>
-              )}
-            </div>
+                  {member.initial}
+                </div>
+                {member.name}
+              </button>
+            );
+          })}
+          {selectedMemberIds.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setSelectedMemberIds([])}
+              className="px-2 py-0.5 text-xs text-gray-400 hover:text-gray-600 rounded-full border border-transparent hover:border-gray-200"
+            >
+              クリア
+            </button>
           )}
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -455,7 +427,6 @@ function RankingSection({ data }: { data?: OtokogiByMember[] }) {
 export default function OtokogiStatsPage() {
   const [period, setPeriod] = useState<PeriodState>(DEFAULT_PERIOD_STATE);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
-  const [filterExpanded, setFilterExpanded] = useState(false);
 
   // 期間から from/to を計算
   const { from, to } = useMemo(
@@ -487,15 +458,13 @@ export default function OtokogiStatsPage() {
         </Link>
       </div>
 
-      {/* フィルタバー（sticky） */}
+      {/* フィルタバー */}
       <FilterBar
         period={period}
         setPeriod={setPeriod}
         selectedMemberIds={selectedMemberIds}
         setSelectedMemberIds={setSelectedMemberIds}
         members={members}
-        expanded={filterExpanded}
-        setExpanded={setFilterExpanded}
       />
 
       {/* 概要バッジ */}
