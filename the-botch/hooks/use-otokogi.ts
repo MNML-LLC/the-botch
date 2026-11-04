@@ -212,19 +212,12 @@ export type OtokogiChartsResponse = {
     cells: { month: string; memberId: string; amount: number }[];
     maxAmount: number;
   };
+  // Issue #400: 期間内月を軸に累積総額 1 本に変更
+  //   month: 'YYYY-MM', cumulative: anchor より未来は null
   cumulativeYearly: {
-    month: number;
-    thisYear: number | null;
-    lastYear: number;
-    yearBefore: number;
+    month: string;
+    cumulative: number | null;
   }[];
-  comparison: {
-    thisMonth: { total: number; byMember: { memberId: string; memberName: string; amount: number }[] };
-    lastMonth: { total: number; byMember: { memberId: string; memberName: string; amount: number }[] };
-    thisYear: { total: number; byMember: { memberId: string; memberName: string; amount: number }[] };
-    lastYear: { total: number; byMember: { memberId: string; memberName: string; amount: number }[] };
-    labels: { thisMonth: string; lastMonth: string; thisYear: string; lastYear: string };
-  };
   topRecent: {
     id: string;
     eventName: string;
@@ -234,6 +227,7 @@ export type OtokogiChartsResponse = {
     payer: Member;
   }[];
   members: Member[];
+  periodLabel: { from: string | null; to: string | null };
   anchorYear: number;
 };
 
