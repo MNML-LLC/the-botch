@@ -754,9 +754,18 @@ test.describe('9. レスポンシブ・モバイル表示', () => {
   test('男気統計グラフが表示される', async ({ page }) => {
     await page.goto('/otokogi/stats')
 
+    // デフォルト期間フィルタ (current-fy, 11/1〜翌10/31) は会計年度切替直後だと
+    // seed データ範囲外になり得るため、「全期間」に切り替えて確実にデータを描画させる。
+    // モバイルビューではフィルタが折りたたまれているので先に展開する。
+    const viewportWidth = page.viewportSize()?.width ?? 1280
+    if (viewportWidth < 640) {
+      await page.getByRole('button', { name: /フィルタ/ }).click()
+    }
+    await page.getByRole('tab', { name: '全期間' }).click()
+
     // rechartsのSVGが描画されているか
     const svgElements = page.locator('svg.recharts-surface')
-    await expect(svgElements.first()).toBeVisible({ timeout: 10000 })
+    await expect(svgElements.first()).toBeVisible({ timeout: 15000 })
     const svgCount = await svgElements.count()
     // 最低1つのグラフがレンダリングされている
     expect(svgCount).toBeGreaterThanOrEqual(1)

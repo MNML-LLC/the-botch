@@ -176,6 +176,158 @@ export function HeatmapSection({ data }: { data?: OtokogiChartsResponse['heatmap
 }
 
 // ============================================================
+// A2. 月 × メンバー ヒートマップ (Issue #366, design review Phase 2)
+// log スケール + Tailwind amber-100 〜 amber-900 の 9 段階離散色
+// ============================================================
+
+// Tailwind amber-100 〜 amber-900 の実色 (background) と、
+// 階調ごとに読みやすい前景色。
+const AMBER_SCALE: { bg: string; text: string }[] = [
+  { bg: '#fef3c7', text: '#78350f' }, // amber-100
+  { bg: '#fde68a', text: '#78350f' }, // amber-200
+  { bg: '#fcd34d', text: '#78350f' }, // amber-300
+  { bg: '#fbbf24', text: '#78350f' }, // amber-400
+  { bg: '#f59e0b', text: '#1f2937' }, // amber-500
+  { bg: '#d97706', text: '#ffffff' }, // amber-600
+  { bg: '#b45309', text: '#ffffff' }, // amber-700
+  { bg: '#92400e', text: '#ffffff' }, // amber-800
+  { bg: '#78350f', text: '#ffffff' }, // amber-900
+];
+const EMPTY_CELL = { bg: 'rgb(248, 250, 252)', text: 'rgb(203, 213, 225)' };
+
+// amount と maxAmount から log 正規化で 0〜8 のバケットを返す。
+// amount=0 は -1 (空セル扱い)。
+function logBucket(amount: number, maxAmount: number): number {
+  if (amount <= 0 || maxAmount <= 0) return -1;
+  // log(x+1) / log(max+1) ∈ (0, 1]
+  const ratio = Math.log(amount + 1) / Math.log(maxAmount + 1);
+  const idx = Math.min(
+    AMBER_SCALE.length - 1,
+    Math.max(0, Math.floor(ratio * AMBER_SCALE.length)),
+  );
+  return idx;
+}
+
+export function MonthMemberHeatmapSection({
+  data,
+}: {
+  data?: OtokogiChartsResponse['monthMemberHeatmap'];
+}) {
+  if (!data) return null;
+
+  // メンバー別支払合計で降順（0 だけのメンバーは下に）
+  const memberTotals = new Map<string, number>();
+  for (const cell of data.cells) {
+    memberTotals.set(cell.memberId, (memberTotals.get(cell.memberId) ?? 0) + cell.amount);
+  }
+  const sortedMembers = [...data.members].sort(
+    (a, b) => (memberTotals.get(b.id) ?? 0) - (memberTotals.get(a.id) ?? 0)
+  );
+
+  // (month, memberId) → amount
+  const cellMap = new Map<string, number>();
+  for (const cell of data.cells) {
+    cellMap.set(`${cell.month}:${cell.memberId}`, cell.amount);
+  }
+
+  const noData = data.maxAmount <= 0;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-slate-800">月 × メンバー ヒートマップ</CardTitle>
+        <p className="text-xs text-gray-500 mt-0.5">
+          期間内の月ごとのメンバー別支払額（log スケール, 濃いほど多い）
+        </p>
+      </CardHeader>
+      <CardContent>
+        {noData ? (
+          <p className="text-sm text-gray-500">データがありません</p>
+        ) : (
+          <div className="overflow-x-auto -mx-2 px-2">
+            <table className="text-xs border-collapse" style={{ minWidth: 480 }}>
+              <thead>
+                <tr>
+                  <th className="sticky left-0 z-10 bg-white p-1.5 text-left font-medium text-gray-500 whitespace-nowrap min-w-[72px]">
+                    メンバー
+                  </th>
+                  {data.months.map((m) => (
+                    <th
+                      key={m}
+                      className="p-1 text-center font-medium text-gray-500 whitespace-nowrap"
+                      style={{ minWidth: 36, width: 36 }}
+                    >
+                      {shortMonthLabel(m)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {sortedMembers.map((member) => (
+                  <tr key={member.id}>
+                    <td className="sticky left-0 z-10 bg-white p-1.5 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5">
+                        <Avatar member={member} size="sm" />
+                        <span className="text-slate-800">{member.name}</span>
+                      </div>
+                    </td>
+                    {data.months.map((m) => {
+                      const amount = cellMap.get(`${m}:${member.id}`) ?? 0;
+                      const bucket = logBucket(amount, data.maxAmount);
+                      const { bg, text } = bucket < 0 ? EMPTY_CELL : AMBER_SCALE[bucket];
+                      return (
+                        <td
+                          key={m}
+                          className="p-0 text-center"
+                          style={{ width: 36, height: 32 }}
+                          title={`${member.name} ${shortMonthLabel(m)}: ${formatYen(amount)}`}
+                        >
+                          <div
+                            className="w-full h-full flex items-center justify-center rounded"
+                            style={{
+                              backgroundColor: bg,
+                              color: text,
+                              fontSize: 9,
+                              fontWeight: amount > 0 ? 600 : 400,
+                            }}
+                          >
+                            {amount > 0 ? formatYenShort(amount) : ''}
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {/* 凡例: amber の 9 段階 (log スケール) */}
+            <div className="flex items-center gap-2 mt-3 pl-1">
+              <span className="text-[10px] text-gray-500">少</span>
+              <div className="flex gap-0.5">
+                {AMBER_SCALE.map((c, i) => (
+                  <span
+                    key={i}
+                    className="inline-block w-4 h-3 rounded-sm"
+                    style={{ backgroundColor: c.bg }}
+                  />
+                ))}
+              </div>
+              <span className="text-[10px] text-gray-500">多</span>
+              <span className="text-[10px] text-gray-400 ml-auto">
+                最大 {formatYen(data.maxAmount)}
+              </span>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1 pl-1">
+              横スクロールで全月表示 / セル hover で詳細金額 / log スケールで桁差を可視化
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================================
 // B. 円グラフ（イベント種別別の支払分布）
 // ============================================================
 type CategoryEntry = { category: OtokogiCategory; amount: number; count: number };
