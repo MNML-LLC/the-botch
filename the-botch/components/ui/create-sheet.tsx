@@ -36,11 +36,11 @@ export function CreateSheet({ open, onClose }: CreateSheetProps) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg bg-white rounded-t-2xl sm:rounded-2xl p-4 pb-[max(env(safe-area-inset-bottom),2rem)] sm:pb-4 shadow-xl"
+        className="w-full max-w-lg bg-white rounded-t-2xl sm:rounded-2xl p-4 pb-[max(2rem,env(safe-area-inset-bottom))] sm:pb-4 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-3">
-          <h2 id="create-sheet-title" className="text-base font-bold text-slate-800">
+          <h2 id="create-sheet-title" className="text-base font-bold text-slate-900">
             作成
           </h2>
           <button
@@ -58,9 +58,9 @@ export function CreateSheet({ open, onClose }: CreateSheetProps) {
               <Link
                 href={link.href}
                 onClick={onClose}
-                className="block rounded-lg border border-gray-200 p-3 hover:border-amber-300 hover:bg-amber-50 transition"
+                className="block min-h-[56px] rounded-lg border border-gray-200 p-3 hover:border-amber-300 hover:bg-amber-50 transition"
               >
-                <p className="text-sm font-medium text-slate-800">{link.label}</p>
+                <p className="text-sm font-medium text-slate-900">{link.label}</p>
                 <p className="text-xs text-gray-500 mt-0.5">{link.description}</p>
               </Link>
             </li>

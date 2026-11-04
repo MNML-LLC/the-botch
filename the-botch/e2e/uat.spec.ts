@@ -34,11 +34,16 @@ async function cleanup(page: Page) {
 // 1. 画面表示・遷移の検証
 // =============================================================================
 test.describe('1. 画面表示・遷移', () => {
-  test('ダッシュボードが正常に表示される', async ({ page }) => {
+  test('ダッシュボードが正常に表示される', async ({ page, viewport }) => {
     await page.goto('/')
-    // ヘッダー
-    await expect(page.locator('header')).toBeVisible()
-    await expect(page.getByRole('link', { name: 'The botch' })).toBeVisible()
+    const isMobile = (viewport?.width ?? 1280) < 768
+    // ナビゲーション: デスクトップは header、モバイルは BottomTabBar (Issue #361)
+    if (isMobile) {
+      await expect(page.getByRole('navigation', { name: 'メインナビゲーション' })).toBeVisible()
+    } else {
+      await expect(page.locator('header')).toBeVisible()
+      await expect(page.getByRole('link', { name: 'The botch' })).toBeVisible()
+    }
     // 新 5 セクション (Issue #338): A 要アクション / B 承認待ち / C 来週 / D Top 3 / E サマリ
     await expect(page.locator('main').getByText('要アクション')).toBeVisible()
     await expect(page.locator('main').getByText('承認待ち / 要確認')).toBeVisible()
@@ -65,11 +70,12 @@ test.describe('1. 画面表示・遷移', () => {
 
     async function navigateTo(name: string) {
       if (isMobile) {
-        // ハンバーガーメニューを開いてリンクをクリック
-        await page.locator('header button').filter({ has: page.locator('svg') }).click()
-        const mobileMenu = page.locator('header .bg-slate-700')
-        await expect(mobileMenu).toBeVisible()
-        await mobileMenu.getByRole('link', { name }).click()
+        // BottomTabBar の「メニュー」タブから /menu に入り、そこでリンクをクリック
+        await page.getByRole('navigation', { name: 'メインナビゲーション' })
+          .getByRole('link', { name: 'メニュー' })
+          .click()
+        await expect(page).toHaveURL(/\/menu/)
+        await page.locator('main').getByRole('link', { name: new RegExp(name) }).click()
       } else {
         await page.locator('header nav').getByRole('link', { name }).click()
       }
@@ -89,14 +95,38 @@ test.describe('1. 画面表示・遷移', () => {
 
     // ダッシュボードに戻る
     if (isMobile) {
-      await page.locator('header button').filter({ has: page.locator('svg') }).click()
-      const mobileMenu = page.locator('header .bg-slate-700')
-      await expect(mobileMenu).toBeVisible()
-      await mobileMenu.getByRole('link', { name: 'ダッシュボード' }).click()
+      await page.getByRole('navigation', { name: 'メインナビゲーション' })
+        .getByRole('link', { name: 'ホーム' })
+        .click()
     } else {
       await page.getByRole('link', { name: 'The botch' }).click()
     }
     await expect(page).toHaveURL(/\/(#.*)?$/)
+  })
+
+  test('モバイル: BottomTabBar が固定表示され、作成シートが開く', async ({ page, viewport }) => {
+    test.skip((viewport?.width ?? 1280) >= 768, 'desktop では BottomTabBar は非表示')
+
+    await page.goto('/')
+    const nav = page.getByRole('navigation', { name: 'メインナビゲーション' })
+    await expect(nav).toBeVisible()
+    // 4 タブ
+    await expect(nav.getByRole('link', { name: 'ホーム' })).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'タイムライン' })).toBeVisible()
+    await expect(nav.getByRole('button', { name: '作成' })).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'メニュー' })).toBeVisible()
+
+    // 作成シート展開
+    await nav.getByRole('button', { name: '作成' }).click()
+    const sheet = page.getByRole('dialog')
+    await expect(sheet).toBeVisible()
+    await expect(sheet.getByRole('link', { name: /男気を記録/ })).toBeVisible()
+    await expect(sheet.getByRole('link', { name: /割り勘を立てる/ })).toBeVisible()
+    await expect(sheet.getByRole('link', { name: /イベントを追加/ })).toBeVisible()
+
+    // 閉じる
+    await sheet.getByRole('button', { name: '閉じる' }).click()
+    await expect(sheet).toBeHidden()
   })
 
   test('割り勘一覧ページが正常表示される', async ({ page }) => {
@@ -721,26 +751,9 @@ test.describe('8. エッジケース', () => {
 // 9. レスポンシブ表示（モバイルプロジェクトで自動実行）
 // =============================================================================
 test.describe('9. レスポンシブ・モバイル表示', () => {
-  test('モバイルハンバーガーメニュー', async ({ page }) => {
-    // モバイルプロジェクトでのみ意味あり
-    await page.goto('/')
-
-    // ビューポートがモバイルサイズの場合
-    const viewportWidth = page.viewportSize()?.width ?? 1280
-    if (viewportWidth < 768) {
-      // ハンバーガーメニューボタンが見える
-      const menuBtn = page.locator('button').filter({ has: page.locator('svg') }).first()
-      await expect(menuBtn).toBeVisible()
-
-      // メニューを開く
-      await menuBtn.click()
-
-      // モバイルメニュー内のナビゲーションリンクが表示される
-      const mobileMenu = page.locator('header .bg-slate-700')
-      await expect(mobileMenu.getByText('ダッシュボード')).toBeVisible()
-      await expect(mobileMenu.getByText('割り勘管理')).toBeVisible()
-    }
-  })
+  // NOTE: 旧「モバイルハンバーガーメニュー」テストは Issue #361 で BottomTabBar に
+  // 置き換えられたため削除。モバイルナビは「1. 画面表示・遷移」の
+  // 「モバイル: BottomTabBar が固定表示され、作成シートが開く」でカバー済み。
 
   test('ダッシュボード — 金額が画面に収まる', async ({ page }) => {
     await page.goto('/')
