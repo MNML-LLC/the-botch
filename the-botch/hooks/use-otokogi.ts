@@ -387,10 +387,16 @@ type BadgeStatsResponse = {
 type BadgeMemberSummaryResponse = {
   members: {
     memberId: string;
+    memberName: string;
     payerCount: number;
+    participationCount: number;
     // Issue #393: MVP を actualPaid ベースに変更したため必須化
     actualPaid: number;
+    shouldHavePaid: number;
+    // Issue #401: 裏男気王 を期間フィルタ版でも判定するため必須
+    otokogiAmount: number;
     averagePaymentAmount: number;
+    maxSingleOtokogi: number;
     clutchCount: number;
     jankenWinRate: number | null;
     jankenParticipationCount: number;
@@ -468,11 +474,27 @@ export function useOtokogiBadges(period: PeriodState) {
     gcTime: 30 * 60 * 1000,
   });
 
+  const periodLabel = useMemo(() => badgePeriodLabel(period), [period]);
+
+  const memberSummariesById = useMemo(() => {
+    const map = new Map<string, BadgeMemberSummaryResponse['members'][number]>();
+    if (!summaryQuery.data) return map;
+    for (const m of summaryQuery.data.members ?? []) map.set(m.memberId, m);
+    return map;
+  }, [summaryQuery.data]);
+
+  const streaksById = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!statsQuery.data) return map;
+    for (const s of statsQuery.data.streaks ?? []) map.set(s.id, s.maxStreak);
+    return map;
+  }, [statsQuery.data]);
+
   const badgesByMember = useMemo(() => {
     const map = new Map<string, Badge[]>();
     if (!statsQuery.data || !summaryQuery.data) return map;
     const ctx: BadgeContext = {
-      periodLabel: badgePeriodLabel(period),
+      periodLabel,
       streaks: statsQuery.data.streaks ?? [],
       memberSummaries: summaryQuery.data.members ?? [],
     };
@@ -482,10 +504,13 @@ export function useOtokogiBadges(period: PeriodState) {
       map.set(id, computeBadges(id, ctx));
     }
     return map;
-  }, [period, statsQuery.data, summaryQuery.data]);
+  }, [periodLabel, statsQuery.data, summaryQuery.data]);
 
   return {
     badgesByMember,
+    memberSummariesById,
+    streaksById,
+    periodLabel,
     isLoading: statsQuery.isLoading || summaryQuery.isLoading,
     isError: statsQuery.isError || summaryQuery.isError,
   };
