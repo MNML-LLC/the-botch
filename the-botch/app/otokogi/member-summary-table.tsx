@@ -29,6 +29,11 @@ type MemberSummaryData = {
   hasJankenData: boolean;
 };
 
+// Issue #393: じゃんけん勝率列は hasJankenData=false でも常に表示
+// (記録なしなら "—" で明示。UI 実装はあるが列ごと非表示 → CEO が機能を知らない状態を解消)
+const JANKEN_NO_DATA_HINT =
+  '現在じゃんけん記録なし。新規男気追加時に「じゃんけんで決めた」を選ぶと勝率が計算されます。';
+
 type PeriodFilter = 'all' | 'month' | 'year' | 'custom';
 
 function getPeriodDates(
@@ -73,7 +78,7 @@ type MetricDef = {
   render: (m: MemberSummaryEntry) => ReactNode;
 };
 
-function buildMetrics(hasJankenData: boolean): MetricDef[] {
+function buildMetrics(): MetricDef[] {
   const metrics: MetricDef[] = [
     {
       key: 'participationCount',
@@ -145,13 +150,12 @@ function buildMetrics(hasJankenData: boolean): MetricDef[] {
     },
   ];
 
-  if (hasJankenData) {
-    metrics.push({
-      key: 'jankenWinRate',
-      label: <TermTooltip term="じゃんけん勝率">じゃんけん勝率</TermTooltip>,
-      render: (m) => (m.jankenWinRate !== null ? formatPercent(m.jankenWinRate) : '—'),
-    });
-  }
+  // Issue #393: じゃんけん勝率列は常に表示 (記録なしなら "—")
+  metrics.push({
+    key: 'jankenWinRate',
+    label: <TermTooltip term="じゃんけん勝率">じゃんけん勝率</TermTooltip>,
+    render: (m) => (m.jankenWinRate !== null ? formatPercent(m.jankenWinRate) : '—'),
+  });
 
   return metrics;
 }
@@ -172,8 +176,9 @@ export default function MemberSummaryTable() {
 
   const { data, isFetching } = useOtokogiMemberSummary<MemberSummaryData>(from, to);
 
-  const metrics = buildMetrics(data?.hasJankenData ?? false);
+  const metrics = buildMetrics();
   const members = data?.members ?? [];
+  const hasJankenData = data?.hasJankenData ?? false;
 
   return (
     <Card>
@@ -255,6 +260,11 @@ export default function MemberSummaryTable() {
                 ))}
               </tbody>
             </table>
+            {!hasJankenData && members.length > 0 && (
+              <p className="text-[11px] text-gray-400 mt-2 px-2">
+                ※ じゃんけん勝率: {JANKEN_NO_DATA_HINT}
+              </p>
+            )}
           </div>
         )}
       </CardContent>
