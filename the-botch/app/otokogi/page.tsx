@@ -7,13 +7,15 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Swords, Trophy } from 'lucide-react';
-import { useOtokogiEvents, useOtokogiRanking } from '@/hooks/use-otokogi';
+import { useOtokogiBadges, useOtokogiEvents, useOtokogiRanking } from '@/hooks/use-otokogi';
 import { useScrollRestoration } from '@/hooks/use-scroll-restoration';
 import { Yen } from '@/components/ui/yen';
 import { formatDateBoth } from '@/lib/date-utils';
 import type { PeriodState } from '@/lib/date-utils';
 import { PeriodFilter, DEFAULT_PERIOD_STATE } from '@/components/ui/period-filter';
 import { ClutchBadge } from '@/components/otokogi/clutch-badge';
+import { BadgeChip } from '@/components/otokogi/badge-chip';
+import { topBadge } from '@/lib/otokogi-badges';
 
 function OtokogiHistorySkeleton() {
   return (
@@ -80,6 +82,9 @@ export default function OtokogiPage() {
 
   const { data: rankingResponse, isLoading: rankingLoading } = useOtokogiRanking(period);
   const rankingData = rankingResponse?.ranking ?? [];
+
+  // Issue #368: ランキングカードに top バッジ (1 個) を表示
+  const { badgesByMember } = useOtokogiBadges(period);
 
   const loading = activeTab === 'history' ? eventsLoading : rankingLoading;
 
@@ -224,23 +229,29 @@ export default function OtokogiPage() {
               />
             ) : (
               <div className="space-y-3">
-                {rankingData.map((member) => (
-                  <div key={member.memberId} className="flex items-center gap-2 sm:gap-3">
-                    <span className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold shrink-0 ${
-                      member.rank === 1 ? 'bg-amber-100 text-amber-700' : member.rank === 2 ? 'bg-gray-100 text-gray-600' : member.rank === 3 ? 'bg-orange-100 text-orange-700' : 'bg-gray-50 text-gray-500'
-                    }`}>
-                      {member.rank}
-                    </span>
-                    <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${member.colorBg} ${member.colorText}`}>
-                      {member.initial}
+                {rankingData.map((member) => {
+                  const top = topBadge(badgesByMember.get(member.memberId) ?? []);
+                  return (
+                    <div key={member.memberId} className="flex items-center gap-2 sm:gap-3">
+                      <span className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold shrink-0 ${
+                        member.rank === 1 ? 'bg-amber-100 text-amber-700' : member.rank === 2 ? 'bg-gray-100 text-gray-600' : member.rank === 3 ? 'bg-orange-100 text-orange-700' : 'bg-gray-50 text-gray-500'
+                      }`}>
+                        {member.rank}
+                      </span>
+                      <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${member.colorBg} ${member.colorText}`}>
+                        {member.initial}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-medium text-slate-800 truncate">{member.name}</p>
+                          {top && <BadgeChip badge={top} size="xs" />}
+                        </div>
+                        <p className="text-xs text-gray-500">{member.count}回</p>
+                      </div>
+                      <Yen value={member.totalPaid} className="font-bold text-sm sm:text-base text-slate-800 shrink-0" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-800 truncate">{member.name}</p>
-                      <p className="text-xs text-gray-500">{member.count}回</p>
-                    </div>
-                    <Yen value={member.totalPaid} className="font-bold text-sm sm:text-base text-slate-800 shrink-0" />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
