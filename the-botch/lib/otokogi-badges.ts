@@ -5,6 +5,7 @@
 //
 // 称号カテゴリ:
 //   - MVP            : 期間内の "actualPaid" (支払総額) 1 位 (Issue #393)
+//   - 裏男気王        : 期間内の otokogiAmount (フェアシェア超過) 1 位 (Issue #401)
 //   - 男気量産王      : 期間内の payerCount (奢った件数) 1 位 (Issue #393)
 //   - クラッチマスター : CLUTCH 5 回以上
 //   - ストリーク王    : 連続男気 (maxStreak) 5 回以上
@@ -67,6 +68,9 @@ export type BadgeMemberSummary = {
   payerCount: number
   // Issue #393: MVP を actualPaid ベースにするため追加
   actualPaid: number
+  // Issue #401: 裏男気王 (shadow-otokogi-king) を期間フィルタ版でも判定するため追加
+  // = actualPaid - shouldHavePaid (フェアシェア超過分)。未指定時は 0 扱い。
+  otokogiAmount?: number
   averagePaymentAmount: number
   clutchCount: number
   jankenWinRate: number | null
@@ -106,7 +110,31 @@ export function computeBadges(memberId: string, ctx: BadgeContext): Badge[] {
     })
   }
 
-  // 2. 男気量産王: 期間内の payerCount (奢った件数) 1 位 (Issue #393)
+  // 2. 裏男気王 (shadow-otokogi-king): 期間内の otokogiAmount (フェアシェア超過) 1 位 (Issue #401)
+  //    actualPaid − shouldHavePaid が正で最大のメンバー。
+  //    "本来の負担" を超えて引き受けた "隠れた真の男気"。
+  const topShadow = ctx.memberSummaries.reduce<BadgeMemberSummary | null>(
+    (top, m) => {
+      const amount = m.otokogiAmount ?? 0
+      if (amount <= 0) return top
+      const topAmount = top?.otokogiAmount ?? 0
+      return top === null || amount > topAmount ? m : top
+    },
+    null,
+  )
+  if (topShadow && topShadow.memberId === memberId && (topShadow.otokogiAmount ?? 0) > 0) {
+    const amount = topShadow.otokogiAmount ?? 0
+    badges.push({
+      kind: 'shadow-otokogi-king',
+      id: `shadow-otokogi-king-${ctx.periodLabel}`,
+      label: `${ctx.periodLabel} 裏男気王`,
+      icon: '🏆',
+      color: 'bg-rose-100 text-rose-800',
+      description: `${ctx.periodLabel} のフェアシェア超過分 1 位 (¥${amount.toLocaleString()})。期待負担を超えて引き受けた "隠れた真の男気"。`,
+    })
+  }
+
+  // 3. 男気量産王: 期間内の payerCount (奢った件数) 1 位 (Issue #393)
   //    「¥10k x 30 回」と「¥100k x 3 回」で前者を評価する軸。
   const topCount = ctx.memberSummaries.reduce<BadgeMemberSummary | null>(
     (top, m) => (top === null || m.payerCount > top.payerCount ? m : top),

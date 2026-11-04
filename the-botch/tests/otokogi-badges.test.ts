@@ -105,6 +105,70 @@ describe('computeBadges', () => {
     })
   })
 
+  describe('裏男気王 (otokogiAmount 1 位 / Issue #401)', () => {
+    test('otokogiAmount 正の 1 位のメンバーに付与される', () => {
+      const ctx = makeCtx({
+        memberSummaries: [
+          summary('a', { payerCount: 3, actualPaid: 100_000, otokogiAmount: 66_000 }),
+          summary('b', { payerCount: 1, actualPaid: 50_000, otokogiAmount: 20_000 }),
+        ],
+      })
+      const badges = computeBadges('a', ctx)
+      const shadow = badges.find((b) => b.kind === 'shadow-otokogi-king')
+      expect(shadow).toBeDefined()
+      expect(shadow?.id).toBe('shadow-otokogi-king-FY26')
+      expect(shadow?.label).toBe('FY26 裏男気王')
+      expect(shadow?.description).toContain('¥66,000')
+    })
+
+    test('2 位以下のメンバーには付与されない', () => {
+      const ctx = makeCtx({
+        memberSummaries: [
+          summary('a', { otokogiAmount: 66_000 }),
+          summary('b', { otokogiAmount: 20_000 }),
+        ],
+      })
+      expect(computeBadges('b', ctx).find((x) => x.kind === 'shadow-otokogi-king')).toBeUndefined()
+    })
+
+    test('otokogiAmount が 0 以下のメンバーは候補から除外される', () => {
+      const ctx = makeCtx({
+        memberSummaries: [
+          summary('a', { otokogiAmount: -5_000 }),
+          summary('b', { otokogiAmount: 0 }),
+        ],
+      })
+      expect(computeBadges('a', ctx).find((x) => x.kind === 'shadow-otokogi-king')).toBeUndefined()
+      expect(computeBadges('b', ctx).find((x) => x.kind === 'shadow-otokogi-king')).toBeUndefined()
+    })
+
+    test('otokogiAmount 未指定の場合は 0 扱いで付与されない (後方互換)', () => {
+      const ctx = makeCtx({
+        memberSummaries: [
+          summary('a', { payerCount: 3, actualPaid: 100_000 }),
+          summary('b', { payerCount: 1, actualPaid: 50_000 }),
+        ],
+      })
+      expect(computeBadges('a', ctx).find((x) => x.kind === 'shadow-otokogi-king')).toBeUndefined()
+      expect(computeBadges('b', ctx).find((x) => x.kind === 'shadow-otokogi-king')).toBeUndefined()
+    })
+
+    test('MVP と 裏男気王 が別人になるケース (回数多く総額1位 vs 1 回で超過1位)', () => {
+      // a: 10 回参加 — 支払総額は最大だが参加も多くフェアシェアも高い → 超過は小さい
+      // b: 1 回しか参加しておらず超過額は大きい → 裏男気王
+      const ctx = makeCtx({
+        memberSummaries: [
+          summary('a', { payerCount: 10, actualPaid: 300_000, otokogiAmount: 10_000 }),
+          summary('b', { payerCount: 1, actualPaid: 100_000, otokogiAmount: 90_000 }),
+        ],
+      })
+      expect(computeBadges('a', ctx).find((x) => x.kind === 'mvp')).toBeDefined()
+      expect(computeBadges('b', ctx).find((x) => x.kind === 'shadow-otokogi-king')).toBeDefined()
+      expect(computeBadges('a', ctx).find((x) => x.kind === 'shadow-otokogi-king')).toBeUndefined()
+      expect(computeBadges('b', ctx).find((x) => x.kind === 'mvp')).toBeUndefined()
+    })
+  })
+
   describe('男気量産王 (payerCount 1 位 / Issue #393)', () => {
     test('payerCount 1 位のメンバーに付与される', () => {
       const ctx = makeCtx({
@@ -331,6 +395,33 @@ describe('computeBadges', () => {
       const kinds = computeBadges('a', ctx).map((b) => b.kind)
       expect(kinds).toEqual([
         'mvp',
+        'count-king',
+        'streak-king',
+        'clutch-master',
+        'generosity-emperor',
+        'janken-god',
+      ])
+    })
+
+    test('Issue #401: shadow-otokogi-king は MVP と count-king の間に並ぶ', () => {
+      const ctx = makeCtx({
+        streaks: [{ id: 'a', maxStreak: 10 }],
+        memberSummaries: [
+          summary('a', {
+            payerCount: 5,
+            actualPaid: 100_000,
+            otokogiAmount: 30_000,
+            averagePaymentAmount: 20_000,
+            clutchCount: 10,
+            jankenWinRate: 1.0,
+            jankenParticipationCount: 20,
+          }),
+        ],
+      })
+      const kinds = computeBadges('a', ctx).map((b) => b.kind)
+      expect(kinds).toEqual([
+        'mvp',
+        'shadow-otokogi-king',
         'count-king',
         'streak-king',
         'clutch-master',
