@@ -218,6 +218,7 @@ export async function GET(request: NextRequest) {
         averagePaymentAmount: payerCount > 0 ? Math.round(actualPaid / payerCount) : 0,
         maxSingleOtokogi: maxSingleOtokogiMap.get(member.id) ?? 0,
         jankenWinRate,
+        jankenParticipationCount: jankenParticipated,
         clutchCount: clutch?.count ?? 0,
         clutchTotal: clutch?.total ?? 0,
         clutchRate: payerCount > 0 ? (clutch?.count ?? 0) / payerCount : 0,

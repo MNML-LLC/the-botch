@@ -8,11 +8,13 @@ import {
 } from 'recharts';
 import { useMembers } from '@/hooks/use-members';
 import {
+  useOtokogiBadges,
   useOtokogiCharts,
   useOtokogiMemberSummary,
   useOtokogiStatsMain,
 } from '@/hooks/use-otokogi';
 import type { OtokogiCategory } from '@/lib/otokogi-category';
+import { BadgeChip } from '@/components/otokogi/badge-chip';
 import {
   MonthMemberHeatmapSection,
   CategoryPieSection,
@@ -288,6 +290,64 @@ function MemberBalanceSection({
   );
 }
 
+// ---- 称号一覧 (Issue #368) ----
+
+function BadgesSection({ period, members }: { period: PeriodState; members: Member[] }) {
+  const { badgesByMember, isLoading } = useOtokogiBadges(period);
+
+  const memberById = useMemo(
+    () => new Map(members.map((m) => [m.id, m])),
+    [members],
+  );
+
+  // 称号を 1 つ以上保有するメンバーのみ表示
+  const entries = useMemo(() => {
+    const list: { member: Member; badges: ReturnType<typeof badgesByMember.get> }[] = [];
+    for (const [memberId, badges] of badgesByMember.entries()) {
+      if (!badges || badges.length === 0) continue;
+      const member = memberById.get(memberId);
+      if (member) list.push({ member, badges });
+    }
+    return list.sort((a, b) => (b.badges?.length ?? 0) - (a.badges?.length ?? 0));
+  }, [badgesByMember, memberById]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-slate-800">称号一覧</CardTitle>
+        <p className="text-xs text-gray-500 mt-0.5">
+          期間内の男気額 / 連勝 / クラッチ / 気前度 / じゃんけんから自動判定
+        </p>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <p className="text-sm text-gray-500">読み込み中...</p>
+        ) : entries.length === 0 ? (
+          <p className="text-sm text-gray-500">この期間に称号を獲得したメンバーはいません</p>
+        ) : (
+          <div className="space-y-3">
+            {entries.map(({ member, badges }) => (
+              <div key={member.id} className="flex items-start gap-3">
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${member.colorBg} ${member.colorText}`}>
+                  {member.initial}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-800 mb-1">{member.name}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {badges?.map((badge) => (
+                      <BadgeChip key={badge.id} badge={badge} size="xs" />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ---- 月別推移グラフ ----
 
 function MonthlyTrendSection({ data }: { data?: { month: string; amount: number }[] }) {
@@ -461,6 +521,9 @@ export default function OtokogiStatsPage() {
 
       {/* グラフ（縦スタック、モバイル縦スクロール最適化） */}
       <div className="space-y-4">
+        {/* 0. 称号一覧 (Issue #368) */}
+        <BadgesSection period={period} members={members} />
+
         {/* 1. メンバー別収支表 */}
         <MemberBalanceSection
           from={from}
