@@ -8,9 +8,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Swords, Wallet } from 'lucide-react';
 import { useMemberDetail, type MemberProfileWarikanEvent } from '@/hooks/use-members';
+import { useOtokogiBadges } from '@/hooks/use-otokogi';
 import { WARIKAN_STATUS_LABELS } from '@/lib/constants';
 import { Yen } from '@/components/ui/yen';
 import { formatDateBoth } from '@/lib/date-utils';
+import { BadgeChip } from '@/components/otokogi/badge-chip';
 
 function warikanDisplayDate(event: MemberProfileWarikanEvent) {
   return event.displayDate ?? event.paymentDeadline ?? event.detailDeadline ?? event.createdAt;
@@ -58,6 +60,9 @@ export default function MemberProfilePage() {
   const params = useParams();
   const id = params.id as string;
   const { data: member, isPending, isError } = useMemberDetail(id);
+  // 称号は通算 (全期間) で表示する (期間フィルタ UI が無い画面のため)
+  const { badgesByMember } = useOtokogiBadges({ period: 'all' });
+  const memberBadges = badgesByMember.get(id);
 
   if (isPending) {
     return (
@@ -86,6 +91,7 @@ export default function MemberProfilePage() {
   const otokogiEvents = member.otokogiParticipations.map((p) => p.otokogiEvent);
   const warikanEvents = member.warikanParticipations.map((p) => p.warikanEvent);
   const { stats } = member;
+  const badges = memberBadges ?? [];
 
   return (
     <div>
@@ -151,6 +157,18 @@ export default function MemberProfilePage() {
               </span>
             </div>
           </div>
+
+          {/* 称号バッジ (Issue #368) */}
+          {badges.length > 0 && (
+            <div className="mt-4 border-t border-gray-100 pt-3">
+              <p className="text-xs text-gray-500 mb-2">称号 ({badges.length})</p>
+              <div className="flex flex-wrap gap-1.5">
+                {badges.map((badge) => (
+                  <BadgeChip key={badge.id} badge={badge} size="sm" />
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

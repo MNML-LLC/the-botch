@@ -1,5 +1,7 @@
 import { Yen } from '@/components/ui/yen'
 import type { OtokogiRankingEntry } from '@/hooks/use-otokogi'
+import { BadgeChip } from '@/components/otokogi/badge-chip'
+import { topBadge, type Badge } from '@/lib/otokogi-badges'
 
 // メダル (rank → 絵文字)
 const MEDAL_BY_RANK: Record<1 | 2 | 3, string> = {
@@ -38,9 +40,10 @@ const BRASS_STYLE_BY_RANK: Record<
 interface HeroCardProps {
   entry: OtokogiRankingEntry
   rank: 1 | 2 | 3
+  badge: Badge | null
 }
 
-function HeroCard({ entry, rank }: HeroCardProps) {
+function HeroCard({ entry, rank, badge }: HeroCardProps) {
   const style = BRASS_STYLE_BY_RANK[rank]
   const medal = MEDAL_BY_RANK[rank]
   const ratePercent = Math.round(entry.otokogiRate * 100)
@@ -76,9 +79,12 @@ function HeroCard({ entry, rank }: HeroCardProps) {
 
         {/* 名前・指標 — truncate 廃止で 2 行まで折返し可 (Issue #382) */}
         <div className="flex-1 min-w-0">
-          <p className="font-bold text-slate-800 text-sm sm:text-lg leading-tight break-words line-clamp-2">
-            {entry.name}
-          </p>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="font-bold text-slate-800 text-sm sm:text-lg leading-tight break-words line-clamp-2">
+              {entry.name}
+            </p>
+            {badge && <BadgeChip badge={badge} size="xs" />}
+          </div>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] sm:text-xs text-slate-600">
             <span className="tabular-nums">
               支払 <span className="font-semibold text-slate-800">{entry.count}</span> 回
@@ -113,6 +119,7 @@ function HeroCard({ entry, rank }: HeroCardProps) {
 
 interface RankingHeroCardsProps {
   top3: OtokogiRankingEntry[]
+  badgesByMember?: Map<string, Badge[]>
 }
 
 /**
@@ -120,13 +127,19 @@ interface RankingHeroCardsProps {
  * - 1 列スタックで積み上げる (375px 想定)
  * - 各カードに brass gradient のバンド + メダル絵文字
  * - クラッチ回数・男気率も表示
+ * - 保有バッジがあれば top バッジ 1 個を名前横に表示 (Issue #368)
  */
-export function RankingHeroCards({ top3 }: RankingHeroCardsProps) {
+export function RankingHeroCards({ top3, badgesByMember }: RankingHeroCardsProps) {
   if (top3.length === 0) return null
   return (
     <div className="space-y-2.5">
       {top3.slice(0, 3).map((entry, i) => (
-        <HeroCard key={entry.memberId} entry={entry} rank={(i + 1) as 1 | 2 | 3} />
+        <HeroCard
+          key={entry.memberId}
+          entry={entry}
+          rank={(i + 1) as 1 | 2 | 3}
+          badge={topBadge(badgesByMember?.get(entry.memberId) ?? [])}
+        />
       ))}
     </div>
   )

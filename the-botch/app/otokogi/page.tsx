@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Swords, Trophy } from 'lucide-react';
-import { useOtokogiEvents, useOtokogiRanking } from '@/hooks/use-otokogi';
+import { useOtokogiBadges, useOtokogiEvents, useOtokogiRanking } from '@/hooks/use-otokogi';
 import { useScrollRestoration } from '@/hooks/use-scroll-restoration';
 import { Yen } from '@/components/ui/yen';
 import { formatDateBoth } from '@/lib/date-utils';
@@ -16,6 +16,8 @@ import type { PeriodState } from '@/lib/date-utils';
 import { PeriodFilter, DEFAULT_PERIOD_STATE } from '@/components/ui/period-filter';
 import { ClutchBadge } from '@/components/otokogi/clutch-badge';
 import { RankingHeroCards } from '@/components/otokogi/ranking-hero-cards';
+import { BadgeChip } from '@/components/otokogi/badge-chip';
+import { topBadge } from '@/lib/otokogi-badges';
 
 function OtokogiHistorySkeleton() {
   return (
@@ -102,6 +104,9 @@ export default function OtokogiPage() {
 
   const { data: rankingResponse, isLoading: rankingLoading } = useOtokogiRanking(period);
   const rankingData = rankingResponse?.ranking ?? [];
+
+  // Issue #368: ランキングカードに top バッジ (1 個) を表示
+  const { badgesByMember } = useOtokogiBadges(period);
 
   const loading = activeTab === 'history' ? eventsLoading : rankingLoading;
 
@@ -247,45 +252,54 @@ export default function OtokogiPage() {
             ) : (
               <div className="space-y-4">
                 {/* Top-3 ヒーローカード (金 / 銀 / 銅) */}
-                <RankingHeroCards top3={rankingData.slice(0, 3)} />
+                <RankingHeroCards
+                  top3={rankingData.slice(0, 3)}
+                  badgesByMember={badgesByMember}
+                />
 
                 {/* 4 位以降 — spring motion で順位変動をアニメーション */}
                 {rankingData.length > 3 && (
                   <div className="space-y-3 pt-1">
                     <AnimatePresence initial={false}>
-                      {rankingData.slice(3).map((member) => (
-                        <motion.div
-                          key={member.memberId}
-                          layout={prefersReducedMotion ? false : 'position'}
-                          initial={prefersReducedMotion ? false : { opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={
-                            prefersReducedMotion
-                              ? { duration: 0 }
-                              : { type: 'spring', stiffness: 320, damping: 32, mass: 0.9 }
-                          }
-                          className="flex items-center gap-2 sm:gap-3"
-                        >
-                          <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold shrink-0 bg-gray-50 text-gray-500 tabular-nums">
-                            {member.rank}
-                          </span>
-                          <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${member.colorBg} ${member.colorText}`}>
-                            {member.initial}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-slate-800 break-words line-clamp-2 leading-tight">{member.name}</p>
-                            <p className="text-xs text-gray-500 tabular-nums mt-0.5">
-                              {member.count}回
-                              {member.clutchCount > 0 && <span className="ml-1">· ★ {member.clutchCount}</span>}
-                              {member.participationCount > 0 && (
-                                <span className="ml-1">· 男気率 {Math.round(member.otokogiRate * 100)}%</span>
-                              )}
-                            </p>
-                          </div>
-                          <Yen value={member.totalPaid} size="sm" className="font-bold text-slate-800 shrink-0" />
-                        </motion.div>
-                      ))}
+                      {rankingData.slice(3).map((member) => {
+                        const top = topBadge(badgesByMember.get(member.memberId) ?? []);
+                        return (
+                          <motion.div
+                            key={member.memberId}
+                            layout={prefersReducedMotion ? false : 'position'}
+                            initial={prefersReducedMotion ? false : { opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={
+                              prefersReducedMotion
+                                ? { duration: 0 }
+                                : { type: 'spring', stiffness: 320, damping: 32, mass: 0.9 }
+                            }
+                            className="flex items-center gap-2 sm:gap-3"
+                          >
+                            <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold shrink-0 bg-gray-50 text-gray-500 tabular-nums">
+                              {member.rank}
+                            </span>
+                            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${member.colorBg} ${member.colorText}`}>
+                              {member.initial}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <p className="text-sm font-medium text-slate-800 break-words line-clamp-2 leading-tight">{member.name}</p>
+                                {top && <BadgeChip badge={top} size="xs" />}
+                              </div>
+                              <p className="text-xs text-gray-500 tabular-nums mt-0.5">
+                                {member.count}回
+                                {member.clutchCount > 0 && <span className="ml-1">· ★ {member.clutchCount}</span>}
+                                {member.participationCount > 0 && (
+                                  <span className="ml-1">· 男気率 {Math.round(member.otokogiRate * 100)}%</span>
+                                )}
+                              </p>
+                            </div>
+                            <Yen value={member.totalPaid} size="sm" className="font-bold text-slate-800 shrink-0" />
+                          </motion.div>
+                        );
+                      })}
                     </AnimatePresence>
                   </div>
                 )}

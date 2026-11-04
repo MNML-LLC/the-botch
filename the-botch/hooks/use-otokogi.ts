@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import {
   useInfiniteQuery,
   useMutation,
@@ -10,8 +10,15 @@ import {
 } from '@tanstack/react-query';
 import {
   appendPeriodSearchParams,
+  getFiscalYearRange,
+  getPeriodRange,
   type PeriodState,
 } from '@/lib/date-utils';
+import {
+  computeBadges,
+  type Badge,
+  type BadgeContext,
+} from '@/lib/otokogi-badges';
 
 function periodKey(state: PeriodState): string {
   return state.period === 'custom'
@@ -369,4 +376,128 @@ export function useDeleteOtokogi(
       options?.onSuccess?.(data, variables, onMutateResult, context);
     },
   });
+}
+
+// ===== 男気称号バッジ (Issue #368) =====
+//
+// /api/otokogi/stats + /api/otokogi/member-summary のレスポンスを合成して
+// メンバー別の保有バッジを計算する。期間フィルタ連動 (period=all もサポート)。
+
+type BadgeStatsResponse = {
+  otokogiByMember: { id: string; otokogiAmount: number }[];
+  streaks: { id: string; maxStreak: number }[];
+};
+
+type BadgeMemberSummaryResponse = {
+  members: {
+    memberId: string;
+    payerCount: number;
+    averagePaymentAmount: number;
+    clutchCount: number;
+    jankenWinRate: number | null;
+    jankenParticipationCount: number;
+  }[];
+};
+
+// 期間から MVP ラベル用の文字列を決める
+// - current-fy / last-fy: "FYxx"
+// - current-month: "YYYY/M月"
+// - custom: "YYYY/M–YYYY/M"
+// - all: "通算"
+function badgePeriodLabel(period: PeriodState, ref: Date = new Date()): string {
+  switch (period.period) {
+    case 'current-fy': {
+      const r = getFiscalYearRange(ref, 0);
+      return `FY${(r.fy % 100).toString().padStart(2, '0')}`;
+    }
+    case 'last-fy': {
+      const r = getFiscalYearRange(ref, -1);
+      return `FY${(r.fy % 100).toString().padStart(2, '0')}`;
+    }
+    case 'current-month':
+      return `${ref.getFullYear()}/${ref.getMonth() + 1}月`;
+    case 'custom': {
+      const r = getPeriodRange('custom', ref, { from: period.from, to: period.to });
+      const from = r.from
+        ? `${r.from.getFullYear()}/${r.from.getMonth() + 1}`
+        : '';
+      const to = r.to
+        ? `${r.to.getFullYear()}/${r.to.getMonth() + 1}`
+        : '';
+      return from && to ? `${from}–${to}` : from || to || 'カスタム';
+    }
+    case 'all':
+    default:
+      return '通算';
+  }
+}
+
+export function useOtokogiBadges(period: PeriodState) {
+  const key = period.period === 'custom'
+    ? `custom|${period.from ?? ''}|${period.to ?? ''}`
+    : period.period;
+
+  const fetchParams = useMemo(() => {
+    const params = new URLSearchParams();
+    const r = getPeriodRange(period.period, new Date(), {
+      from: period.from,
+      to: period.to,
+    });
+    if (r.from) params.set('from', toIso(r.from));
+    if (r.to) params.set('to', toIso(r.to));
+    return params.toString();
+  }, [period]);
+
+  const statsQuery = useQuery({
+    queryKey: ['otokogi-badges-stats', key],
+    queryFn: async () => {
+      const res = await fetch(`/api/otokogi/stats?${fetchParams}`);
+      if (!res.ok) throw new Error('バッジ用統計の取得に失敗しました');
+      return res.json() as Promise<BadgeStatsResponse>;
+    },
+    staleTime: 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+
+  const summaryQuery = useQuery({
+    queryKey: ['otokogi-badges-summary', key],
+    queryFn: async () => {
+      const res = await fetch(`/api/otokogi/member-summary?${fetchParams}`);
+      if (!res.ok) throw new Error('バッジ用収支の取得に失敗しました');
+      return res.json() as Promise<BadgeMemberSummaryResponse>;
+    },
+    staleTime: 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+
+  const badgesByMember = useMemo(() => {
+    const map = new Map<string, Badge[]>();
+    if (!statsQuery.data || !summaryQuery.data) return map;
+    const ctx: BadgeContext = {
+      periodLabel: badgePeriodLabel(period),
+      otokogiByMember: statsQuery.data.otokogiByMember ?? [],
+      streaks: statsQuery.data.streaks ?? [],
+      memberSummaries: summaryQuery.data.members ?? [],
+    };
+    const ids = new Set<string>();
+    for (const m of ctx.otokogiByMember) ids.add(m.id);
+    for (const m of ctx.memberSummaries) ids.add(m.memberId);
+    for (const id of ids) {
+      map.set(id, computeBadges(id, ctx));
+    }
+    return map;
+  }, [period, statsQuery.data, summaryQuery.data]);
+
+  return {
+    badgesByMember,
+    isLoading: statsQuery.isLoading || summaryQuery.isLoading,
+    isError: statsQuery.isError || summaryQuery.isError,
+  };
+}
+
+function toIso(d: Date): string {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }
