@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { MEMBER_SELECT } from '@/lib/prisma-selects';
-import { EVENT_TYPE_LABELS, WARIKAN_STATUS_LABELS } from '@/lib/constants';
+import { EVENT_TYPE_LABELS } from '@/lib/constants';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Yen } from '@/components/ui/yen';
@@ -32,6 +32,15 @@ function daysUntil(target: Date, from: Date): number {
   return Math.round((a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24));
 }
 
+type DeadlineTone = 'over' | 'near' | 'safe' | 'none';
+
+function deadlineTone(diff: number | null): DeadlineTone {
+  if (diff === null) return 'none';
+  if (diff < 0) return 'over';
+  if (diff <= 3) return 'near';
+  return 'safe';
+}
+
 async function fetchDashboardData() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -39,11 +48,13 @@ async function fetchDashboardData() {
   nextWeek.setDate(nextWeek.getDate() + 7);
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   const nextMonthStart = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+  const yearStart = new Date(today.getFullYear(), 0, 1);
+  const nextYearStart = new Date(today.getFullYear() + 1, 0, 1);
 
   const [
     openWarikan,
     upcomingEvents,
-    monthlyOtokogi,
+    yearlyOtokogi,
     monthlyStats,
   ] = await Promise.all([
     // A: 未精算の割り勘イベント（ENTERING / PAYING）
@@ -82,13 +93,13 @@ async function fetchDashboardData() {
       take: 3,
     }),
 
-    // D: 今月の男気 Top 3
+    // D: 今期(年初来)の男気 Top 3
     prisma.$queryRaw<{ payerId: string; total: bigint; count: bigint }[]>`
       SELECT payer_id AS "payerId",
              SUM(amount)::bigint AS total,
              COUNT(*)::bigint AS count
       FROM otokogi_events
-      WHERE event_date >= ${monthStart} AND event_date < ${nextMonthStart}
+      WHERE event_date >= ${yearStart} AND event_date < ${nextYearStart}
       GROUP BY payer_id
       ORDER BY total DESC
       LIMIT 3
@@ -104,8 +115,40 @@ async function fetchDashboardData() {
     `,
   ]);
 
+  // 未精算の金額を割り勘ごとに集計:
+  //  - ENTERING: 立替明細の合計（これから分割される原資）
+  //  - PAYING: 未受領の精算合計（まだ動いていないお金）
+  const enteringIds = openWarikan.filter((w) => w.status === 'ENTERING').map((w) => w.id);
+  const payingIds = openWarikan.filter((w) => w.status === 'PAYING').map((w) => w.id);
+
+  const [enteringSums, payingSums] = await Promise.all([
+    enteringIds.length
+      ? prisma.warikanExpense.groupBy({
+          by: ['warikanEventId'],
+          where: { warikanEventId: { in: enteringIds } },
+          _sum: { amount: true },
+        })
+      : Promise.resolve([] as { warikanEventId: string; _sum: { amount: number | null } }[]),
+    payingIds.length
+      ? prisma.warikanSettlement.groupBy({
+          by: ['warikanEventId'],
+          where: { warikanEventId: { in: payingIds }, isReceived: false },
+          _sum: { amount: true },
+        })
+      : Promise.resolve([] as { warikanEventId: string; _sum: { amount: number | null } }[]),
+  ]);
+
+  const amountMap = new Map<string, number>();
+  for (const r of enteringSums) amountMap.set(r.warikanEventId, Number(r._sum.amount ?? 0));
+  for (const r of payingSums) amountMap.set(r.warikanEventId, Number(r._sum.amount ?? 0));
+
+  const openWarikanWithAmount = openWarikan.map((w) => ({
+    ...w,
+    pendingAmount: amountMap.get(w.id) ?? 0,
+  }));
+
   // 男気 Top 3 のメンバー情報取得
-  const topPayerIds = monthlyOtokogi.map((r) => r.payerId);
+  const topPayerIds = yearlyOtokogi.map((r) => r.payerId);
   const topPayers = topPayerIds.length
     ? await prisma.member.findMany({
         where: { id: { in: topPayerIds } },
@@ -113,7 +156,7 @@ async function fetchDashboardData() {
       })
     : [];
   const topPayerMap = new Map(topPayers.map((m) => [m.id, m]));
-  const otokogiTop = monthlyOtokogi
+  const otokogiTop = yearlyOtokogi
     .map((r) => {
       const m = topPayerMap.get(r.payerId);
       if (!m) return null;
@@ -140,105 +183,186 @@ async function fetchDashboardData() {
     monthLabel: `${today.getFullYear()}年${today.getMonth() + 1}月`,
   };
 
-  return { openWarikan, upcomingEvents, otokogiTop, summary, today };
+  return {
+    openWarikan: openWarikanWithAmount,
+    upcomingEvents,
+    otokogiTop,
+    summary,
+    today,
+    yearLabel: `${today.getFullYear()}年`,
+  };
 }
 
 export default async function DashboardPage() {
-  const { openWarikan, upcomingEvents, otokogiTop, summary, today } = await fetchDashboardData();
+  const { openWarikan, upcomingEvents, otokogiTop, summary, today, yearLabel } = await fetchDashboardData();
+
+  const [hero, ...rest] = openWarikan;
+  const heroDeadline = hero ? hero.paymentDeadline ?? hero.detailDeadline : null;
+  const heroDiff = heroDeadline ? daysUntil(new Date(heroDeadline), today) : null;
+  const heroTone = deadlineTone(heroDiff);
+
+  const HERO_TONE_STYLES: Record<DeadlineTone, { card: string; chip: string; amount: string; label: string }> = {
+    over: {
+      card: 'border-red-200 bg-gradient-to-br from-red-50 to-white',
+      chip: 'bg-red-100 text-red-700',
+      amount: 'text-red-700',
+      label: '期限超過',
+    },
+    near: {
+      card: 'border-amber-200 bg-gradient-to-br from-amber-50 to-white',
+      chip: 'bg-amber-100 text-amber-700',
+      amount: 'text-amber-700',
+      label: '期限間近',
+    },
+    safe: {
+      card: 'border-slate-200 bg-gradient-to-br from-slate-50 to-white',
+      chip: 'bg-slate-100 text-slate-700',
+      amount: 'text-slate-800',
+      label: '余裕あり',
+    },
+    none: {
+      card: 'border-slate-200 bg-gradient-to-br from-slate-50 to-white',
+      chip: 'bg-slate-100 text-slate-600',
+      amount: 'text-slate-800',
+      label: '期限未設定',
+    },
+  };
 
   return (
     <div className="grid gap-4">
-      {/* A. 🔴 要アクション (未精算) */}
-      <Card data-section="action-required">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-slate-800 flex items-center gap-2">
-              <span aria-hidden>🔴</span>
-              要アクション
-            </CardTitle>
-            <Button variant="ghost" size="sm" asChild className="text-xs text-gray-500 min-h-[44px] px-3">
+      {/* 🔴 要アクション（未精算ヒーロー） */}
+      <section data-section="action-required" aria-labelledby="action-required-heading">
+        <div className="flex items-center justify-between mb-2 px-1">
+          <h2 id="action-required-heading" className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+            <span aria-hidden>🔴</span>
+            要アクション
+          </h2>
+          {hero && (
+            <Button variant="ghost" size="sm" asChild className="text-xs text-gray-500 h-auto py-1 px-2">
               <Link href="/warikan">全て →</Link>
             </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-0">
-          {openWarikan.length === 0 ? (
-            <div className="flex items-center gap-2 rounded-lg bg-green-50 border border-green-100 p-3">
-              <span className="text-base" aria-hidden>✅</span>
-              <p className="text-sm text-green-700 font-medium">全部精算済み</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {openWarikan.map((w) => {
-                const deadline = w.paymentDeadline ?? w.detailDeadline;
-                const diff = deadline ? daysUntil(new Date(deadline), today) : null;
-                const over = diff !== null && diff < 0;
-                const near = diff !== null && diff >= 0 && diff <= 3;
-                const bg = over
-                  ? 'border-red-200 bg-red-50 hover:border-red-300'
-                  : near
-                    ? 'border-amber-200 bg-amber-50 hover:border-amber-300'
-                    : 'border-gray-200 bg-white hover:border-slate-300';
-                const dateText = deadline ? `期限: ${formatShortDate(deadline)}` : '期限未設定';
-                const diffText = diff === null
-                  ? ''
-                  : over
-                    ? `(${Math.abs(diff)}日超過)`
-                    : diff === 0
-                      ? '(今日)'
-                      : `(あと${diff}日)`;
-                return (
-                  <Link
-                    key={w.id}
-                    href={`/warikan/${w.id}`}
-                    className={`block rounded-md border p-3 transition ${bg}`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-slate-800 truncate">{w.eventName}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {w._count.participants}人 / 幹事: {w.manager?.name ?? '未設定'}
-                        </p>
-                        <p className={`text-xs mt-1 ${over ? 'text-red-600 font-medium' : near ? 'text-amber-700 font-medium' : 'text-gray-500'}`}>
-                          {dateText} {diffText}
-                        </p>
-                      </div>
-                      <div className="flex flex-col items-end gap-1 shrink-0">
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${w.status === 'ENTERING' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
-                          {WARIKAN_STATUS_LABELS[w.status]}
-                        </span>
-                        <span className="text-xs font-bold text-slate-700">
-                          {w.status === 'ENTERING' ? '入力へ' : '払う'} →
-                        </span>
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* B. 🟡 承認待ち / 要確認 */}
-      <Card data-section="approval-pending">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-slate-800 flex items-center gap-2">
-            <span aria-hidden>🟡</span>
-            承認待ち / 要確認
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <p className="text-sm text-gray-500">現在、承認待ちの申請はありません</p>
-        </CardContent>
-      </Card>
+        {!hero ? (
+          <Card className="border-green-200 bg-gradient-to-br from-green-50 to-white">
+            <CardContent className="py-10 text-center">
+              <div className="text-4xl mb-2" aria-hidden>🎉</div>
+              <p className="text-base font-bold text-green-700">全部精算済み</p>
+              <p className="text-xs text-green-600 mt-1">未精算の割り勘はありません</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            {/* Hero: 画面の約 40% を占める大カード */}
+            <Link
+              href={`/warikan/${hero.id}`}
+              className={`block rounded-xl border-2 p-5 transition shadow-sm hover:shadow active:scale-[0.99] ${HERO_TONE_STYLES[heroTone].card}`}
+            >
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <span
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${HERO_TONE_STYLES[heroTone].chip}`}
+                >
+                  {heroDiff === null
+                    ? HERO_TONE_STYLES[heroTone].label
+                    : heroTone === 'over'
+                      ? `${Math.abs(heroDiff)}日超過`
+                      : heroDiff === 0
+                        ? '今日が期限'
+                        : `あと${heroDiff}日`}
+                </span>
+                <span
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${hero.status === 'ENTERING' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}
+                >
+                  {hero.status === 'ENTERING' ? '明細入力中' : '支払待ち'}
+                </span>
+              </div>
 
-      {/* C. 📅 来週のイベント (max 3件) */}
+              <h3 className="text-lg font-bold text-slate-900 leading-snug line-clamp-2 mb-1">
+                {hero.eventName}
+              </h3>
+              <p className="text-xs text-gray-600 mb-4">
+                {hero._count.participants}人 / 幹事: {hero.manager?.name ?? '未設定'}
+                {heroDeadline && <> ・ 期限: {formatShortDate(heroDeadline)}</>}
+              </p>
+
+              <div className="mb-5">
+                <p className="text-[11px] text-gray-500 uppercase tracking-wide mb-0.5">
+                  {hero.status === 'ENTERING' ? '立替合計' : '未精算残額'}
+                </p>
+                <div className={`font-bold ${HERO_TONE_STYLES[heroTone].amount}`}>
+                  <Yen value={hero.pendingAmount} size="xl" className="text-4xl sm:text-5xl tracking-tight" />
+                </div>
+              </div>
+
+              {/* CTA: Thumb-first で下 1/3 に配置 */}
+              <div className="grid grid-cols-2 gap-2">
+                <span className="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm">
+                  {hero.status === 'ENTERING' ? '明細入力 →' : '払う →'}
+                </span>
+                <span className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700">
+                  {hero.status === 'ENTERING' ? '精算開始' : '払ったことにする'}
+                </span>
+              </div>
+            </Link>
+
+            {/* 他の未精算（折りたたみ） */}
+            {rest.length > 0 && (
+              <details className="mt-3 group">
+                <summary className="cursor-pointer text-xs text-gray-600 py-2 px-3 rounded-md bg-gray-50 hover:bg-gray-100 inline-flex items-center gap-1 list-none">
+                  <span className="group-open:rotate-90 transition-transform inline-block">▶</span>
+                  他 {rest.length} 件
+                </summary>
+                <div className="mt-2 space-y-2">
+                  {rest.map((w) => {
+                    const deadline = w.paymentDeadline ?? w.detailDeadline;
+                    const diff = deadline ? daysUntil(new Date(deadline), today) : null;
+                    const tone = deadlineTone(diff);
+                    const bg =
+                      tone === 'over'
+                        ? 'border-red-200 bg-red-50'
+                        : tone === 'near'
+                          ? 'border-amber-200 bg-amber-50'
+                          : 'border-gray-200 bg-white';
+                    const diffText =
+                      diff === null
+                        ? '期限未設定'
+                        : tone === 'over'
+                          ? `${Math.abs(diff)}日超過`
+                          : diff === 0
+                            ? '今日'
+                            : `あと${diff}日`;
+                    return (
+                      <Link
+                        key={w.id}
+                        href={`/warikan/${w.id}`}
+                        className={`block rounded-md border p-3 transition hover:border-slate-300 ${bg}`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-slate-800 truncate">{w.eventName}</p>
+                            <p className={`text-xs mt-0.5 ${tone === 'over' ? 'text-red-600 font-medium' : tone === 'near' ? 'text-amber-700 font-medium' : 'text-gray-500'}`}>
+                              {diffText} ・ {w.status === 'ENTERING' ? '明細入力中' : '支払待ち'}
+                            </p>
+                          </div>
+                          <Yen value={w.pendingAmount} size="sm" className="font-bold text-slate-700 shrink-0" />
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </details>
+            )}
+          </>
+        )}
+      </section>
+
+      {/* 🟡 来週のイベント */}
       <Card data-section="upcoming-events">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-slate-800 flex items-center gap-2">
-              <span aria-hidden>📅</span>
+              <span aria-hidden>🟡</span>
               来週のイベント
             </CardTitle>
             <Button variant="ghost" size="sm" asChild className="text-xs text-gray-500 min-h-[44px] px-3">
@@ -250,26 +374,27 @@ export default async function DashboardPage() {
           {upcomingEvents.length === 0 ? (
             <p className="text-sm text-gray-500">7日以内の予定はありません</p>
           ) : (
-            <div className="space-y-1">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {upcomingEvents.map((ev) => (
                 <Link
                   key={ev.id}
                   href={`/events/${ev.id}`}
-                  className="flex items-center gap-2 py-2 px-2 rounded-lg hover:bg-gray-50 transition group"
+                  className="flex flex-col gap-1.5 rounded-lg border border-amber-100 bg-amber-50/50 p-3 hover:bg-amber-50 hover:border-amber-200 transition min-w-0"
                 >
-                  <div className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-                  <span className="text-xs text-amber-600 font-medium shrink-0 tabular-nums">
+                  <span className="text-xs text-amber-700 font-semibold tabular-nums">
                     {formatDateBoth(ev.date)}
                   </span>
-                  <span className="text-sm font-medium text-slate-800 flex-1 truncate group-hover:text-amber-700">
+                  <span className="text-sm font-medium text-slate-800 truncate">
                     {ev.title}
                   </span>
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full shrink-0 ${EVENT_TYPE_COLORS[ev.eventType] ?? EVENT_TYPE_COLORS.OTHER}`}>
-                    {EVENT_TYPE_LABELS[ev.eventType] ?? 'その他'}
-                  </span>
-                  <span className="text-xs text-gray-400 shrink-0">
-                    {ev._count.participants}人
-                  </span>
+                  <div className="flex items-center justify-between gap-1 mt-auto">
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${EVENT_TYPE_COLORS[ev.eventType] ?? EVENT_TYPE_COLORS.OTHER}`}>
+                      {EVENT_TYPE_LABELS[ev.eventType] ?? 'その他'}
+                    </span>
+                    <span className="text-[10px] text-gray-500">
+                      {ev._count.participants}人
+                    </span>
+                  </div>
                 </Link>
               ))}
             </div>
@@ -277,13 +402,14 @@ export default async function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* D. 🏆 今月の男気 Top 3 */}
+      {/* 🏆 今期の男気 Top 3 */}
       <Card data-section="otokogi-top3">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-slate-800 flex items-center gap-2">
               <span aria-hidden>🏆</span>
-              今月の男気 Top 3
+              今期の男気 Top 3
+              <span className="text-xs text-gray-400 font-normal">（{yearLabel}）</span>
             </CardTitle>
             <Button variant="ghost" size="sm" asChild className="text-xs text-gray-500 min-h-[44px] px-3">
               <Link href="/otokogi/stats">全部見る →</Link>
@@ -292,7 +418,7 @@ export default async function DashboardPage() {
         </CardHeader>
         <CardContent className="pt-0">
           {otokogiTop.length === 0 ? (
-            <p className="text-sm text-gray-500">今月の男気はまだありません</p>
+            <p className="text-sm text-gray-500">今期の男気はまだありません</p>
           ) : (
             <div className="space-y-2">
               {otokogiTop.map((row, idx) => {
@@ -321,7 +447,7 @@ export default async function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* E. 📊 今月サマリ (折りたたみ) */}
+      {/* 📊 今月サマリ (折りたたみ) */}
       <MonthlySummaryCollapsible
         monthLabel={summary.monthLabel}
         otokogiCount={summary.otokogiCount}
