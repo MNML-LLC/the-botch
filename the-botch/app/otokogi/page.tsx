@@ -14,6 +14,7 @@ import { formatDateBoth } from '@/lib/date-utils';
 import type { PeriodState } from '@/lib/date-utils';
 import { PeriodFilter, DEFAULT_PERIOD_STATE } from '@/components/ui/period-filter';
 import { ClutchBadge } from '@/components/otokogi/clutch-badge';
+import { RankingHeroCards } from '@/components/otokogi/ranking-hero-cards';
 
 function OtokogiHistorySkeleton() {
   return (
@@ -46,18 +47,37 @@ function OtokogiHistorySkeleton() {
 
 function OtokogiRankingSkeleton() {
   return (
-    <div className="space-y-3">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="flex items-center gap-2 sm:gap-3">
-          <Skeleton className="w-7 h-7 sm:w-8 sm:h-8 rounded-full shrink-0" />
-          <Skeleton className="w-7 h-7 sm:w-8 sm:h-8 rounded-full shrink-0" />
-          <div className="flex-1 min-w-0 space-y-1">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-3 w-10" />
+    <div className="space-y-4">
+      {/* Top-3 ヒーローカード skeleton */}
+      <div className="space-y-2.5">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="rounded-xl bg-white border p-3 sm:p-4">
+            <div className="flex items-center gap-3">
+              <Skeleton className="w-10 sm:w-12 h-10 shrink-0" />
+              <Skeleton className="w-14 h-14 sm:w-16 sm:h-16 rounded-full shrink-0" />
+              <div className="flex-1 min-w-0 space-y-2">
+                <Skeleton className="h-5 w-32" />
+                <Skeleton className="h-3 w-40" />
+              </div>
+              <Skeleton className="h-6 w-24 shrink-0" />
+            </div>
           </div>
-          <Skeleton className="h-4 w-20 shrink-0" />
-        </div>
-      ))}
+        ))}
+      </div>
+      {/* 4 位以降 skeleton */}
+      <div className="space-y-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-2 sm:gap-3">
+            <Skeleton className="w-7 h-7 sm:w-8 sm:h-8 rounded-full shrink-0" />
+            <Skeleton className="w-7 h-7 sm:w-8 sm:h-8 rounded-full shrink-0" />
+            <div className="flex-1 min-w-0 space-y-1">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-3 w-10" />
+            </div>
+            <Skeleton className="h-4 w-20 shrink-0" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -223,24 +243,36 @@ export default function OtokogiPage() {
                 action={{ label: '+ 記録する', href: '/otokogi/new' }}
               />
             ) : (
-              <div className="space-y-3">
-                {rankingData.map((member) => (
-                  <div key={member.memberId} className="flex items-center gap-2 sm:gap-3">
-                    <span className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold shrink-0 ${
-                      member.rank === 1 ? 'bg-amber-100 text-amber-700' : member.rank === 2 ? 'bg-gray-100 text-gray-600' : member.rank === 3 ? 'bg-orange-100 text-orange-700' : 'bg-gray-50 text-gray-500'
-                    }`}>
-                      {member.rank}
-                    </span>
-                    <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${member.colorBg} ${member.colorText}`}>
-                      {member.initial}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-800 truncate">{member.name}</p>
-                      <p className="text-xs text-gray-500">{member.count}回</p>
-                    </div>
-                    <Yen value={member.totalPaid} className="font-bold text-sm sm:text-base text-slate-800 shrink-0" />
+              <div className="space-y-4">
+                {/* Top-3 ヒーローカード (金 / 銀 / 銅) */}
+                <RankingHeroCards top3={rankingData.slice(0, 3)} />
+
+                {/* 4 位以降 — 従来の行一覧 */}
+                {rankingData.length > 3 && (
+                  <div className="space-y-3 pt-1">
+                    {rankingData.slice(3).map((member) => (
+                      <div key={member.memberId} className="flex items-center gap-2 sm:gap-3">
+                        <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold shrink-0 bg-gray-50 text-gray-500 tabular-nums">
+                          {member.rank}
+                        </span>
+                        <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${member.colorBg} ${member.colorText}`}>
+                          {member.initial}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-800 truncate">{member.name}</p>
+                          <p className="text-xs text-gray-500 tabular-nums">
+                            {member.count}回
+                            {member.clutchCount > 0 && <span className="ml-1">· ★ {member.clutchCount}</span>}
+                            {member.participationCount > 0 && (
+                              <span className="ml-1">· 男気率 {Math.round(member.otokogiRate * 100)}%</span>
+                            )}
+                          </p>
+                        </div>
+                        <Yen value={member.totalPaid} className="font-bold text-sm sm:text-base text-slate-800 shrink-0" />
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
             )}
           </CardContent>

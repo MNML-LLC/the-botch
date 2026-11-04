@@ -54,6 +54,9 @@ export type OtokogiRankingEntry = {
   colorText: string;
   count: number;
   totalPaid: number;
+  clutchCount: number;
+  participationCount: number;
+  otokogiRate: number;
 };
 
 export type OtokogiRankingResponse = {
