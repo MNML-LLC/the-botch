@@ -52,11 +52,11 @@ function HeroCard({ entry, rank }: HeroCardProps) {
       {/* 上面バンド (brass gradient) */}
       <div className={`h-2 w-full ${style.band}`} aria-hidden />
 
-      <div className="flex items-center gap-3 p-3 sm:p-4">
+      <div className="flex items-center gap-2 sm:gap-3 p-3 sm:p-4">
         {/* 順位 + メダル */}
-        <div className="flex flex-col items-center shrink-0 w-10 sm:w-12">
+        <div className="flex flex-col items-center shrink-0 w-8 sm:w-12">
           <span
-            className="text-2xl sm:text-3xl leading-none select-none"
+            className="text-xl sm:text-3xl leading-none select-none"
             aria-label={`${rank}位`}
             title={`${rank}位 (${style.label})`}
           >
@@ -67,16 +67,18 @@ function HeroCard({ entry, rank }: HeroCardProps) {
           </span>
         </div>
 
-        {/* アバター (大) */}
+        {/* アバター (mobile 48px / sm 64px) — Issue #382 で mobile 時に縮小 */}
         <div
-          className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-base sm:text-lg font-bold shrink-0 ${entry.colorBg} ${entry.colorText}`}
+          className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-sm sm:text-lg font-bold shrink-0 ${entry.colorBg} ${entry.colorText}`}
         >
           {entry.initial}
         </div>
 
-        {/* 名前・指標 */}
+        {/* 名前・指標 — truncate 廃止で 2 行まで折返し可 (Issue #382) */}
         <div className="flex-1 min-w-0">
-          <p className="font-bold text-slate-800 truncate text-base sm:text-lg">{entry.name}</p>
+          <p className="font-bold text-slate-800 text-sm sm:text-lg leading-tight break-words line-clamp-2">
+            {entry.name}
+          </p>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] sm:text-xs text-slate-600">
             <span className="tabular-nums">
               支払 <span className="font-semibold text-slate-800">{entry.count}</span> 回
@@ -96,11 +98,11 @@ function HeroCard({ entry, rank }: HeroCardProps) {
           </div>
         </div>
 
-        {/* 金額 (右) */}
+        {/* 金額 — mobile は base, sm 以上で xl (Issue #382 で名前スペース確保) */}
         <div className="shrink-0 text-right">
           <Yen
             value={entry.totalPaid}
-            size="lg"
+            size="base"
             className="font-bold text-slate-800 sm:text-xl"
           />
         </div>

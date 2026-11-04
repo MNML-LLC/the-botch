@@ -11,9 +11,11 @@ type MemoryEntry = {
 }
 
 const CACHE_TTL_SECONDS = 5 * 60 // 5分
-const KEY_PREFIX = 'stats:'
+// スキーマ変更時はこの prefix を bump して古いキャッシュを purge する。
+// v2: totalOtokogiAmount / categoryBreakdown 追加 (#382 regression 修正)
+const KEY_PREFIX = 'stats:v2:'
 // KV 上で一括削除する対象キーを追跡する Set
-const KV_INDEX_KEY = 'stats:__keys'
+const KV_INDEX_KEY = 'stats:v2:__keys'
 
 const memoryCache = new Map<string, MemoryEntry>()
 

@@ -9,7 +9,7 @@ import { EVENT_TYPE_LABELS } from '@/lib/constants';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Yen } from '@/components/ui/yen';
-import { formatDateBoth } from '@/lib/date-utils';
+import { formatDateBoth, getFiscalYearRange } from '@/lib/date-utils';
 import MonthlySummaryCollapsible from './(dashboard)/monthly-summary-collapsible';
 
 const EVENT_TYPE_COLORS: Record<string, string> = {
@@ -48,8 +48,10 @@ async function fetchDashboardData() {
   nextWeek.setDate(nextWeek.getDate() + 7);
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   const nextMonthStart = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-  const yearStart = new Date(today.getFullYear(), 0, 1);
-  const nextYearStart = new Date(today.getFullYear() + 1, 0, 1);
+  // 「今期」は会計年度 (11/1 - 翌 10/31) を /otokogi/stats と揃える (Issue #382)
+  const fy = getFiscalYearRange(today, 0);
+  const yearStart = fy.from;
+  const nextYearStart = new Date(fy.to.getTime() + 1);
 
   const [
     openWarikan,
@@ -189,7 +191,7 @@ async function fetchDashboardData() {
     otokogiTop,
     summary,
     today,
-    yearLabel: `${today.getFullYear()}年`,
+    yearLabel: `${fy.fy}年度`,
   };
 }
 
@@ -340,7 +342,7 @@ export default async function DashboardPage() {
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-slate-800 truncate">{w.eventName}</p>
+                            <p className="text-sm font-medium text-slate-800 break-words line-clamp-2 leading-tight">{w.eventName}</p>
                             <p className={`text-xs mt-0.5 ${tone === 'over' ? 'text-red-600 font-medium' : tone === 'near' ? 'text-amber-700 font-medium' : 'text-gray-500'}`}>
                               {diffText} ・ {w.status === 'ENTERING' ? '明細入力中' : '支払待ち'}
                             </p>
@@ -384,7 +386,7 @@ export default async function DashboardPage() {
                   <span className="text-xs text-amber-700 font-semibold tabular-nums">
                     {formatDateBoth(ev.date)}
                   </span>
-                  <span className="text-sm font-medium text-slate-800 truncate">
+                  <span className="text-sm font-medium text-slate-800 break-words line-clamp-2 leading-tight">
                     {ev.title}
                   </span>
                   <div className="flex items-center justify-between gap-1 mt-auto">
@@ -435,8 +437,8 @@ export default async function DashboardPage() {
                       {row.member.initial}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-800 truncate">{row.member.name}</p>
-                      <p className="text-[10px] text-gray-500">{row.count}回</p>
+                      <p className="text-sm font-medium text-slate-800 break-words line-clamp-2 leading-tight">{row.member.name}</p>
+                      <p className="text-[10px] text-gray-500 mt-0.5">{row.count}回</p>
                     </div>
                     <Yen value={row.total} size="sm" className="font-bold text-slate-800 shrink-0" />
                   </div>

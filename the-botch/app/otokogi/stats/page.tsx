@@ -445,12 +445,12 @@ export default function OtokogiStatsPage() {
             <p className="text-lg font-bold text-slate-800">{stats.totalCount}</p>
             <p className="text-[10px] text-gray-500">総回数</p>
           </div>
-          <div className="flex-1">
-            <Yen value={stats.totalAmount} size="sm" className="font-bold text-slate-800 truncate block" />
+          <div className="flex-1 min-w-0">
+            <Yen value={stats.totalAmount} size="sm" className="font-bold text-slate-800 tabular-nums block tracking-tight" />
             <p className="text-[10px] text-gray-500">累計金額</p>
           </div>
-          <div className="flex-1">
-            <Yen value={stats.averageAmount} size="sm" className="font-bold text-slate-800 truncate block" />
+          <div className="flex-1 min-w-0">
+            <Yen value={stats.averageAmount} size="sm" className="font-bold text-slate-800 tabular-nums block tracking-tight" />
             <p className="text-[10px] text-gray-500">平均金額</p>
           </div>
         </div>

@@ -167,8 +167,8 @@ export default function OtokogiPage() {
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${event.payer.colorBg} ${event.payer.colorText}`}>
                         {event.payer.initial}
                       </div>
-                      <div className="min-w-0">
-                        <p className="font-medium text-slate-800 truncate">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-slate-800 break-words line-clamp-2">
                           {event.eventName}
                           {event.hasAlbum && (
                             <span
@@ -181,7 +181,7 @@ export default function OtokogiPage() {
                           )}
                           <ClutchBadge amount={event.amount} className="ml-1.5 align-middle" />
                         </p>
-                        <p className="text-xs text-gray-500 mt-0.5">
+                        <p className="text-xs text-gray-500 mt-0.5 break-words">
                           <span className="tabular-nums">{formatDateBoth(event.eventDate)}</span> / {event.payer.name}
                           {event.place && ` / ${event.place}`}
                         </p>
@@ -274,8 +274,8 @@ export default function OtokogiPage() {
                             {member.initial}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-slate-800 truncate">{member.name}</p>
-                            <p className="text-xs text-gray-500 tabular-nums">
+                            <p className="text-sm font-medium text-slate-800 break-words line-clamp-2 leading-tight">{member.name}</p>
+                            <p className="text-xs text-gray-500 tabular-nums mt-0.5">
                               {member.count}回
                               {member.clutchCount > 0 && <span className="ml-1">· ★ {member.clutchCount}</span>}
                               {member.participationCount > 0 && (
@@ -283,7 +283,7 @@ export default function OtokogiPage() {
                               )}
                             </p>
                           </div>
-                          <Yen value={member.totalPaid} className="font-bold text-sm sm:text-base text-slate-800 shrink-0" />
+                          <Yen value={member.totalPaid} size="sm" className="font-bold text-slate-800 shrink-0" />
                         </motion.div>
                       ))}
                     </AnimatePresence>

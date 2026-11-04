@@ -803,15 +803,15 @@ export function TopRecentSection({ data }: { data?: OtokogiChartsResponse['topRe
                   <Avatar member={entry.payer} size="md" />
                 </div>
                 <Yen value={entry.amount} className="text-2xl font-extrabold text-slate-800 block" />
-                <p className="text-sm font-medium text-slate-700 mt-1 truncate">
+                <p className="text-sm font-medium text-slate-700 mt-1 break-words line-clamp-2 leading-tight">
                   {entry.payer.name}
                 </p>
-                <p className="text-xs text-gray-600 mt-1 truncate" title={entry.eventName}>
+                <p className="text-xs text-gray-600 mt-1 break-words line-clamp-2" title={entry.eventName}>
                   {entry.eventName}
                 </p>
-                <div className="flex items-center justify-between text-[10px] text-gray-500 mt-1">
-                  <span>{entry.eventDate}</span>
-                  {entry.place && <span className="truncate ml-2">@{entry.place}</span>}
+                <div className="flex items-center justify-between gap-2 text-[10px] text-gray-500 mt-1">
+                  <span className="tabular-nums shrink-0">{entry.eventDate}</span>
+                  {entry.place && <span className="truncate min-w-0">@{entry.place}</span>}
                 </div>
               </div>
             ))}

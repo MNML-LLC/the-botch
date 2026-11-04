@@ -578,10 +578,10 @@ export default function WarikanDetailPage() {
 
                   return (
                     <div key={expense.id} className="flex items-center justify-between gap-2 py-2 border-b last:border-b-0">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-800 truncate">{expense.payer.name}</p>
-                        <p className="text-xs text-gray-500 truncate">{expense.description}</p>
-                        <p className="text-xs text-gray-400 truncate">対象: {debtorNames}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-slate-800 break-words">{expense.payer.name}</p>
+                        <p className="text-xs text-gray-500 break-words line-clamp-2">{expense.description}</p>
+                        <p className="text-xs text-gray-400 break-words line-clamp-2">対象: {debtorNames}</p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <Yen value={expense.amount} size="sm" className="font-bold text-slate-800" />
