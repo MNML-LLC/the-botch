@@ -34,11 +34,16 @@ async function cleanup(page: Page) {
 // 1. 画面表示・遷移の検証
 // =============================================================================
 test.describe('1. 画面表示・遷移', () => {
-  test('ダッシュボードが正常に表示される', async ({ page }) => {
+  test('ダッシュボードが正常に表示される', async ({ page, viewport }) => {
     await page.goto('/')
-    // ヘッダー
-    await expect(page.locator('header')).toBeVisible()
-    await expect(page.getByRole('link', { name: 'The botch' })).toBeVisible()
+    const isMobile = (viewport?.width ?? 1280) < 768
+    // ナビゲーション: デスクトップは header、モバイルは BottomTabBar (Issue #361)
+    if (isMobile) {
+      await expect(page.getByRole('navigation', { name: 'メインナビゲーション' })).toBeVisible()
+    } else {
+      await expect(page.locator('header')).toBeVisible()
+      await expect(page.getByRole('link', { name: 'The botch' })).toBeVisible()
+    }
     // 新 5 セクション (Issue #338): A 要アクション / B 承認待ち / C 来週 / D Top 3 / E サマリ
     await expect(page.locator('main').getByText('要アクション')).toBeVisible()
     await expect(page.locator('main').getByText('承認待ち / 要確認')).toBeVisible()
@@ -746,26 +751,9 @@ test.describe('8. エッジケース', () => {
 // 9. レスポンシブ表示（モバイルプロジェクトで自動実行）
 // =============================================================================
 test.describe('9. レスポンシブ・モバイル表示', () => {
-  test('モバイルハンバーガーメニュー', async ({ page }) => {
-    // モバイルプロジェクトでのみ意味あり
-    await page.goto('/')
-
-    // ビューポートがモバイルサイズの場合
-    const viewportWidth = page.viewportSize()?.width ?? 1280
-    if (viewportWidth < 768) {
-      // ハンバーガーメニューボタンが見える
-      const menuBtn = page.locator('button').filter({ has: page.locator('svg') }).first()
-      await expect(menuBtn).toBeVisible()
-
-      // メニューを開く
-      await menuBtn.click()
-
-      // モバイルメニュー内のナビゲーションリンクが表示される
-      const mobileMenu = page.locator('header .bg-slate-700')
-      await expect(mobileMenu.getByText('ダッシュボード')).toBeVisible()
-      await expect(mobileMenu.getByText('割り勘管理')).toBeVisible()
-    }
-  })
+  // NOTE: 旧「モバイルハンバーガーメニュー」テストは Issue #361 で BottomTabBar に
+  // 置き換えられたため削除。モバイルナビは「1. 画面表示・遷移」の
+  // 「モバイル: BottomTabBar が固定表示され、作成シートが開く」でカバー済み。
 
   test('ダッシュボード — 金額が画面に収まる', async ({ page }) => {
     await page.goto('/')
