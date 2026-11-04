@@ -17,6 +17,7 @@ import {
   MonthMemberHeatmapSection,
   CategoryPieSection,
   CumulativeYearlySection,
+  CumulativeRaceSection,
   ComparisonSection,
   TopRecentSection,
 } from './charts';
@@ -48,6 +49,7 @@ type StatsData = {
   totalAmount: number;
   averageAmount: number;
   categoryBreakdown: { category: OtokogiCategory; amount: number; count: number }[];
+  cumulativeRace: { month: string; [memberId: string]: string | number }[];
 };
 
 type MemberSummaryEntry = {
@@ -482,10 +484,13 @@ export default function OtokogiStatsPage() {
         {/* 6. 累積折れ線（今年 / 昨年 / 一昨年、固定） */}
         <CumulativeYearlySection data={charts?.cumulativeYearly} thisYearLabel={chartsThisYearLabel} />
 
-        {/* 7. 比較棒グラフ（今月vs先月 / 今年vs昨年、固定） */}
+        {/* 7. 累積レース（メンバー別、期間フィルタ連動 / Issue #365） */}
+        <CumulativeRaceSection data={stats?.cumulativeRace} members={members} />
+
+        {/* 8. 比較棒グラフ（今月vs先月 / 今年vs昨年、固定） */}
         <ComparisonSection data={charts?.comparison} />
 
-        {/* 8. Top 3 カード（直近 3ヶ月、固定） */}
+        {/* 9. Top 3 カード（直近 3ヶ月、固定） */}
         <TopRecentSection data={charts?.topRecent} />
       </div>
     </div>
