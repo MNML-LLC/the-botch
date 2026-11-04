@@ -1,17 +1,16 @@
 "use client";
 
-// Issue #336: 追加 5 グラフ
+// Issue #336: 追加グラフ（Issue #391 で D. 比較棒グラフは削除）
 //  A. ヒートマップ（メンバー × 月、HTML+CSS 実装）
 //  B. 円グラフ（イベント種別別の支払分布）
 //  C. 累積折れ線（今年 / 昨年 / 一昨年）
-//  D. 比較棒グラフ（今月 vs 先月 / 今年 vs 昨年、メンバー別積み上げ）
 //  E. Top 3 カード（直近 3ヶ月 最高額）
+//  F. 累積レース（メンバー別の累積男気額を時系列で競争表示）
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
   LineChart, Line, XAxis, YAxis, CartesianGrid,
-  BarChart, Bar,
 } from 'recharts';
 import type { OtokogiCategory } from '@/lib/otokogi-category';
 import type { OtokogiChartsResponse } from '@/hooks/use-otokogi';
@@ -549,22 +548,8 @@ export function CumulativeYearlySection({
 }
 
 // ============================================================
-// D. 比較棒グラフ（今月 vs 先月 / 今年 vs 昨年、メンバー別積み上げ）
+// F. 累積レース（メンバー別の累積男気額を時系列で競争表示）
 // ============================================================
-type ComparisonProp = OtokogiChartsResponse['comparison'];
-type ComparisonMemberCol = { memberId: string; memberName: string; amount: number };
-
-// members のうち、少なくとも 1 系列で金額 > 0 のメンバーに絞って凡例の氾濫を防ぐ
-function activeMembers(entries: ComparisonMemberCol[][]): string[] {
-  const ids = new Set<string>();
-  for (const arr of entries) {
-    for (const m of arr) {
-      if (m.amount > 0) ids.add(m.memberId);
-    }
-  }
-  return [...ids];
-}
-
 const MEMBER_PALETTE = [
   '#d97706', '#0057b7', '#d95c5c', '#059669', '#7c3aed',
   '#db2777', '#2563eb', '#ea580c', '#0d9488', '#9333ea',
@@ -574,151 +559,6 @@ function colorForIndex(i: number): string {
   return MEMBER_PALETTE[i % MEMBER_PALETTE.length];
 }
 
-type ComparisonChartRow = {
-  label: string;
-  total: number;
-  [memberId: string]: number | string;
-};
-
-function toChartRow(label: string, total: number, byMember: ComparisonMemberCol[]): ComparisonChartRow {
-  const row: ComparisonChartRow = { label, total };
-  for (const m of byMember) {
-    row[m.memberId] = m.amount;
-  }
-  return row;
-}
-
-export function ComparisonSection({ data }: { data?: ComparisonProp }) {
-  if (!data) return null;
-
-  const monthChartData: ComparisonChartRow[] = [
-    toChartRow(data.labels.lastMonth, data.lastMonth.total, data.lastMonth.byMember),
-    toChartRow(data.labels.thisMonth, data.thisMonth.total, data.thisMonth.byMember),
-  ];
-  const yearChartData: ComparisonChartRow[] = [
-    toChartRow(data.labels.lastYear, data.lastYear.total, data.lastYear.byMember),
-    toChartRow(data.labels.thisYear, data.thisYear.total, data.thisYear.byMember),
-  ];
-
-  const monthActive = activeMembers([data.thisMonth.byMember, data.lastMonth.byMember]);
-  const yearActive = activeMembers([data.thisYear.byMember, data.lastYear.byMember]);
-
-  const nameLookup = new Map(
-    [...data.thisMonth.byMember, ...data.thisYear.byMember].map((m) => [
-      m.memberId,
-      m.memberName,
-    ])
-  );
-
-  const monthDiff = data.thisMonth.total - data.lastMonth.total;
-  const yearDiff = data.thisYear.total - data.lastYear.total;
-
-  function renderStackedChart(
-    rows: ComparisonChartRow[],
-    activeIds: string[],
-    title: string,
-    diff: number,
-    totalThis: number,
-  ) {
-    const noData = rows.every((r) => r.total === 0);
-    return (
-      <Card>
-        <CardHeader>
-          <div className="flex items-baseline justify-between">
-            <CardTitle className="text-slate-800 text-base">{title}</CardTitle>
-            <div className="text-right">
-              <p className="text-sm font-bold text-slate-800 tabular-nums">
-                {formatYen(totalThis)}
-              </p>
-              {!noData && (
-                <p
-                  className={`text-[10px] font-medium ${
-                    diff > 0 ? 'text-green-600' : diff < 0 ? 'text-red-500' : 'text-gray-400'
-                  }`}
-                >
-                  {diff > 0 ? '▲' : diff < 0 ? '▼' : '='} {formatYen(Math.abs(diff))}
-                </p>
-              )}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {noData ? (
-            <p className="text-sm text-gray-500">データがありません</p>
-          ) : (
-            <div className="w-full h-44">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={rows}
-                  margin={{ top: 5, right: 5, left: -10, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                  <YAxis
-                    tickFormatter={formatYenShort}
-                    tick={{ fontSize: 10 }}
-                    width={46}
-                  />
-                  <Tooltip
-                    formatter={(value, name) => {
-                      const label = nameLookup.get(String(name)) ?? String(name);
-                      return [formatYen(Number(value)), label];
-                    }}
-                  />
-                  {activeIds.map((id, i) => (
-                    <Bar
-                      key={id}
-                      dataKey={id}
-                      stackId="s"
-                      fill={colorForIndex(i)}
-                      radius={i === activeIds.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-                    />
-                  ))}
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-          {!noData && activeIds.length > 0 && (
-            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
-              {activeIds.map((id, i) => (
-                <div key={id} className="flex items-center gap-1 text-[10px] text-gray-600">
-                  <span
-                    className="inline-block w-2.5 h-2.5 rounded-sm"
-                    style={{ backgroundColor: colorForIndex(i) }}
-                  />
-                  {nameLookup.get(id) ?? id}
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      {renderStackedChart(
-        monthChartData,
-        monthActive,
-        `${data.labels.thisMonth} vs ${data.labels.lastMonth}`,
-        monthDiff,
-        data.thisMonth.total,
-      )}
-      {renderStackedChart(
-        yearChartData,
-        yearActive,
-        `${data.labels.thisYear} vs ${data.labels.lastYear}`,
-        yearDiff,
-        data.thisYear.total,
-      )}
-    </div>
-  );
-}
-
-// ============================================================
-// F. 累積レース（メンバー別の累積男気額を時系列で競争表示）
-// ============================================================
 type CumulativeRaceRow = { month: string; [memberId: string]: string | number };
 
 export function CumulativeRaceSection({
