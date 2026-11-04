@@ -1,6 +1,7 @@
 import './globals.css';
 import Header from '@/components/layout/Header';
 import BottomNav from '@/components/layout/bottom-nav';
+import Fab from '@/components/ui/fab';
 import Providers from './providers';
 import { Toaster } from '@/components/ui/toaster';
 
@@ -31,6 +32,7 @@ export default function RootLayout({
             </footer>
           </div>
           <BottomNav />
+          <Fab />
           <Toaster />
         </Providers>
       </body>
