@@ -1,5 +1,8 @@
 name: AI Review
 
+# PR auto-review via Claude Code Action (OAuth 認証).
+# APPROVE -> enable auto-merge. CHANGES -> @claude iteration (max 3).
+
 on:
   pull_request:
     types: [opened, synchronize]
@@ -14,141 +17,85 @@ permissions:
   issues: read
 
 jobs:
-  review:
+  guard:
     runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
+    if: >
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.user.login != 'dependabot[bot]'
+    outputs:
+      proceed: ${{ steps.check.outputs.proceed }}
+      iter_count: ${{ steps.check.outputs.iter_count }}
+      issue_num: ${{ steps.check.outputs.issue_num }}
+    steps:
+      - name: Check PR size and iteration count
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUM: ${{ github.event.pull_request.number }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          DIFF_LINES=$(gh pr diff "$PR_NUM" | wc -l)
+          ISSUE_NUM=$(echo "$PR_BODY" | grep -oE "(Closes|Fixes|Resolves) #[0-9]+" | head -1 | grep -oE "[0-9]+" || true)
+          echo "issue_num=$ISSUE_NUM" >> "$GITHUB_OUTPUT"
+
+          ITER=$(gh pr view "$PR_NUM" --json comments \
+            -q '[.comments[] | select(.body | startswith("## AI Review") and contains("CHANGES"))] | length')
+          echo "iter_count=$ITER" >> "$GITHUB_OUTPUT"
+
+          if [ "$DIFF_LINES" -gt 2000 ]; then
+            gh pr comment "$PR_NUM" --body "## AI Review: SKIPPED
+          Large PR (${DIFF_LINES} lines). Human review recommended."
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          elif [ "$ITER" -ge 3 ]; then
+            gh pr comment "$PR_NUM" --body "## AI Review: STOPPED
+          3 iterations reached. Awaiting CEO decision."
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  review:
+    needs: guard
+    if: needs.guard.outputs.proceed == 'true'
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
-      - name: Collect PR context
-        id: context
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUM: ${{ github.event.pull_request.number }}
-          PR_BODY: ${{ github.event.pull_request.body }}
-        run: |
-          mkdir -p /tmp/ai-review
-          gh pr diff "$PR_NUM" > /tmp/ai-review/pr-diff.txt
-          DIFF_LINES=$(wc -l < /tmp/ai-review/pr-diff.txt)
-          echo "diff_lines=$DIFF_LINES" >> "$GITHUB_OUTPUT"
+      - name: Invoke Claude Code (review mode)
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_TOKEN_THEBOTCH }}
+          mode: tag
+          prompt: |
+            Review PR #${{ github.event.pull_request.number }}: "${{ github.event.pull_request.title }}" in the-botch.
 
-          ISSUE_NUM=$(echo "$PR_BODY" | grep -oE "(Closes|Fixes|Resolves) #[0-9]+" | head -1 | grep -oE "[0-9]+" || true)
-          if [ -n "$ISSUE_NUM" ]; then
-            gh issue view "$ISSUE_NUM" --json body -q '.body' > /tmp/ai-review/issue-body.txt || echo "no issue" > /tmp/ai-review/issue-body.txt
-            echo "issue_num=$ISSUE_NUM" >> "$GITHUB_OUTPUT"
-          else
-            echo "no linked issue" > /tmp/ai-review/issue-body.txt
-          fi
+            Fetch and analyze:
+            - `gh pr diff ${{ github.event.pull_request.number }}` (the PR diff)
+            - `gh issue view ${{ needs.guard.outputs.issue_num }}` (linked Issue body, if any)
 
-          ITER_COUNT=$(gh pr view "$PR_NUM" --json comments \
-            -q '[.comments[] | select(.body | startswith("## AI Review") and contains("CHANGES"))] | length')
-          echo "iter_count=$ITER_COUNT" >> "$GITHUB_OUTPUT"
+            Review criteria:
+            1. Does the PR implement all Issue completion conditions?
+            2. Mobile-first (44px tap targets, semantic colors: 男気=brass/amber-700, 割り勘=blue-800)
+            3. No Prisma schema changes unless explicit in Issue
+            4. No obvious bugs or missing edge cases
+            5. Code quality: types, no `any`, proper error handling
 
-      - name: Skip large PRs
-        if: ${{ steps.context.outputs.diff_lines > 2000 }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUM: ${{ github.event.pull_request.number }}
-        run: |
-          gh pr comment "$PR_NUM" --body "## AI Review: SKIPPED
-          Large PR (${{ steps.context.outputs.diff_lines }} lines > 2000). Human review recommended."
-          exit 0
+            Then post ONE PR comment starting with EXACTLY one of:
 
-      - name: Skip after 3 iterations
-        if: ${{ steps.context.outputs.iter_count >= 3 }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUM: ${{ github.event.pull_request.number }}
-        run: |
-          gh pr comment "$PR_NUM" --body "## AI Review: STOPPED
-          3 iterations reached. Awaiting CEO decision."
-          exit 0
+            `## AI Review: APPROVE`
+            <one-sentence summary>
 
-      - name: Run AI review
-        id: review
-        if: ${{ steps.context.outputs.diff_lines <= 2000 && steps.context.outputs.iter_count < 3 }}
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.CLAUDE_TOKEN_THEBOTCH }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-        run: |
-          pip install anthropic==0.40.0 >/dev/null
+            or
 
-          python3 <<'PY'
-          import os, json, pathlib
-          from anthropic import Anthropic
+            `## AI Review: CHANGES (iteration ${{ needs.guard.outputs.iter_count }}/3)`
+            - <bullet list of specific gaps>
 
-          pr_title = os.environ["PR_TITLE"]
-          diff = pathlib.Path("/tmp/ai-review/pr-diff.txt").read_text()[:80000]
-          issue_body = pathlib.Path("/tmp/ai-review/issue-body.txt").read_text()[:20000]
+            @claude Please address the above feedback.
 
-          client = Anthropic()
-          msg = client.messages.create(
-              model="claude-haiku-4-5-20251001",
-              max_tokens=1500,
-              messages=[{
-                  "role": "user",
-                  "content": f"""You are a code reviewer for the-botch (Next.js/Prisma, 6-member MNML internal app).
+            If APPROVE, also run `gh pr merge ${{ github.event.pull_request.number }} --auto --squash` to enable auto-merge.
 
-          PR: {pr_title}
-
-          Linked Issue body:
-          <issue>
-          {issue_body}
-          </issue>
-
-          PR diff:
-          <diff>
-          {diff}
-          </diff>
-
-          Review criteria:
-          1. Does the PR implement what the Issue requested? (all completion conditions covered)
-          2. Mobile-first design principles honored (44px tap targets, semantic colors: 男気=brass/amber-700, 割り勘=blue-800)
-          3. No Prisma schema changes unless explicit in Issue
-          4. No obvious bugs or missing edge cases
-          5. Code quality: types, no `any`, proper error handling
-
-          Output EXACTLY one line, then details:
-          APPROVE: <one-sentence summary>
-          or
-          CHANGES: <bullet list of specific gaps>
-
-          Be strict — only APPROVE if you'd merge this yourself."""
-              }],
-          )
-          verdict = msg.content[0].text.strip()
-          pathlib.Path("/tmp/ai-review/verdict.txt").write_text(verdict)
-          print(verdict)
-          PY
-
-      - name: Post verdict
-        if: ${{ steps.context.outputs.diff_lines <= 2000 && steps.context.outputs.iter_count < 3 }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUM: ${{ github.event.pull_request.number }}
-        run: |
-          VERDICT=$(cat /tmp/ai-review/verdict.txt)
-          FIRST_LINE=$(echo "$VERDICT" | head -1)
-
-          if echo "$FIRST_LINE" | grep -q "^APPROVE"; then
-            gh pr comment "$PR_NUM" --body "## AI Review: APPROVE
-
-          $VERDICT"
-            gh pr merge "$PR_NUM" --auto --squash || true
-          elif echo "$FIRST_LINE" | grep -q "^CHANGES"; then
-            ITER=$((${{ steps.context.outputs.iter_count }} + 1))
-            gh pr comment "$PR_NUM" --body "## AI Review: CHANGES (iteration $ITER/3)
-
-          $VERDICT
-
-          @claude Please address the above feedback."
-          else
-            gh pr comment "$PR_NUM" --body "## AI Review: UNCLEAR
-
-          $VERDICT
-
-          Human review needed."
-          fi
+            Be strict. Only APPROVE if you would merge this yourself.
