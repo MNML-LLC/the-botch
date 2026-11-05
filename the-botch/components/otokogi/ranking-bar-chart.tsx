@@ -7,10 +7,11 @@ import type { Badge } from '@/lib/otokogi-badges'
 import { BadgeChip } from '@/components/otokogi/badge-chip'
 import { Yen } from '@/components/ui/yen'
 
-// Issue #406: 男気ランキング tab を 横棒グラフ (6人) + 相対スケール で視覚化。
+// Issue #406: 男気ランキング tab を 横棒グラフ (6人) で視覚化。
+// Issue #418: スケーリングを「総額 100%」= シェア率表示 に変更。
 //
 // 旧 "Top-3 称号カード (#403)" + "全員の集計表" を 1 枚の横棒チャートに統合。
-// - 相対スケール (within-period): 期間内最大額を 100% として他メンバーが比率表示
+// - シェア率スケール (within-period): 期間内総額を 100% として各メンバーが何割払ったか
 // - 1 位 = brass gradient (gold)、2 位 = silver、3 位 = bronze、4-6 位 = slate
 // - 各行に 期間内獲得称号 chips
 // - 期間変更で bar width がスプリングで伸縮 (Framer Motion)
@@ -77,16 +78,14 @@ export function RankingBarChart({
 }: RankingBarChartProps) {
   const prefersReducedMotion = useReducedMotion()
 
-  const { totalAmount, totalCount, maxPaid, hasAnyPaid } = useMemo(() => {
+  const { totalAmount, totalCount, hasAnyPaid } = useMemo(() => {
     let totalAmount = 0
     let totalCount = 0
-    let maxPaid = 0
     for (const r of ranking) {
       totalAmount += r.totalPaid
       totalCount += r.count
-      if (r.totalPaid > maxPaid) maxPaid = r.totalPaid
     }
-    return { totalAmount, totalCount, maxPaid, hasAnyPaid: maxPaid > 0 }
+    return { totalAmount, totalCount, hasAnyPaid: totalAmount > 0 }
   }, [ranking])
 
   return (
@@ -131,10 +130,11 @@ export function RankingBarChart({
           {ranking.map((entry) => {
             const tier = rankTier(entry.rank)
             const style = TIER_STYLES[tier]
-            const widthPct =
-              maxPaid > 0 ? (entry.totalPaid / maxPaid) * 100 : 0
+            const sharePct =
+              totalAmount > 0 ? (entry.totalPaid / totalAmount) * 100 : 0
             const badges = badgesByMember.get(entry.memberId) ?? []
-            const roundedPct = Math.round(widthPct)
+            const shareLabel = sharePct.toFixed(1)
+            const roundedShare = Math.round(sharePct)
             return (
               <li
                 key={entry.memberId}
@@ -174,22 +174,22 @@ export function RankingBarChart({
                   </div>
                 </div>
 
-                {/* Row 2: bar (相対スケール) */}
+                {/* Row 2: bar (シェア率 = 総額 100%) */}
                 <div className="mt-1.5 flex items-center gap-2">
                   <div
                     className="relative flex-1 h-3 sm:h-3.5 rounded-full bg-gray-100 overflow-hidden"
                     role="progressbar"
-                    aria-valuenow={roundedPct}
+                    aria-valuenow={roundedShare}
                     aria-valuemin={0}
                     aria-valuemax={100}
-                    aria-label={`期間内最大額に対する比率 ${roundedPct}%`}
+                    aria-label={`期間内総額に対するシェア率 ${shareLabel}%`}
                   >
                     <motion.div
                       className={`h-full ${style.gradient} rounded-full`}
                       initial={
-                        prefersReducedMotion ? { width: `${widthPct}%` } : { width: 0 }
+                        prefersReducedMotion ? { width: `${sharePct}%` } : { width: 0 }
                       }
-                      animate={{ width: `${widthPct}%` }}
+                      animate={{ width: `${sharePct}%` }}
                       transition={
                         prefersReducedMotion
                           ? { duration: 0 }
@@ -197,8 +197,8 @@ export function RankingBarChart({
                       }
                     />
                   </div>
-                  <span className="text-[10px] text-gray-500 tabular-nums w-10 text-right shrink-0">
-                    {roundedPct}%
+                  <span className="text-[11px] font-semibold text-slate-700 tabular-nums w-12 text-right shrink-0">
+                    {shareLabel}%
                   </span>
                 </div>
 
