@@ -3,7 +3,6 @@
 import { Suspense, useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,14 +11,11 @@ import { Swords, Trophy } from 'lucide-react';
 import { useOtokogiBadges, useOtokogiEvents, useOtokogiRanking } from '@/hooks/use-otokogi';
 import { useScrollRestoration } from '@/hooks/use-scroll-restoration';
 import { Yen } from '@/components/ui/yen';
-import { formatDateBoth } from '@/lib/date-utils';
+import { formatDateBoth, getPeriodRange } from '@/lib/date-utils';
 import type { PeriodState } from '@/lib/date-utils';
 import { PeriodFilter, DEFAULT_PERIOD_STATE } from '@/components/ui/period-filter';
 import { ClutchBadge } from '@/components/otokogi/clutch-badge';
-import { RankingTitleCards } from '@/components/otokogi/ranking-title-cards';
-import { BadgeChip } from '@/components/otokogi/badge-chip';
-import { topBadge } from '@/lib/otokogi-badges';
-import { TermTooltip } from '@/components/ui/term-tooltip';
+import { RankingBarChart } from '@/components/otokogi/ranking-bar-chart';
 import { StatsContent } from './stats-content';
 
 function OtokogiHistorySkeleton() {
@@ -52,53 +48,68 @@ function OtokogiHistorySkeleton() {
 }
 
 function OtokogiRankingSkeleton() {
+  // Issue #406: 横棒グラフレイアウトに合わせて header + 6 行の bar を模す
   return (
-    <div className="space-y-4">
-      {/* 称号カルーセル skeleton (Issue #401) */}
-      <div className="space-y-2.5">
-        {/* MVP ヒーローカード */}
-        <div className="rounded-xl bg-white border p-4 sm:p-5">
-          <div className="flex items-center gap-3">
-            <Skeleton className="w-14 sm:w-16 h-14 shrink-0" />
-            <Skeleton className="w-14 h-14 sm:w-16 sm:h-16 rounded-full shrink-0" />
-            <div className="flex-1 min-w-0 space-y-2">
-              <Skeleton className="h-5 w-32" />
-              <Skeleton className="h-6 w-40" />
-            </div>
-          </div>
-        </div>
-        {/* 2 位以降の sub カード (2 列 grid) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="rounded-lg bg-white border p-2.5 sm:p-3">
-              <div className="flex items-center gap-2">
-                <Skeleton className="w-10 sm:w-12 h-10 shrink-0" />
-                <Skeleton className="w-10 h-10 rounded-full shrink-0" />
-                <div className="flex-1 min-w-0 space-y-1">
-                  <Skeleton className="h-3 w-16" />
-                  <Skeleton className="h-4 w-20" />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+    <div className="space-y-3">
+      <div className="rounded-lg bg-slate-50/70 border border-slate-200/70 px-3 py-2.5 space-y-1.5">
+        <Skeleton className="h-3 w-56" />
+        <Skeleton className="h-3 w-44" />
       </div>
-      {/* 全員の一覧表 skeleton */}
-      <div className="space-y-3 pt-2">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="flex items-center gap-2 sm:gap-3">
-            <Skeleton className="w-7 h-7 sm:w-8 sm:h-8 rounded-full shrink-0" />
-            <Skeleton className="w-7 h-7 sm:w-8 sm:h-8 rounded-full shrink-0" />
-            <div className="flex-1 min-w-0 space-y-1">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-3 w-10" />
+      <div className="space-y-2.5">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div
+            key={i}
+            className="rounded-lg bg-white ring-1 ring-gray-200 px-2.5 py-2.5 sm:px-3 space-y-1.5"
+          >
+            <div className="flex items-center gap-2 sm:gap-2.5">
+              <Skeleton className="w-7 h-7 sm:w-8 sm:h-8 rounded-full shrink-0" />
+              <Skeleton className="w-7 h-7 sm:w-8 sm:h-8 rounded-full shrink-0" />
+              <Skeleton className="h-4 flex-1" />
+              <Skeleton className="h-4 w-20 shrink-0" />
             </div>
-            <Skeleton className="h-4 w-20 shrink-0" />
+            <Skeleton className="h-3 w-full rounded-full" />
           </div>
         ))}
       </div>
     </div>
   );
+}
+
+function formatJaDate(d: Date): string {
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+}
+
+// 期間の "YYYY年M月D日 〜 YYYY年M月D日" 表現 (全期間なら null)
+function formatPeriodRangeText(period: PeriodState, now: Date): string | null {
+  const r = getPeriodRange(period.period, now, { from: period.from, to: period.to });
+  if (!r.from && !r.to) return null;
+  const fromText = r.from ? formatJaDate(r.from) : '〜';
+  const toText = r.to ? formatJaDate(r.to) : '現在';
+  return `${fromText} 〜 ${toText}`;
+}
+
+// 期間の状態ラベル: FY (今期は "進行中" を付ける) / 月 / カスタム / 通算
+function formatPeriodStatusText(period: PeriodState, now: Date): string {
+  const r = getPeriodRange(period.period, now, { from: period.from, to: period.to });
+  switch (period.period) {
+    case 'current-fy': {
+      const inProgress = r.to && now <= r.to;
+      // 11月始まり FY — 年末時点だと翌暦年が FY の表示年になるので r.from から FY を算出
+      const fyShort = r.from ? r.from.getFullYear() % 100 : now.getFullYear() % 100;
+      return `FY${fyShort.toString().padStart(2, '0')}${inProgress ? ' 進行中' : ''}`;
+    }
+    case 'last-fy': {
+      const fyShort = r.from ? r.from.getFullYear() % 100 : (now.getFullYear() - 1) % 100;
+      return `FY${fyShort.toString().padStart(2, '0')}`;
+    }
+    case 'current-month':
+      return `${now.getFullYear()}年${now.getMonth() + 1}月`;
+    case 'custom':
+      return 'カスタム期間';
+    case 'all':
+    default:
+      return '通算';
+  }
 }
 
 type Tab = 'history' | 'ranking' | 'stats';
@@ -134,7 +145,6 @@ function OtokogiPageInner() {
   );
 
   const [period, setPeriod] = useState<PeriodState>(DEFAULT_PERIOD_STATE);
-  const prefersReducedMotion = useReducedMotion();
 
   const {
     data: eventsData,
@@ -149,8 +159,19 @@ function OtokogiPageInner() {
   const { data: rankingResponse, isLoading: rankingLoading } = useOtokogiRanking(period);
   const rankingData = rankingResponse?.ranking ?? [];
 
-  // Issue #368 / #401: ランキングカードに top バッジ (1 個) + 称号カード用の集計値を取得
-  const { badgesByMember, memberSummariesById, streaksById, periodLabel } = useOtokogiBadges(period);
+  // Issue #368 / #401 / #406: 期間内獲得称号 chip を各行に表示するため badgesByMember を取得
+  const { badgesByMember } = useOtokogiBadges(period);
+
+  // Issue #406: 期間 header に表示する "YYYY年M月D日 〜 YYYY年M月D日" と "FY26 進行中" を導出
+  const now = useMemo(() => new Date(), []);
+  const periodRangeText = useMemo(
+    () => formatPeriodRangeText(period, now),
+    [period, now],
+  );
+  const periodStatusText = useMemo(
+    () => formatPeriodStatusText(period, now),
+    [period, now],
+  );
 
   useScrollRestoration(!eventsLoading);
 
@@ -266,101 +287,35 @@ function OtokogiPageInner() {
         </div>
       )}
 
-      {/* ランキングタブ (Issue #401: Top を称号カルーセルに再構成) */}
+      {/* ランキングタブ (Issue #406: 横棒グラフ (6人) + 相対スケール で視覚化) */}
       {activeTab === 'ranking' && (
-        <div className="space-y-4">
-          {/* 1. 称号カルーセル (MVP + 裏男気王 + 量産王 + ...) */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-slate-800">称号</CardTitle>
-              <p className="text-xs text-gray-500 mt-0.5">
-                期間フィルタ内の集計で、各軸の 1 位を独立したカードで表示。
-              </p>
-            </CardHeader>
-            <CardContent>
-              {rankingLoading ? (
-                <OtokogiRankingSkeleton />
-              ) : rankingData.length === 0 ? (
-                <EmptyState
-                  icon={Trophy}
-                  title="ランキングデータがありません"
-                  description="男気イベントを記録するとランキングが表示されます"
-                  action={{ label: '+ 記録する', href: '/otokogi/new' }}
-                />
-              ) : (
-                <RankingTitleCards
-                  periodLabel={periodLabel}
-                  ranking={rankingData}
-                  memberSummariesById={memberSummariesById}
-                  streaksById={streaksById}
-                />
-              )}
-            </CardContent>
-          </Card>
-
-          {/* 2. 全員の集計表 (支払総額 DESC で全員表示 — rank 1 位から) */}
-          {!rankingLoading && rankingData.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-slate-800">全員の集計</CardTitle>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  支払総額 DESC。期間内の全員の数値を比較。
-                </p>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <AnimatePresence initial={false}>
-                    {rankingData.map((member) => {
-                      const top = topBadge(badgesByMember.get(member.memberId) ?? []);
-                      return (
-                        <motion.div
-                          key={member.memberId}
-                          layout={prefersReducedMotion ? false : 'position'}
-                          initial={prefersReducedMotion ? false : { opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={
-                            prefersReducedMotion
-                              ? { duration: 0 }
-                              : { type: 'spring', stiffness: 320, damping: 32, mass: 0.9 }
-                          }
-                          className="flex items-center gap-2 sm:gap-3"
-                        >
-                          <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold shrink-0 bg-gray-50 text-gray-500 tabular-nums">
-                            {member.rank}
-                          </span>
-                          <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${member.colorBg} ${member.colorText}`}>
-                            {member.initial}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <p className="text-sm font-medium text-slate-800 break-words line-clamp-2 leading-tight">{member.name}</p>
-                              {top && <BadgeChip badge={top} size="xs" />}
-                            </div>
-                            <p className="text-xs text-gray-500 tabular-nums mt-0.5">
-                              {member.count}回
-                              {member.clutchCount > 0 && (
-                                <TermTooltip term="CLUTCH" className="ml-1 text-xs text-gray-500">
-                                  · ★ {member.clutchCount}
-                                </TermTooltip>
-                              )}
-                              {member.participationCount > 0 && (
-                                <TermTooltip term="男気率" className="ml-1 text-xs text-gray-500">
-                                  · 男気率 {Math.round(member.otokogiRate * 100)}%
-                                </TermTooltip>
-                              )}
-                            </p>
-                          </div>
-                          <Yen value={member.totalPaid} size="sm" className="font-bold text-slate-800 shrink-0" />
-                        </motion.div>
-                      );
-                    })}
-                  </AnimatePresence>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-slate-800">漢気ランキング</CardTitle>
+            <p className="text-xs text-gray-500 mt-0.5">
+              期間内最大額を 100% とした相対スケール。期間切替で bar が伸縮します。
+            </p>
+          </CardHeader>
+          <CardContent>
+            {rankingLoading ? (
+              <OtokogiRankingSkeleton />
+            ) : rankingData.length === 0 ? (
+              <EmptyState
+                icon={Trophy}
+                title="ランキングデータがありません"
+                description="男気イベントを記録するとランキングが表示されます"
+                action={{ label: '+ 記録する', href: '/otokogi/new' }}
+              />
+            ) : (
+              <RankingBarChart
+                periodRangeText={periodRangeText}
+                periodStatusText={periodStatusText}
+                ranking={rankingData}
+                badgesByMember={badgesByMember}
+              />
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* 統計タブ (Issue #389: /otokogi/stats を統合) */}
