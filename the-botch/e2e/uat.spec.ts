@@ -149,8 +149,17 @@ test.describe('1. 画面表示・遷移', () => {
     await expect(page.getByRole('button', { name: '統計' })).toBeVisible()
 
     // ランキングタブに切り替え (Issue #401: 横棒グラフ + 称号 chips 構成)
+    // seed データは MNML fiscal year semantics (FY26 = 2025/11〜2026/10) で登録されるため
+    // 現在の FY26 (2026/11〜) には 0 件 → default period `current-fy` では EmptyState が描画される。
+    // data 有無のどちらでも成立する assertion にする。
     await page.getByRole('button', { name: 'ランキング' }).click()
-    await expect(page.getByText('期間内総額').first()).toBeVisible()
+    await page.waitForURL(/\/otokogi\?tab=ranking/)
+    await expect(
+      page
+        .getByText('期間内総額')
+        .or(page.getByText('ランキングデータがありません'))
+        .first(),
+    ).toBeVisible({ timeout: 10000 })
 
     // 統計タブに切り替え → /otokogi?tab=stats に遷移、統計コンテンツが描画
     await page.getByRole('button', { name: '統計' }).click()
