@@ -104,7 +104,8 @@ export function computeBadges(memberId: string, ctx: BadgeContext): Badge[] {
       kind: 'mvp',
       id: `mvp-${ctx.periodLabel}`,
       label: `${ctx.periodLabel} MVP (総額)`,
-      icon: '🏆',
+      // 💎 で FY 版 (`otokogi-fy-badges.ts`) と揃える (Issue #401)
+      icon: '💎',
       color: 'bg-amber-100 text-amber-800',
       description: `${ctx.periodLabel} に支払った男気の "合計" 1 位 (¥${topActualPaid.actualPaid.toLocaleString()})。ガッツリ出した総大将。`,
     })
