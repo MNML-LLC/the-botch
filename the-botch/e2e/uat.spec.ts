@@ -148,9 +148,9 @@ test.describe('1. 画面表示・遷移', () => {
     await expect(page.getByRole('button', { name: 'ランキング' })).toBeVisible()
     await expect(page.getByRole('button', { name: '統計' })).toBeVisible()
 
-    // ランキングタブに切り替え (Issue #401: Top を「称号」カルーセルに再構成)
+    // ランキングタブに切り替え (Issue #401: 横棒グラフで視覚化 / CEO 2026-11-05)
     await page.getByRole('button', { name: 'ランキング' }).click()
-    await expect(page.getByText('称号').first()).toBeVisible()
+    await expect(page.getByText('男気ランキング')).toBeVisible()
 
     // 統計タブに切り替え → /otokogi?tab=stats に遷移、統計コンテンツが描画
     await page.getByRole('button', { name: '統計' }).click()
