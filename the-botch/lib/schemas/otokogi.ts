@@ -19,6 +19,11 @@ export const otokogiAmountSchema = positiveInt('金額').refine(
   { error: `男気は ¥${MIN_OTOKOGI_AMOUNT.toLocaleString()} 以上から成立します` }
 )
 
+/** 男気イベントのカテゴリ（Prisma EventType と同値） */
+export const otokogiEventTypeSchema = z.enum(['TRIP', 'HANGOUT', 'ACTIVITY', 'OTHER'], {
+  error: 'カテゴリは TRIP / HANGOUT / ACTIVITY / OTHER のいずれかで指定してください',
+})
+
 /** POST /api/otokogi — 男気イベント作成のボディ */
 export const createOtokogiSchema = z.object({
   eventDate: dateString('イベント日'),
@@ -28,6 +33,7 @@ export const createOtokogiSchema = z.object({
   place: limitedString('場所', 100).nullable().optional(),
   hasAlbum: z.boolean({ error: 'アルバム有無は true/false で指定してください' }).optional(),
   wasJanken: z.boolean({ error: 'じゃんけん有無は true/false で指定してください' }).optional(),
+  eventType: otokogiEventTypeSchema.nullable().optional(),
   memo: limitedString('メモ', 1000).nullable().optional(),
   eventId: idString('カレンダーイベント').nullable().optional(),
   participantIds: memberIdArray('参加メンバー').min(1, {

@@ -1,11 +1,53 @@
 /**
  * lib/otokogi-category.ts のテスト
+ *
+ * 分類ロジックの優先順位 (Issue #410):
+ *   1. explicitEventType (OtokogiEvent 自身のカラム、最優先)
+ *   2. linkedEventType (親カレンダー Event)
+ *   3. eventName / place のキーワード一致
+ *   4. 金額閾値 (TRIP ¥50,000+ / HANGOUT ¥20,000+)
+ *   5. OTHER
  */
 import { describe, test, expect } from 'vitest'
 import { classifyOtokogiEvent } from '@/lib/otokogi-category'
 
 describe('classifyOtokogiEvent', () => {
-  test('linkedEventType があればそれを採用する', () => {
+  test('explicitEventType が最優先で採用される (キーワード・金額を無視)', () => {
+    expect(
+      classifyOtokogiEvent({
+        eventName: '箱根旅行',
+        place: '温泉旅館',
+        amount: 100_000,
+        explicitEventType: 'OTHER',
+        linkedEventType: 'TRIP',
+      })
+    ).toBe('OTHER')
+  })
+
+  test('explicitEventType=HANGOUT は HANGOUT として確定', () => {
+    expect(
+      classifyOtokogiEvent({
+        eventName: 'xxx',
+        place: null,
+        amount: 15_000,
+        explicitEventType: 'HANGOUT',
+      })
+    ).toBe('HANGOUT')
+  })
+
+  test('explicitEventType が null なら linkedEventType にフォールバック', () => {
+    expect(
+      classifyOtokogiEvent({
+        eventName: '飲み会',
+        place: null,
+        amount: 5000,
+        explicitEventType: null,
+        linkedEventType: 'TRIP',
+      })
+    ).toBe('TRIP')
+  })
+
+  test('linkedEventType があればそれを採用する (explicit なし)', () => {
     expect(
       classifyOtokogiEvent({
         eventName: '飲み会',
@@ -43,16 +85,26 @@ describe('classifyOtokogiEvent', () => {
     ).toBe('ACTIVITY')
   })
 
-  test('キーワード無しかつ金額 ≥10,000 で TRIP フォールバック', () => {
+  test('キーワード無しかつ金額 ≥¥50,000 で TRIP フォールバック', () => {
     expect(
-      classifyOtokogiEvent({ eventName: 'xxx', place: null, amount: 15_000 })
+      classifyOtokogiEvent({ eventName: 'xxx', place: null, amount: 60_000 })
     ).toBe('TRIP')
   })
 
-  test('キーワード無しかつ 3,000 ≤ 金額 <10,000 で HANGOUT', () => {
+  test('キーワード無しかつ ¥20,000 ≤ 金額 <¥50,000 で HANGOUT', () => {
     expect(
-      classifyOtokogiEvent({ eventName: 'xxx', place: null, amount: 5_000 })
+      classifyOtokogiEvent({ eventName: 'xxx', place: null, amount: 25_000 })
     ).toBe('HANGOUT')
+  })
+
+  test('キーワード無しかつ金額 <¥20,000 で OTHER (男気最低額 ¥10,000 を含む)', () => {
+    // Issue #410: 旧ロジックでは ¥10,000 → TRIP になっていたが修正
+    expect(
+      classifyOtokogiEvent({ eventName: 'xxx', place: null, amount: 15_000 })
+    ).toBe('OTHER')
+    expect(
+      classifyOtokogiEvent({ eventName: 'xxx', place: null, amount: 10_000 })
+    ).toBe('OTHER')
   })
 
   test('小額かつキーワード無しで OTHER', () => {
