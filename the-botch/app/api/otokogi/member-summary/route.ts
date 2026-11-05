@@ -187,7 +187,8 @@ export async function GET(request: NextRequest) {
     const jankenParticipationMap = new Map(
       jankenParticipationStats.map((s) => [s.memberId, s._count])
     )
-    const jankenLostMap = new Map(jankenLostStats.map((s) => [s.payerId, s._count]))
+    // CEO ルール: じゃんけん勝者が奢る。payer = じゃんけんに勝って支払った人
+    const jankenPayerCountMap = new Map(jankenLostStats.map((s) => [s.payerId, s._count]))
     const clutchMap = new Map(
       clutchStats.map((s) => [s.payerId, { count: s._count, total: s._sum.amount ?? 0 }])
     )
@@ -200,9 +201,10 @@ export async function GET(request: NextRequest) {
       const shouldHavePaid = shouldHavePaidMap.get(member.id) ?? 0
 
       const jankenParticipated = jankenParticipationMap.get(member.id) ?? 0
-      const jankenLost = jankenLostMap.get(member.id) ?? 0
+      // CEO ルール「勝った人が奢る」: payer 回数 = じゃんけん勝利回数
+      const jankenPayerCount = jankenPayerCountMap.get(member.id) ?? 0
       const jankenWinRate =
-        jankenParticipated > 0 ? (jankenParticipated - jankenLost) / jankenParticipated : null
+        jankenParticipated > 0 ? jankenPayerCount / jankenParticipated : null
 
       const clutch = clutchMap.get(member.id)
 
