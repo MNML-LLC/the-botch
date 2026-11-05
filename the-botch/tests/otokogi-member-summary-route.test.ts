@@ -1,6 +1,10 @@
 /**
  * /api/otokogi/member-summary GET の単体テスト（じゃんけん勝率計算 重点）
  *
+ * CEO ルール「勝った人が奢る」:
+ *   jankenWinRate = payerCount (じゃんけん勝利 = 支払い) / jankenParticipation
+ *   Issue #407 で (participated - lost) / participated から反転
+ *
  * 実行: npx vitest run tests/otokogi-member-summary-route.test.ts
  */
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -108,7 +112,7 @@ describe('GET /api/otokogi/member-summary — じゃんけん勝率', () => {
   test('janken 参加 0 件のメンバーは jankenWinRate=null になる', async () => {
     setupMocks({
       jankenEventCount: 2,
-      // a は 2 回参加 / 1 回負け、b は参加なし
+      // a は 2 回参加 / 1 回 payer (= 1 勝)、b は参加なし
       jankenParticipationStats: [{ memberId: 'a', _count: 2 }],
       jankenLostStats: [{ payerId: 'a', _count: 1 }],
     })
@@ -122,15 +126,15 @@ describe('GET /api/otokogi/member-summary — じゃんけん勝率', () => {
     expect(data.hasJankenData).toBe(true)
     const a = data.members.find((m) => m.memberId === 'a')
     const b = data.members.find((m) => m.memberId === 'b')
-    expect(a?.jankenWinRate).toBe(0.5) // (2 - 1) / 2
+    expect(a?.jankenWinRate).toBe(0.5) // 1 / 2
     expect(b?.jankenWinRate).toBeNull()
   })
 
-  test('全勝: 参加 3 回 / 負け 0 回 → 1.0', async () => {
+  test('全勝: 参加 3 回 / payer 3 回 → 1.0 (CEO ルール: 勝った人が奢る)', async () => {
     setupMocks({
       jankenEventCount: 3,
       jankenParticipationStats: [{ memberId: 'a', _count: 3 }],
-      jankenLostStats: [], // a は 1 度も payer にならなかった
+      jankenLostStats: [{ payerId: 'a', _count: 3 }], // 3 回全部勝って奢った
     })
 
     const res = await GET(createRequest('/api/otokogi/member-summary'))
@@ -141,11 +145,11 @@ describe('GET /api/otokogi/member-summary — じゃんけん勝率', () => {
     expect(data.members.find((m) => m.memberId === 'a')?.jankenWinRate).toBe(1)
   })
 
-  test('全敗: 参加 3 回 / 負け 3 回 → 0.0', async () => {
+  test('全敗: 参加 3 回 / payer 0 回 → 0.0 (CEO ルール: 一度も勝って奢っていない)', async () => {
     setupMocks({
       jankenEventCount: 3,
       jankenParticipationStats: [{ memberId: 'a', _count: 3 }],
-      jankenLostStats: [{ payerId: 'a', _count: 3 }],
+      jankenLostStats: [], // a は 1 度も payer にならなかった = 全敗
     })
 
     const res = await GET(createRequest('/api/otokogi/member-summary'))
@@ -156,7 +160,7 @@ describe('GET /api/otokogi/member-summary — じゃんけん勝率', () => {
     expect(data.members.find((m) => m.memberId === 'a')?.jankenWinRate).toBe(0)
   })
 
-  test('半々: 参加 4 回 / 負け 2 回 → 0.5', async () => {
+  test('半々: 参加 4 回 / payer 2 回 → 0.5', async () => {
     setupMocks({
       jankenEventCount: 4,
       jankenParticipationStats: [{ memberId: 'a', _count: 4 }],
@@ -174,14 +178,14 @@ describe('GET /api/otokogi/member-summary — じゃんけん勝率', () => {
   test('複数メンバー同時: それぞれ独立に計算される', async () => {
     setupMocks({
       jankenEventCount: 6,
-      // a: 6回参加/0敗 (全勝), b: 6回参加/6敗 (全敗), c: 6回参加/3敗 (半々)
+      // a: 6回参加/6回 payer (全勝), b: 6回参加/0回 payer (全敗), c: 6回参加/3回 payer (半々)
       jankenParticipationStats: [
         { memberId: 'a', _count: 6 },
         { memberId: 'b', _count: 6 },
         { memberId: 'c', _count: 6 },
       ],
       jankenLostStats: [
-        { payerId: 'b', _count: 6 },
+        { payerId: 'a', _count: 6 },
         { payerId: 'c', _count: 3 },
       ],
     })
@@ -196,6 +200,35 @@ describe('GET /api/otokogi/member-summary — じゃんけん勝率', () => {
     expect(data.members.find((m) => m.memberId === 'a')?.jankenWinRate).toBe(1)
     expect(data.members.find((m) => m.memberId === 'b')?.jankenWinRate).toBe(0)
     expect(data.members.find((m) => m.memberId === 'c')?.jankenWinRate).toBe(0.5)
+  })
+
+  // Issue #407: 本番 member-summary の値再現 (CEO ルール「勝った人が奢る」)
+  test('本番値: おかじ 17.3% / ゆうき 43.5% (payer / participation)', async () => {
+    setupMocks({
+      members: [
+        { id: 'okaji', name: 'おかじ' },
+        { id: 'yuuki', name: 'ゆうき' },
+      ],
+      jankenEventCount: 100,
+      jankenParticipationStats: [
+        { memberId: 'okaji', _count: 1000 },
+        { memberId: 'yuuki', _count: 1000 },
+      ],
+      jankenLostStats: [
+        { payerId: 'okaji', _count: 173 }, // 173 / 1000 = 17.3%
+        { payerId: 'yuuki', _count: 435 }, // 435 / 1000 = 43.5%
+      ],
+    })
+
+    const res = await GET(createRequest('/api/otokogi/member-summary'))
+    const { data } = await parseResponse<{
+      members: Array<{ memberId: string; jankenWinRate: number | null }>
+    }>(res)
+
+    const okaji = data.members.find((m) => m.memberId === 'okaji')
+    const yuuki = data.members.find((m) => m.memberId === 'yuuki')
+    expect(okaji?.jankenWinRate).toBeCloseTo(0.173, 3)
+    expect(yuuki?.jankenWinRate).toBeCloseTo(0.435, 3)
   })
 })
 
