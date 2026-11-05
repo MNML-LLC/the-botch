@@ -534,9 +534,9 @@ function RankingSection({ data }: { data?: OtokogiByMember[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-slate-800">漢気ランキング</CardTitle>
+        <CardTitle className="text-slate-800">裏男気ランキング</CardTitle>
         <p className="text-xs text-gray-500 mt-0.5">
-          実際払った額 − 本来払うべき額 の累計 (期間内, 下の収支表と同値)
+          フェアシェア超過分 (実際払った額 − 本来払うべき額) の累計。期間内で再計算 (下の収支表と同値)。
         </p>
       </CardHeader>
       <CardContent>
@@ -555,7 +555,7 @@ function RankingSection({ data }: { data?: OtokogiByMember[] }) {
                 width={48}
               />
               <Tooltip
-                formatter={(value) => [`¥${Number(value).toLocaleString()}`, '漢気金額']}
+                formatter={(value) => [`¥${Number(value).toLocaleString()}`, '裏男気']}
               />
               <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
                 {chartData.map((entry, i) => (

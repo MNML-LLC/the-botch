@@ -55,7 +55,8 @@ describe('computeBadges', () => {
       const mvp = badges.find((b) => b.kind === 'mvp')
       expect(mvp).toBeDefined()
       expect(mvp?.id).toBe('mvp-FY26')
-      expect(mvp?.label).toBe('FY26 MVP (総額)')
+      expect(mvp?.label).toBe('FY26 MVP')
+      expect(mvp?.icon).toBe('💎')
     })
 
     test('2 位以下のメンバーには MVP は付与されない', () => {
@@ -88,7 +89,7 @@ describe('computeBadges', () => {
       })
       const mvp = computeBadges('a', ctx).find((b) => b.kind === 'mvp')
       expect(mvp?.id).toBe('mvp-2026')
-      expect(mvp?.label).toBe('2026 MVP (総額)')
+      expect(mvp?.label).toBe('2026 MVP')
     })
 
     test('Issue #393 回帰防止: actualPaid 1 位と otokogiAmount (超過) 1 位が別人でも actualPaid 側が MVP', () => {
@@ -181,7 +182,8 @@ describe('computeBadges', () => {
       const countKing = badges.find((b) => b.kind === 'count-king')
       expect(countKing).toBeDefined()
       expect(countKing?.id).toBe('count-king-FY26')
-      expect(countKing?.label).toBe('FY26 男気量産王')
+      expect(countKing?.label).toBe('FY26 量産王')
+      expect(countKing?.icon).toBe('⚡')
       expect(countKing?.description).toContain('30 回')
     })
 
@@ -263,7 +265,7 @@ describe('computeBadges', () => {
         streaks: [{ id: 'a', maxStreak: 7 }],
       })
       const badge = computeBadges('a', ctx).find((b) => b.kind === 'streak-king')
-      expect(badge?.label).toBe('ストリーク王 (7連勝)')
+      expect(badge?.label).toBe('FY26 連勝王 (7連勝)')
     })
   })
 

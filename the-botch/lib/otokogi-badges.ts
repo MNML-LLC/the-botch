@@ -103,8 +103,8 @@ export function computeBadges(memberId: string, ctx: BadgeContext): Badge[] {
     badges.push({
       kind: 'mvp',
       id: `mvp-${ctx.periodLabel}`,
-      label: `${ctx.periodLabel} MVP (総額)`,
-      icon: '🏆',
+      label: `${ctx.periodLabel} MVP`,
+      icon: '💎',
       color: 'bg-amber-100 text-amber-800',
       description: `${ctx.periodLabel} に支払った男気の "合計" 1 位 (¥${topActualPaid.actualPaid.toLocaleString()})。ガッツリ出した総大将。`,
     })
@@ -144,8 +144,8 @@ export function computeBadges(memberId: string, ctx: BadgeContext): Badge[] {
     badges.push({
       kind: 'count-king',
       id: `count-king-${ctx.periodLabel}`,
-      label: `${ctx.periodLabel} 男気量産王`,
-      icon: '🎖️',
+      label: `${ctx.periodLabel} 量産王`,
+      icon: '⚡',
       color: 'bg-emerald-100 text-emerald-800',
       description: `${ctx.periodLabel} に奢った件数 1 位 (${topCount.payerCount} 回)。コツコツ出し続けた量産型。`,
     })
@@ -158,7 +158,7 @@ export function computeBadges(memberId: string, ctx: BadgeContext): Badge[] {
       kind: 'clutch-master',
       id: 'clutch-master',
       label: 'クラッチマスター',
-      icon: '⚡',
+      icon: '💪',
       color: 'bg-orange-100 text-orange-700',
       description: `¥${CLUTCH_THRESHOLD.toLocaleString()} 以上の男気を ${summary.clutchCount} 回達成`,
     })
@@ -169,11 +169,11 @@ export function computeBadges(memberId: string, ctx: BadgeContext): Badge[] {
   if (streak && streak.maxStreak >= BADGE_STREAK_MIN) {
     badges.push({
       kind: 'streak-king',
-      id: 'streak-king',
-      label: `ストリーク王 (${streak.maxStreak}連勝)`,
+      id: `streak-king-${ctx.periodLabel}`,
+      label: `${ctx.periodLabel} 連勝王 (${streak.maxStreak}連勝)`,
       icon: '🔥',
       color: 'bg-red-100 text-red-700',
-      description: `連続男気 ${streak.maxStreak} 回`,
+      description: `${ctx.periodLabel} 内の連続男気 ${streak.maxStreak} 回`,
     })
   }
 
@@ -186,11 +186,11 @@ export function computeBadges(memberId: string, ctx: BadgeContext): Badge[] {
     if (topAvg.memberId === memberId && topAvg.averagePaymentAmount > 0) {
       badges.push({
         kind: 'generosity-emperor',
-        id: 'generosity-emperor',
-        label: '気前度の帝王 (平均)',
+        id: `generosity-emperor-${ctx.periodLabel}`,
+        label: `${ctx.periodLabel} 気前度の帝王`,
         icon: '👑',
         color: 'bg-yellow-100 text-yellow-800',
-        description: `1 回あたりの平均 payer 額 "平均" 1 位 (¥${topAvg.averagePaymentAmount.toLocaleString()})。1 回ごとに豪快。`,
+        description: `${ctx.periodLabel} の 1 回あたりの平均 payer 額 1 位 (¥${topAvg.averagePaymentAmount.toLocaleString()})。1 回ごとに豪快。`,
       })
     }
   }

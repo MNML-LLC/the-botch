@@ -158,7 +158,7 @@ function buildCards(props: RankingTitleCardsProps): TitleCard[] {
   if (count) {
     cards.push({
       kind: 'count-king',
-      icon: '🎖️',
+      icon: '⚡',
       title: '量産王',
       memberName: count.memberName,
       memberStyle: styleById.get(count.memberId) ?? null,
