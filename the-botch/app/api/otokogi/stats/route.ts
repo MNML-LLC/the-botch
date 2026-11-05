@@ -298,7 +298,7 @@ export async function GET(request: NextRequest) {
           FROM actual a
           FULL OUTER JOIN should s ON a.member_id = s.member_id`,
 
-      // 14. カテゴリ分類用の素データ (eventName / place / amount / 関連 Event.eventType)
+      // 14. カテゴリ分類用の素データ (eventName / place / amount / 明示 eventType / 関連 Event.eventType)
       prisma.otokogiEvent.findMany({
         where: eventWhere,
         select: {
@@ -306,6 +306,7 @@ export async function GET(request: NextRequest) {
           eventName: true,
           place: true,
           amount: true,
+          eventType: true,
           event: { select: { eventType: true } },
         },
       }),
@@ -493,6 +494,7 @@ export async function GET(request: NextRequest) {
         eventName: e.eventName,
         place: e.place,
         amount: e.amount,
+        explicitEventType: e.eventType ?? null,
         linkedEventType: e.event?.eventType ?? null,
       })
       categoryCount[category] += 1

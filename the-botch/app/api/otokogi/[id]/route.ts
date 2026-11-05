@@ -12,7 +12,7 @@ import {
   dateString,
   memberIdArray,
 } from '@/lib/api-validation'
-import { otokogiAmountSchema } from '@/lib/schemas/otokogi'
+import { otokogiAmountSchema, otokogiEventTypeSchema } from '@/lib/schemas/otokogi'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -25,6 +25,7 @@ const updateOtokogiSchema = z.object({
   place: limitedString('場所', 100).nullable().optional(),
   hasAlbum: z.boolean({ error: 'アルバム有無は true/false で指定してください' }).optional(),
   wasJanken: z.boolean({ error: 'じゃんけん有無は true/false で指定してください' }).optional(),
+  eventType: otokogiEventTypeSchema.nullable().optional(),
   memo: limitedString('メモ', 1000).nullable().optional(),
   participantIds: memberIdArray('参加メンバー')
     .min(1, { error: '参加メンバーを1人以上選択してください' })
@@ -74,7 +75,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const result = updateOtokogiSchema.safeParse(parsed.body)
     if (!result.success) return validationErrorResponse(result.error)
 
-    const { eventDate, eventName, payerId, amount, place, hasAlbum, wasJanken, memo, participantIds } = result.data
+    const { eventDate, eventName, payerId, amount, place, hasAlbum, wasJanken, eventType, memo, participantIds } = result.data
 
     const event = await prisma.$transaction(async (tx) => {
       // 参加者の更新がある場合は差し替え
@@ -100,6 +101,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
           ...(place !== undefined && { place }),
           ...(hasAlbum !== undefined && { hasAlbum }),
           ...(wasJanken !== undefined && { wasJanken }),
+          ...(eventType !== undefined && { eventType }),
           ...(memo !== undefined && { memo }),
         },
         include: {

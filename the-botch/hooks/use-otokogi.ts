@@ -34,6 +34,8 @@ type Member = {
   colorText: string;
 };
 
+export type OtokogiEventType = 'TRIP' | 'HANGOUT' | 'ACTIVITY' | 'OTHER';
+
 export type OtokogiEvent = {
   id: string;
   eventDate: string;
@@ -43,6 +45,7 @@ export type OtokogiEvent = {
   memo: string | null;
   hasAlbum: boolean;
   wasJanken: boolean;
+  eventType: OtokogiEventType | null;
   payer: Member;
   participants: { member: Member }[];
 };
@@ -78,6 +81,7 @@ export type OtokogiCreateInput = {
   place: string | null;
   hasAlbum: boolean;
   wasJanken: boolean;
+  eventType: OtokogiEventType | null;
   memo: string | null;
   eventId: string | null;
   participantIds: string[];
@@ -91,6 +95,7 @@ export type OtokogiUpdateInput = Partial<{
   place: string | null;
   hasAlbum: boolean;
   wasJanken: boolean;
+  eventType: OtokogiEventType | null;
   memo: string | null;
   participantIds: string[];
 }>;

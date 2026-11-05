@@ -21,9 +21,21 @@ import {
 import { ParticipantSelector } from '@/components/participant-selector';
 import { useMembers } from '@/hooks/use-members';
 import { useEvents } from '@/hooks/use-events';
-import { useCreateOtokogi } from '@/hooks/use-otokogi';
+import { useCreateOtokogi, type OtokogiEventType } from '@/hooks/use-otokogi';
 import { Yen } from '@/components/ui/yen';
 import { MIN_OTOKOGI_AMOUNT } from '@/lib/constants';
+
+// eventType "auto" = 自動判定 (null として送信)
+const EVENT_TYPE_AUTO = 'auto' as const;
+type EventTypeFormValue = OtokogiEventType | typeof EVENT_TYPE_AUTO;
+
+const EVENT_TYPE_OPTIONS: { value: EventTypeFormValue; label: string }[] = [
+  { value: EVENT_TYPE_AUTO, label: '自動判定' },
+  { value: 'TRIP', label: '🏞️ 旅行' },
+  { value: 'HANGOUT', label: '🍻 飲み会' },
+  { value: 'ACTIVITY', label: '🏃 アクティビティ' },
+  { value: 'OTHER', label: '📦 その他' },
+];
 
 function OtokogiNewForm() {
   const router = useRouter();
@@ -36,6 +48,7 @@ function OtokogiNewForm() {
   const [place, setPlace] = useState('');
   const [hasAlbum, setHasAlbum] = useState(false);
   const [wasJanken, setWasJanken] = useState(false);
+  const [eventType, setEventType] = useState<EventTypeFormValue>(EVENT_TYPE_AUTO);
   const [memo, setMemo] = useState('');
   const [participantIds, setParticipantIds] = useState<string[]>([]);
 
@@ -89,6 +102,7 @@ function OtokogiNewForm() {
       place: place || null,
       hasAlbum,
       wasJanken,
+      eventType: eventType === EVENT_TYPE_AUTO ? null : eventType,
       memo: memo || null,
       eventId: (eventId && eventId !== 'none') ? eventId : null,
       participantIds,
@@ -133,6 +147,28 @@ function OtokogiNewForm() {
               onChange={(e) => setEventName(e.target.value)}
               placeholder="例: chapter"
             />
+          </div>
+
+          <div>
+            <Label>カテゴリ</Label>
+            <Select
+              value={eventType}
+              onValueChange={(v) => setEventType(v as EventTypeFormValue)}
+            >
+              <SelectTrigger className="mt-1 w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {EVENT_TYPE_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-gray-400 mt-1">
+              「自動判定」はイベント名・場所・金額から推定します
+            </p>
           </div>
 
           {events.length > 0 && (

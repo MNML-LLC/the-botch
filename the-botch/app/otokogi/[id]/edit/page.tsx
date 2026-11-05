@@ -11,6 +11,13 @@ import { AmountInput } from '@/components/amount-input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { ParticipantSelector } from '@/components/participant-selector';
 import { ImageUpload } from '@/components/otokogi/image-upload';
 import { useMembers } from '@/hooks/use-members';
@@ -19,9 +26,22 @@ import {
   useOtokogiEvent,
   useUpdateOtokogi,
   type OtokogiEventDetail,
+  type OtokogiEventType,
 } from '@/hooks/use-otokogi';
 import { Yen } from '@/components/ui/yen';
 import { MIN_OTOKOGI_AMOUNT } from '@/lib/constants';
+
+// eventType "auto" = 自動判定 (null として送信)
+const EVENT_TYPE_AUTO = 'auto' as const;
+type EventTypeFormValue = OtokogiEventType | typeof EVENT_TYPE_AUTO;
+
+const EVENT_TYPE_OPTIONS: { value: EventTypeFormValue; label: string }[] = [
+  { value: EVENT_TYPE_AUTO, label: '自動判定' },
+  { value: 'TRIP', label: '🏞️ 旅行' },
+  { value: 'HANGOUT', label: '🍻 飲み会' },
+  { value: 'ACTIVITY', label: '🏃 アクティビティ' },
+  { value: 'OTHER', label: '📦 その他' },
+];
 
 type Member = {
   id: string;
@@ -37,6 +57,9 @@ function EditForm({ id, event, members }: { id: string; event: OtokogiEventDetai
   const [place, setPlace] = useState(event.place ?? '');
   const [hasAlbum, setHasAlbum] = useState(event.hasAlbum);
   const [wasJanken, setWasJanken] = useState(event.wasJanken ?? false);
+  const [eventType, setEventType] = useState<EventTypeFormValue>(
+    event.eventType ?? EVENT_TYPE_AUTO
+  );
   const [memo, setMemo] = useState(event.memo ?? '');
   const [participantIds, setParticipantIds] = useState<string[]>(
     event.participants.map((p) => p.member.id)
@@ -89,6 +112,7 @@ function EditForm({ id, event, members }: { id: string; event: OtokogiEventDetai
       place: place || null,
       hasAlbum,
       wasJanken,
+      eventType: eventType === EVENT_TYPE_AUTO ? null : eventType,
       memo: memo || null,
       participantIds,
     });
@@ -132,6 +156,28 @@ function EditForm({ id, event, members }: { id: string; event: OtokogiEventDetai
             onChange={(e) => setEventName(e.target.value)}
             placeholder="例: chapter"
           />
+        </div>
+
+        <div>
+          <Label>カテゴリ</Label>
+          <Select
+            value={eventType}
+            onValueChange={(v) => setEventType(v as EventTypeFormValue)}
+          >
+            <SelectTrigger className="mt-1 w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {EVENT_TYPE_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-gray-400 mt-1">
+            「自動判定」はイベント名・場所・金額から推定します
+          </p>
         </div>
 
         <hr className="border-gray-200" />

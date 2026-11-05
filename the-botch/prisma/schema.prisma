@@ -90,18 +90,19 @@ model MemberLineAccount {
 // 2. 男気イベント
 // ============================================================
 model OtokogiEvent {
-  id        String   @id @default(uuid())
-  eventDate DateTime @map("event_date") @db.Date
-  eventName String   @map("event_name") @db.VarChar(100)
-  payerId   String   @map("payer_id")
-  amount    Int      // 支払額（円）
-  place     String?  @db.VarChar(100)
-  hasAlbum  Boolean  @default(false) @map("has_album")
-  wasJanken Boolean  @default(false) @map("was_janken") // じゃんけんで決めたか（勝率計算の母数判定）
+  id        String     @id @default(uuid())
+  eventDate DateTime   @map("event_date") @db.Date
+  eventName String     @map("event_name") @db.VarChar(100)
+  payerId   String     @map("payer_id")
+  amount    Int        // 支払額（円）
+  place     String?    @db.VarChar(100)
+  hasAlbum  Boolean    @default(false) @map("has_album")
+  wasJanken Boolean    @default(false) @map("was_janken") // じゃんけんで決めたか（勝率計算の母数判定）
+  eventType EventType? @map("event_type") // 明示指定されたカテゴリ（null なら自動推定）
   memo      String?
-  eventId   String?  @map("event_id") // カレンダーイベント紐付け
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  eventId   String?    @map("event_id") // カレンダーイベント紐付け
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
 
   // リレーション
   payer        Member               @relation(fields: [payerId], references: [id])
