@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { handleApiError } from '@/lib/api-utils'
+import { parsePeriodFromSearchParams } from '@/lib/date-utils'
 import { CLUTCH_THRESHOLD } from '@/lib/constants'
 
 type ShouldHavePaidRow = {
@@ -99,19 +100,16 @@ function buildMaxSingleOtokogiQuery(fromDate: Date | null, toDate: Date | null) 
 
 // GET /api/otokogi/member-summary
 // クエリパラメータ:
+//   period=current-fy|... — 期間プリセット (from/to より優先)
 //   from=YYYY-MM-DD    — 開始日
 //   to=YYYY-MM-DD      — 終了日
 //   memberIds=id1,id2  — 表示するメンバー絞り込み（省略時は全員）
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const from = searchParams.get('from')
-    const to = searchParams.get('to')
+    const { from: fromDate, to: toDate } = parsePeriodFromSearchParams(searchParams)
     const memberIdsParam = searchParams.get('memberIds')
     const memberIdList = memberIdsParam ? memberIdsParam.split(',').filter(Boolean) : []
-
-    const fromDate = from ? new Date(from) : null
-    const toDate = to ? new Date(to) : null
 
     const hasDateFilter = !!(fromDate || toDate)
     const eventDateFilter = {
